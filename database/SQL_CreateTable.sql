@@ -54,15 +54,41 @@ CREATE TABLE menu_price_history (
     FOREIGN KEY (changed_by) REFERENCES admins(id) ON DELETE SET NULL
 );
 
+-- Tạo bảng carts
+CREATE TABLE carts (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    customer_id BIGINT NOT NULL,
+    qr_session_id BIGINT, 
+    status ENUM('ACTIVE','ORDERED','CANCELLED') DEFAULT 'ACTIVE',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES customers(idcustomers) ON DELETE CASCADE,
+    FOREIGN KEY (qr_session_id) REFERENCES qr_sessions(id) ON DELETE CASCADE
+);
+
+-- Tạo bảng cart_items
+CREATE TABLE cart_items (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    cart_id BIGINT NOT NULL,
+    menu_item_id BIGINT NOT NULL,
+    quantity INT DEFAULT 1,
+    note TEXT,
+    unit_price DECIMAL(12,2),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (cart_id) REFERENCES carts(id) ON DELETE CASCADE,
+    FOREIGN KEY (menu_item_id) REFERENCES menu_items(id) ON DELETE CASCADE
+);
+
 -- Bảng đơn đặt món
 CREATE TABLE orders (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     qr_session_id BIGINT,
+    cart_id BIGINT NULL,
     total_price DECIMAL(12,2) DEFAULT 0,
     status ENUM('NEW','IN_PROGRESS','DONE','PAID','CANCELLED') DEFAULT 'NEW',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (qr_session_id) REFERENCES qr_sessions(id) ON DELETE CASCADE
+    FOREIGN KEY (qr_session_id) REFERENCES qr_sessions(id) ON DELETE CASCADE,
+    FOREIGN KEY (cart_id) REFERENCES carts(id) ON DELETE SET NULL
 );
 
 -- Chi tiết món trong đơn hàng
