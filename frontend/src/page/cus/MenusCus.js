@@ -228,23 +228,23 @@ export default function CustomerMenuPage() {
             type="primary"
             shape="circle"
             icon={<HomeOutlined />}
-            style={{ background: getActiveColor("/customers/homes_cs") }}
-            onClick={() => navigate("/customers/homes_cs")}
+            style={{ background: getActiveColor("/cus/homes") }}
+            onClick={() => navigate("/cus/homes")}
           />
           {/* Chatbot */}
           <Button
             type="primary"
             shape="circle"
             icon={<MessageOutlined />}
-            style={{ background: getActiveColor("/customers/chatbot") }}
-            onClick={() => navigate("/customers/chatbot")}
+            style={{ background: getActiveColor("/cus/chatbot") }}
+            onClick={() => navigate("/cus/chatbot")}
           />
           {/* Orders + Badge */}
           <Button
             type="primary"
             shape="circle"
-            style={{ background: getActiveColor("/customers/orders") }}
-            onClick={() => navigate("/customers/orders")}
+            style={{ background: getActiveColor("/cus/carts") }}
+            onClick={() => navigate("/cus/carts")}
           >
             <Badge
               count={cartCount}
@@ -263,16 +263,16 @@ export default function CustomerMenuPage() {
             type="primary"
             shape="circle"
             icon={<FileTextOutlined />}
-            style={{ background: getActiveColor("/customers/bill") }}
-            onClick={() => navigate("/customers/bill")}
+            style={{ background: getActiveColor("/cus/bills") }}
+            onClick={() => navigate("/cus/bills")}
           />
           {/* Menu */}
           <Button
             type="primary"
             shape="circle"
             icon={<AppstoreOutlined />}
-            style={{ background: getActiveColor("/customers/menu") }}
-            onClick={() => navigate("/customers/menu")}
+            style={{ background: getActiveColor("/cus/menus") }}
+            onClick={() => navigate("/cus/menus")}
           />
         </Space>
       </Footer>
