@@ -5,6 +5,7 @@ import MenuPage from "./page/management/Main/Categorys";
 import CustomerPage from "./page/management/Main/Customers";
 import StaffPage from "./page/management/Main/Staffs";
 import HomecsPage from "./page/cus/HomesCus";
+import MenucsPage from "./page/cus/MenusCus";
 const routes = [
   {
     path: "/management/auth",
@@ -33,6 +34,10 @@ const routes = [
   {
     path: "/cus/homes",
     element: <HomecsPage />,
+  },
+  {
+    path: "/cus/menus",
+    element: <MenucsPage />,
   }
 ];
 
