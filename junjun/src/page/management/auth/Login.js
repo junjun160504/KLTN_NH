@@ -65,7 +65,7 @@ const LoginPage = () => {
             rules={[{ required: true, message: "Vui lòng nhập SĐT hoặc email" }]}
           >
             <Input
-              prefix={<UserOutlined style={{ fontSize: 50 }} />}
+              prefix={<UserOutlined style={{ fontSize: 40 }} />}
               placeholder="Nhập SDT hoặc email"
               size="large"
               style={{ marginBottom: 15, height: 70 }}
@@ -77,9 +77,10 @@ const LoginPage = () => {
             rules={[{ required: true, message: "Vui lòng nhập mật khẩu" }]}
           >
             <Input.Password
-              prefix={<LockOutlined />}
+              prefix={<LockOutlined style={{ fontSize: 40 }}/>}
               placeholder="Nhập mật khẩu"
               size="large"
+              style={{ marginBottom: 15, height: 70 }}
             />
           </Form.Item>
 
@@ -100,7 +101,7 @@ const LoginPage = () => {
               type="primary"
               htmlType="submit"
               block
-              onClick={() => navigate("/management/Home")}
+              onClick={() => navigate("/main/homes")}
               style={{ background: "#245c2a", width: 300, height: 60, }}
             >
               Đăng nhập
