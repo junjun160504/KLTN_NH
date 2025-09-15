@@ -1,4 +1,4 @@
--- Bảng khách hàng
+menu_items-- Bảng khách hàng
 CREATE TABLE customers (
     idcustomers BIGINT PRIMARY KEY AUTO_INCREMENT,
     phone VARCHAR(20) UNIQUE NOT NULL,
@@ -37,10 +37,17 @@ CREATE TABLE menu_items (
     name VARCHAR(255) NOT NULL,
     price DECIMAL(12,2) NOT NULL,
     description TEXT,
-    category_id BIGINT,
     image_url VARCHAR(255),
     is_available BOOLEAN DEFAULT TRUE,
-    FOREIGN KEY (category_id) REFERENCES menu_categories(id) ON DELETE SET NULL
+);
+
+-- Bảng trung gian món ăn, danh mục
+CREATE TABLE menu_item_categories (
+    item_id BIGINT,
+    category_id BIGINT,
+    PRIMARY KEY (item_id, category_id),
+    FOREIGN KEY (item_id) REFERENCES menu_items(id) ON DELETE CASCADE,
+    FOREIGN KEY (category_id) REFERENCES menu_categories(id) ON DELETE CASCADE
 );
 
 CREATE TABLE menu_price_history (
