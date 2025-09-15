@@ -6,6 +6,12 @@ import CustomerPage from "./page/management/Main/Customers";
 import StaffPage from "./page/management/Main/Staffs";
 import HomecsPage from "./page/cus/HomesCus";
 import MenucsPage from "./page/cus/MenusCus";
+import CartcsPage from "./page/cus/CartsCus";
+import BillcsPage from "./page/cus/BillsCus";
+import ChatbotcsPage from "./page/cus/ChatbotsCus";
+import ReviewcsPage from "./page/cus/ReviewsCus";
+import FoodReviewcsPage from "./page/cus/FoodReviewsCus";
+import LoyaltycsPage from "./page/cus/LoyaltysCus";
 const routes = [
   {
     path: "/management/auth",
@@ -38,6 +44,30 @@ const routes = [
   {
     path: "/cus/menus",
     element: <MenucsPage />,
+  },
+  {
+    path: "/cus/carts",
+    element: <CartcsPage />,
+  },
+  {
+    path: "/cus/bills",
+    element: <BillcsPage />,
+  },
+  {
+    path: "/cus/chatbot",
+    element: <ChatbotcsPage />,
+  },
+  {
+    path: "/cus/reviews",
+    element: <ReviewcsPage />,
+  },
+  {
+    path: "/cus/foodreviews",
+    element: <FoodReviewcsPage />,
+  },
+  {
+    path: "/cus/loyaltys",
+    element: <LoyaltycsPage />,
   }
 ];
 
