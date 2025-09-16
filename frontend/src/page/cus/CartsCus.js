@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import CustomerFooterNav from "../../components/CustomerFooterNav";
 import {
   Layout,
   Typography,
@@ -6,22 +7,14 @@ import {
   Button,
   InputNumber,
   Space,
-  Divider,
   message,
   Checkbox,
+  Modal,
 } from "antd";
-import {
-  HomeOutlined,
-  MessageOutlined,
-  ShoppingCartOutlined,
-  AppstoreOutlined,
-  FileTextOutlined,
-  DeleteOutlined,
-  ArrowLeftOutlined,
-} from "@ant-design/icons";
-import { useNavigate, useLocation } from "react-router-dom";
+import { DeleteOutlined, ArrowLeftOutlined } from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
 
-const { Header, Content, Footer } = Layout;
+const { Header, Content } = Layout;
 const { Title, Text } = Typography;
 
 export default function CustomerCartPage() {
@@ -47,29 +40,14 @@ export default function CustomerCartPage() {
       qty: 3,
       img: "https://source.unsplash.com/80x80/?springroll,vietnam",
     },
-    {
-      id: 4,
-      name: "Bún Bò Huế",
-      price: 75000,
-      qty: 1,
-      img: "https://source.unsplash.com/80x80/?bunbohue,vietnam",
-    },
-    {
-      id: 5,
-      name: "Cơm Tấm Sườn Nướng",
-      price: 65000,
-      qty: 2,
-      img: "https://source.unsplash.com/80x80/?comtam,vietnam",
-    },
   ]);
 
-  const [selectedItems, setSelectedItems] = useState(cart.map((i) => i.id)); // mặc định chọn tất cả
-
+  const [selectedItems, setSelectedItems] = useState(cart.map((i) => i.id));
+  const [isModalVisible, setIsModalVisible] = useState(false); // ✅ popup
   const navigate = useNavigate();
-  const location = useLocation();
 
-  // ✅ tổng số lượng trong giỏ (tất cả)
-  const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
+  // ✅ tổng số lượng trong giỏ
+  const cartCount = cart.reduce((sum, item) => sum + item.qty, 0);
 
   // ✅ tổng số lượng món được chọn
   const totalSelectedQty = cart
@@ -85,7 +63,11 @@ export default function CustomerCartPage() {
     if (qty <= 0) return;
     setCart(cart.map((item) => (item.id === id ? { ...item, qty } : item)));
   };
-
+  const handleCloseModal = () => {
+    setIsModalVisible(false);
+    setCart(cart.filter((item) => !selectedItems.includes(item.id))); // ❌ xóa món đã tick
+    setSelectedItems([]); // reset tick
+  };
   const removeItem = (id) => {
     setCart(cart.filter((item) => item.id !== id));
     setSelectedItems(selectedItems.filter((sid) => sid !== id));
@@ -102,9 +84,6 @@ export default function CustomerCartPage() {
     else setSelectedItems([]);
   };
 
-  const getActiveColor = (path) =>
-    location.pathname === path ? "orange" : "#226533";
-
   return (
     <Layout style={{ minHeight: "100vh", background: "#fafafa" }}>
       {/* -------- HEADER -------- */}
@@ -116,6 +95,11 @@ export default function CustomerCartPage() {
           alignItems: "center",
           justifyContent: "space-between",
           boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+          position: "fixed", // cố định header
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 1000,
         }}
       >
         <Button
@@ -123,23 +107,35 @@ export default function CustomerCartPage() {
           icon={<ArrowLeftOutlined />}
           onClick={() => navigate(-1)}
         />
-        <Title level={5} style={{ margin: 0 }}>
-          Giỏ hàng của bạn ({totalQty})
+        <Title
+          level={5}
+          style={{
+            margin: 0,
+            fontSize: 20,
+            color: "#226533",
+            fontWeight: "bold",
+            textAlign: "center",
+          }}
+        >
+          Giỏ hàng của bạn{" "}
+          <span style={{ color: "orangered" }}>({cartCount})</span>
         </Title>
+
         <Tag color="green" style={{ borderRadius: 12 }}>
           Bàn C8
         </Tag>
       </Header>
 
       {/* -------- CONTENT -------- */}
-      <Content style={{ padding: "12px", paddingBottom: "120px" }}>
+      <Content
+        style={{ padding: "12px", paddingTop: "60px", paddingBottom: "220px" }}
+      >
         {/* Chọn tất cả */}
         <div style={{ marginBottom: 12 }}>
           <Checkbox
             checked={selectedItems.length === cart.length}
             indeterminate={
-              selectedItems.length > 0 &&
-              selectedItems.length < cart.length
+              selectedItems.length > 0 && selectedItems.length < cart.length
             }
             onChange={(e) => toggleSelectAll(e.target.checked)}
           >
@@ -211,23 +207,22 @@ export default function CustomerCartPage() {
             />
           </div>
         ))}
+      </Content>
 
-        {/* Điểm tích luỹ */}
-        <div
-          style={{
-            background: "#f6ffed",
-            border: "1px solid #b7eb8f",
-            borderRadius: 8,
-            padding: 8,
-            marginBottom: 12,
-          }}
-        >
-          <Text strong>Điểm tích luỹ: </Text> 120 điểm (SDT: 09xx xxx xxx)
-        </div>
-
-        <Divider />
-
-        {/* Tổng số món ăn */}
+      {/* -------- TỔNG KẾT (cố định) -------- */}
+      <div
+        style={{
+          position: "fixed",
+          bottom: 70, // nằm trên CustomerFooterNav
+          left: 0,
+          right: 0,
+          background: "#fff",
+          padding: "12px 16px",
+          borderTop: "1px solid #eee",
+          boxShadow: "0 -2px 8px rgba(0,0,0,0.1)",
+          zIndex: 1000,
+        }}
+      >
         <div
           style={{
             display: "flex",
@@ -241,7 +236,6 @@ export default function CustomerCartPage() {
           </Text>
         </div>
 
-        {/* Tổng cộng */}
         <div
           style={{
             display: "flex",
@@ -255,87 +249,57 @@ export default function CustomerCartPage() {
           </Text>
         </div>
 
-        {/* Thời gian dự kiến */}
-        <Text type="secondary" style={{ display: "block", marginBottom: 8 }}>
-          ⏱ Thời gian dự kiến: ~20 phút
-        </Text>
-
-        {/* Nút đặt hàng */}
         <Button
           type="primary"
           block
           size="large"
+          style={{
+            background: "#226533",
+            fontWeight: "bold",
+            borderRadius: 8,
+          }}
           disabled={selectedItems.length === 0}
-          onClick={() =>
-            navigate("/cus/bills", {
-              state: {
-                selectedItems: cart.filter((i) =>
-                  selectedItems.includes(i.id)
-                ),
-              },
-            })
-          }
+          onClick={() => setIsModalVisible(true)} // ✅ bật popup
         >
           Đặt hàng ngay
         </Button>
-      </Content>
+      </div>
 
       {/* -------- FOOTER NAV -------- */}
-      <Footer
-        style={{
-          background: "#fff",
-          padding: "8px 16px",
-          boxShadow: "0 -2px 8px rgba(0,0,0,0.1)",
-          position: "fixed",
-          bottom: 0,
-          left: 0,
-          right: 0,
-        }}
+      <CustomerFooterNav cartCount={cartCount} />
+
+      {/* -------- POPUP -------- */}
+      <Modal
+        open={isModalVisible}
+        title="🎉 Đặt hàng thành công"
+        onCancel={handleCloseModal}
+        footer={null}
+        centered
       >
-        <Space
-          style={{
-            width: "100%",
-            justifyContent: "space-around",
-            display: "flex",
-          }}
-        >
+        <p>
+          Đơn hàng của bạn đã được gửi đến nhà hàng.
+          Hãy quay lại với chúng tôi khi muốn thanh toán nhé.
+        </p>
+        <p>Bạn có muốn order thêm không?</p>
+        <div style={{ textAlign: "center", marginTop: 16 }}>
           <Button
             type="primary"
-            shape="circle"
-            icon={<HomeOutlined />}
-            style={{ background: getActiveColor("/cus/homes") }}
-            onClick={() => navigate("/cus/homes")}
-          />
-          <Button
-            type="primary"
-            shape="circle"
-            icon={<MessageOutlined />}
-            style={{ background: getActiveColor("/cus/chatbot") }}
-            onClick={() => navigate("/cus/chatbot")}
-          />
-          <Button
-            type="primary"
-            shape="circle"
-            icon={<ShoppingCartOutlined />}
-            style={{ background: getActiveColor("/cus/carts") }}
-            onClick={() => navigate("/cus/carts")}
-          />
-          <Button
-            type="primary"
-            shape="circle"
-            icon={<FileTextOutlined />}
-            style={{ background: getActiveColor("/cus/bill") }}
-            onClick={() => navigate("/cus/bill")}
-          />
-          <Button
-            type="primary"
-            shape="circle"
-            icon={<AppstoreOutlined />}
-            style={{ background: getActiveColor("/cus/menu") }}
-            onClick={() => navigate("/cus/menu")}
-          />
-        </Space>
-      </Footer>
+            style={{ marginRight: 8 }}
+            onClick={() => {
+              setIsModalVisible(false);
+              navigate("/cus/menus"); // 👉 đi đến menu order thêm
+            }}
+          >
+            Order tiếp
+          </Button>
+          <Button onClick={() => {
+            setIsModalVisible(false);
+            navigate("/cus/homes"); // 👉 quay về màn chính
+          }}>
+            Về màn chính
+          </Button>
+        </div>
+      </Modal>
     </Layout>
   );
 }

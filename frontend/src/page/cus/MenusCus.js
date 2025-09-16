@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import CustomerFooterNav from "../../components/CustomerFooterNav";
 import {
   Layout,
   Input,
@@ -9,27 +10,15 @@ import {
   Row,
   Col,
   Space,
-  Badge,
 } from "antd";
-import {
-  SearchOutlined,
-  ShoppingCartOutlined,
-  HomeOutlined,
-  MessageOutlined,
-  AppstoreOutlined,
-  FileTextOutlined, // ✅ Icon hóa đơn
-} from "@ant-design/icons";
-import { useNavigate, useLocation } from "react-router-dom";
+import { SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 
-const { Header, Content, Footer } = Layout;
+const { Header, Content } = Layout;
 const { Title, Text } = Typography;
 
 export default function CustomerMenuPage() {
   const [selectedCategory, setSelectedCategory] = useState("Tất cả");
   const [cartCount, setCartCount] = useState(5); // ✅ Demo giỏ hàng có 5 sản phẩm
-
-  const navigate = useNavigate();
-  const location = useLocation();
 
   // ✅ Lời chào theo giờ
   const hour = new Date().getHours();
@@ -81,10 +70,6 @@ export default function CustomerMenuPage() {
     selectedCategory === "Tất cả"
       ? foods
       : foods.filter((f) => f.category === selectedCategory);
-
-  // ✅ Xác định màu active cho Footer Nav
-  const getActiveColor = (path) =>
-    location.pathname === path ? "orange" : "#226533";
 
   return (
     <Layout style={{ minHeight: "100vh", background: "#fafafa" }}>
@@ -202,80 +187,7 @@ export default function CustomerMenuPage() {
           ))}
         </Row>
       </Content>
-
-      {/* -------- FOOTER NAV -------- */}
-      <Footer
-        style={{
-          background: "#fff",
-          padding: "8px 16px",
-          boxShadow: "0 -2px 8px rgba(0,0,0,0.1)",
-          position: "fixed",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          zIndex: 1000,
-        }}
-      >
-        <Space
-          style={{
-            width: "100%",
-            justifyContent: "space-around",
-            display: "flex",
-          }}
-        >
-          {/* Home */}
-          <Button
-            type="primary"
-            shape="circle"
-            icon={<HomeOutlined />}
-            style={{ background: getActiveColor("/cus/homes") }}
-            onClick={() => navigate("/cus/homes")}
-          />
-          {/* Chatbot */}
-          <Button
-            type="primary"
-            shape="circle"
-            icon={<MessageOutlined />}
-            style={{ background: getActiveColor("/cus/chatbot") }}
-            onClick={() => navigate("/cus/chatbot")}
-          />
-          {/* Orders + Badge */}
-          <Button
-            type="primary"
-            shape="circle"
-            style={{ background: getActiveColor("/cus/carts") }}
-            onClick={() => navigate("/cus/carts")}
-          >
-            <Badge
-              count={cartCount}
-              offset={[0, 5]}
-              style={{
-                backgroundColor: "orange",
-                fontWeight: "bold",
-                boxShadow: "0 0 4px rgba(0,0,0,0.2)",
-              }}
-            >
-              <ShoppingCartOutlined style={{ fontSize: 18, color: "white" }} />
-            </Badge>
-          </Button>
-          {/* Bill */}
-          <Button
-            type="primary"
-            shape="circle"
-            icon={<FileTextOutlined />}
-            style={{ background: getActiveColor("/cus/bills") }}
-            onClick={() => navigate("/cus/bills")}
-          />
-          {/* Menu */}
-          <Button
-            type="primary"
-            shape="circle"
-            icon={<AppstoreOutlined />}
-            style={{ background: getActiveColor("/cus/menus") }}
-            onClick={() => navigate("/cus/menus")}
-          />
-        </Space>
-      </Footer>
+      <CustomerFooterNav cartCount={cartCount} />
     </Layout>
   );
 }
