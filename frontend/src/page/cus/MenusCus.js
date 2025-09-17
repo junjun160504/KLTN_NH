@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import CustomerFooterNav from "../../components/CustomerFooterNav";
 import {
   Layout,
@@ -17,8 +18,10 @@ const { Header, Content } = Layout;
 const { Title, Text } = Typography;
 
 export default function CustomerMenuPage() {
+  const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState("Tất cả");
   const [cartCount, setCartCount] = useState(5); // ✅ Demo giỏ hàng có 5 sản phẩm
+  const [searchText, setSearchText] = useState("");
 
   // ✅ Lời chào theo giờ
   const hour = new Date().getHours();
@@ -28,7 +31,13 @@ export default function CustomerMenuPage() {
   else greeting = "Chào buổi chiều";
 
   // ✅ Danh mục
-  const categories = ["Tất cả", "Món chính", "Đồ uống", "Tráng miệng", "Khuyến mãi"];
+  const categories = [
+    "Tất cả",
+    "Món chính",
+    "Đồ uống",
+    "Tráng miệng",
+    "Khuyến mãi",
+  ];
 
   // ✅ Dữ liệu món ăn mẫu
   const foods = [
@@ -66,10 +75,13 @@ export default function CustomerMenuPage() {
     },
   ];
 
-  const filteredFoods =
-    selectedCategory === "Tất cả"
-      ? foods
-      : foods.filter((f) => f.category === selectedCategory);
+  // ✅ Lọc món ăn theo category + tìm kiếm
+  const filteredFoods = foods.filter((f) => {
+    const matchCategory =
+      selectedCategory === "Tất cả" || f.category === selectedCategory;
+    const matchSearch = f.name.toLowerCase().includes(searchText.toLowerCase());
+    return matchCategory && matchSearch;
+  });
 
   return (
     <Layout style={{ minHeight: "100vh", background: "#fafafa" }}>
@@ -112,6 +124,8 @@ export default function CustomerMenuPage() {
         <Input
           placeholder="Tìm món ăn, đồ uống..."
           prefix={<SearchOutlined />}
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
           style={{
             borderRadius: 20,
             marginBottom: 12,
@@ -136,6 +150,7 @@ export default function CustomerMenuPage() {
               shape="round"
               size="small"
               onClick={() => setSelectedCategory(cat)}
+              
             >
               {cat}
             </Button>
@@ -159,6 +174,7 @@ export default function CustomerMenuPage() {
                     }}
                   />
                 }
+                onClick={() => navigate(`/food/${food.id}`, { state: food })}
                 style={{
                   borderRadius: 12,
                   boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
@@ -178,7 +194,10 @@ export default function CustomerMenuPage() {
                   icon={<ShoppingCartOutlined />}
                   block
                   shape="round"
-                  onClick={() => setCartCount(cartCount + 1)} // ✅ demo tăng giỏ
+                  onClick={(e) => {
+                    e.stopPropagation(); // tránh trigger click card
+                    setCartCount(cartCount + 1);
+                  }}
                 >
                   Thêm vào giỏ
                 </Button>
@@ -187,6 +206,8 @@ export default function CustomerMenuPage() {
           ))}
         </Row>
       </Content>
+
+      {/* Footer giỏ hàng */}
       <CustomerFooterNav cartCount={cartCount} />
     </Layout>
   );

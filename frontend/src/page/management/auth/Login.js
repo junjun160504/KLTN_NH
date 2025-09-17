@@ -1,9 +1,8 @@
 import React from "react";
 import { Form, Input, Button, Checkbox, Typography } from "antd";
 import { UserOutlined, LockOutlined } from "@ant-design/icons";
-import logo from "../../../assets/imgs/Logo.png"; //
+import logo from "../../../assets/imgs/Logo.png";
 import { useNavigate } from "react-router-dom";
-
 
 const { Title, Text } = Typography;
 
@@ -12,6 +11,12 @@ const LoginPage = () => {
 
   const onFinish = (values) => {
     console.log("Success:", values);
+    // chỉ chạy khi form hợp lệ
+    navigate("/main/homes");
+  };
+
+  const onFinishFailed = (errorInfo) => {
+    console.log("Failed:", errorInfo);
   };
 
   return (
@@ -26,8 +31,7 @@ const LoginPage = () => {
     >
       <div
         style={{
-          width: 800,
-          height: 600,
+          width: 600,
           padding: 30,
           borderRadius: 12,
           background: "#fff",
@@ -36,27 +40,25 @@ const LoginPage = () => {
         }}
       >
         {/* Logo */}
-        <img
-          src={logo}
-          alt="Logo"
-          style={{ height: 100, marginBottom: 20 }}
-        />
+        <img src={logo} alt="Logo" style={{ height: 100, marginBottom: 20 }} />
 
         {/* Tiêu đề */}
-        <Title level={3} style={{ margin: 0, color: "#245c2a", fontSize: 30, fontWeight: 'bold' }}>
+        <Title
+          level={3}
+          style={{ margin: 0, color: "#245c2a", fontSize: 30, fontWeight: "bold" }}
+        >
           Nhà hàng Phương Nam
         </Title>
 
         <br />
-        <Text style={{ fontSize: 20, color: "#0c0c0cff" }}>
-          Hệ thống quản lý
-        </Text>
+        <Text style={{ fontSize: 20, color: "#0c0c0cff" }}>Hệ thống quản lý</Text>
 
         {/* Form */}
         <Form
           name="login"
           initialValues={{ remember: true }}
           onFinish={onFinish}
+          onFinishFailed={onFinishFailed}
           layout="vertical"
           style={{ marginTop: 20, textAlign: "left" }}
         >
@@ -65,10 +67,10 @@ const LoginPage = () => {
             rules={[{ required: true, message: "Vui lòng nhập SĐT hoặc email" }]}
           >
             <Input
-              prefix={<UserOutlined style={{ fontSize: 40 }} />}
+              prefix={<UserOutlined style={{ fontSize: 30 }} />}
               placeholder="Nhập SDT hoặc email"
               size="large"
-              style={{ marginBottom: 15, height: 70 }}
+              style={{ marginBottom: 10, height: 60 }}
             />
           </Form.Item>
 
@@ -77,10 +79,10 @@ const LoginPage = () => {
             rules={[{ required: true, message: "Vui lòng nhập mật khẩu" }]}
           >
             <Input.Password
-              prefix={<LockOutlined style={{ fontSize: 40 }}/>}
+              prefix={<LockOutlined style={{ fontSize: 30 }} />}
               placeholder="Nhập mật khẩu"
               size="large"
-              style={{ marginBottom: 15, height: 70 }}
+              style={{ marginBottom: 10, height: 60 }}
             />
           </Form.Item>
 
@@ -96,13 +98,22 @@ const LoginPage = () => {
             </Form.Item>
             <a href="/forgot-password">Quên mật khẩu?</a>
           </div>
+
           <Form.Item style={{ display: "flex", justifyContent: "center" }}>
             <Button
               type="primary"
               htmlType="submit"
               block
-              onClick={() => navigate("/main/homes")}
-              style={{ background: "#245c2a", width: 300, height: 60, }}
+              style={{
+                background: "#245c2a",
+                width: 300,
+                height: 50,
+                fontSize: 20,
+                fontWeight: "bold",
+                fontFamily: "Arial, sans-serif",
+                letterSpacing: 1,
+                textTransform: "uppercase",
+              }}
             >
               Đăng nhập
             </Button>
