@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import CustomerFooterNav from "../../components/CustomerFooterNav";
 import {
   Layout,
   Input,
@@ -9,27 +11,17 @@ import {
   Row,
   Col,
   Space,
-  Badge,
 } from "antd";
-import {
-  SearchOutlined,
-  ShoppingCartOutlined,
-  HomeOutlined,
-  MessageOutlined,
-  AppstoreOutlined,
-  FileTextOutlined, // ✅ Icon hóa đơn
-} from "@ant-design/icons";
-import { useNavigate, useLocation } from "react-router-dom";
+import { SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 
-const { Header, Content, Footer } = Layout;
+const { Header, Content } = Layout;
 const { Title, Text } = Typography;
 
 export default function CustomerMenuPage() {
+  const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState("Tất cả");
   const [cartCount, setCartCount] = useState(5); // ✅ Demo giỏ hàng có 5 sản phẩm
-
-  const navigate = useNavigate();
-  const location = useLocation();
+  const [searchText, setSearchText] = useState("");
 
   // ✅ Lời chào theo giờ
   const hour = new Date().getHours();
@@ -39,7 +31,13 @@ export default function CustomerMenuPage() {
   else greeting = "Chào buổi chiều";
 
   // ✅ Danh mục
-  const categories = ["Tất cả", "Món chính", "Đồ uống", "Tráng miệng", "Khuyến mãi"];
+  const categories = [
+    "Tất cả",
+    "Món chính",
+    "Đồ uống",
+    "Tráng miệng",
+    "Khuyến mãi",
+  ];
 
   // ✅ Dữ liệu món ăn mẫu
   const foods = [
@@ -77,14 +75,13 @@ export default function CustomerMenuPage() {
     },
   ];
 
-  const filteredFoods =
-    selectedCategory === "Tất cả"
-      ? foods
-      : foods.filter((f) => f.category === selectedCategory);
-
-  // ✅ Xác định màu active cho Footer Nav
-  const getActiveColor = (path) =>
-    location.pathname === path ? "orange" : "#226533";
+  // ✅ Lọc món ăn theo category + tìm kiếm
+  const filteredFoods = foods.filter((f) => {
+    const matchCategory =
+      selectedCategory === "Tất cả" || f.category === selectedCategory;
+    const matchSearch = f.name.toLowerCase().includes(searchText.toLowerCase());
+    return matchCategory && matchSearch;
+  });
 
   return (
     <Layout style={{ minHeight: "100vh", background: "#fafafa" }}>
@@ -127,6 +124,8 @@ export default function CustomerMenuPage() {
         <Input
           placeholder="Tìm món ăn, đồ uống..."
           prefix={<SearchOutlined />}
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
           style={{
             borderRadius: 20,
             marginBottom: 12,
@@ -151,6 +150,7 @@ export default function CustomerMenuPage() {
               shape="round"
               size="small"
               onClick={() => setSelectedCategory(cat)}
+              
             >
               {cat}
             </Button>
@@ -174,6 +174,7 @@ export default function CustomerMenuPage() {
                     }}
                   />
                 }
+                onClick={() => navigate(`/food/${food.id}`, { state: food })}
                 style={{
                   borderRadius: 12,
                   boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
@@ -193,7 +194,10 @@ export default function CustomerMenuPage() {
                   icon={<ShoppingCartOutlined />}
                   block
                   shape="round"
-                  onClick={() => setCartCount(cartCount + 1)} // ✅ demo tăng giỏ
+                  onClick={(e) => {
+                    e.stopPropagation(); // tránh trigger click card
+                    setCartCount(cartCount + 1);
+                  }}
                 >
                   Thêm vào giỏ
                 </Button>
@@ -203,79 +207,8 @@ export default function CustomerMenuPage() {
         </Row>
       </Content>
 
-      {/* -------- FOOTER NAV -------- */}
-      <Footer
-        style={{
-          background: "#fff",
-          padding: "8px 16px",
-          boxShadow: "0 -2px 8px rgba(0,0,0,0.1)",
-          position: "fixed",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          zIndex: 1000,
-        }}
-      >
-        <Space
-          style={{
-            width: "100%",
-            justifyContent: "space-around",
-            display: "flex",
-          }}
-        >
-          {/* Home */}
-          <Button
-            type="primary"
-            shape="circle"
-            icon={<HomeOutlined />}
-            style={{ background: getActiveColor("/cus/homes") }}
-            onClick={() => navigate("/cus/homes")}
-          />
-          {/* Chatbot */}
-          <Button
-            type="primary"
-            shape="circle"
-            icon={<MessageOutlined />}
-            style={{ background: getActiveColor("/cus/chatbot") }}
-            onClick={() => navigate("/cus/chatbot")}
-          />
-          {/* Orders + Badge */}
-          <Button
-            type="primary"
-            shape="circle"
-            style={{ background: getActiveColor("/cus/carts") }}
-            onClick={() => navigate("/cus/carts")}
-          >
-            <Badge
-              count={cartCount}
-              offset={[0, 5]}
-              style={{
-                backgroundColor: "orange",
-                fontWeight: "bold",
-                boxShadow: "0 0 4px rgba(0,0,0,0.2)",
-              }}
-            >
-              <ShoppingCartOutlined style={{ fontSize: 18, color: "white" }} />
-            </Badge>
-          </Button>
-          {/* Bill */}
-          <Button
-            type="primary"
-            shape="circle"
-            icon={<FileTextOutlined />}
-            style={{ background: getActiveColor("/cus/bills") }}
-            onClick={() => navigate("/cus/bills")}
-          />
-          {/* Menu */}
-          <Button
-            type="primary"
-            shape="circle"
-            icon={<AppstoreOutlined />}
-            style={{ background: getActiveColor("/cus/menus") }}
-            onClick={() => navigate("/cus/menus")}
-          />
-        </Space>
-      </Footer>
+      {/* Footer giỏ hàng */}
+      <CustomerFooterNav cartCount={cartCount} />
     </Layout>
   );
 }

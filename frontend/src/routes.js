@@ -12,9 +12,10 @@ import ChatbotcsPage from "./page/cus/ChatbotsCus";
 import ReviewcsPage from "./page/cus/ReviewsCus";
 import FoodReviewcsPage from "./page/cus/FoodReviewsCus";
 import LoyaltycsPage from "./page/cus/LoyaltysCus";
+import FoodDetailcsPage from "./page/cus/FoodDetailsCus"; 
 const routes = [
   {
-    path: "/management/auth",
+    path: "/main/auth",
     element: <LoginPage />,
   },
   {
@@ -68,7 +69,12 @@ const routes = [
   {
     path: "/cus/loyaltys",
     element: <LoyaltycsPage />,
+  },
+  {
+    path: "/cus/fooddetails/:id",
+    element: <FoodDetailcsPage />,
   }
+
 ];
 
 export default routes;

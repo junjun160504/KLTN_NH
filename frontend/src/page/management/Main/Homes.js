@@ -9,27 +9,33 @@ import {
   Row,
   Col,
   Typography,
-  Space,
   Progress,
-  Tabs,
+  Select,
 } from "antd";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
 
 const { Content } = Layout;
 const { RangePicker } = DatePicker;
 const { Title, Text } = Typography;
+const { Option } = Select;
 
 const Home = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [pageTitle] = useState("Tổng quan");
   const [activeButton, setActiveButton] = useState("today");
-
-  // menu user
-  const userMenu = {
-    items: [
-      { key: "1", label: <span style={{ display: "block", marginBottom: 12 }}>Hồ sơ cá nhân</span> },
-      { key: "2", label: "Đăng xuất" },
-    ],
-  };
+  const [orderView, setOrderView] = useState("day"); // trạng thái cho biểu đồ đơn hàng
 
   // Danh sách nút lọc ngày
   const dateButtons = [
@@ -38,6 +44,35 @@ const Home = () => {
     { key: "30days", label: "30 ngày qua" },
     { key: "custom", label: "Tùy chọn" },
   ];
+
+  // Dữ liệu mẫu cho biểu đồ
+  const revenueData = [
+    { name: "Th1", value: 12000000 },
+    { name: "Th2", value: 18000000 },
+    { name: "Th3", value: 10000000 },
+  ];
+
+  const orderData = [
+    { name: "01/05", value: 30 },
+    { name: "02/05", value: 45 },
+    { name: "03/05", value: 20 },
+  ];
+
+  const orderBySession = [
+    { name: "Sáng", value: 40 },
+    { name: "Trưa", value: 30 },
+    { name: "Tối", value: 50 },
+  ];
+
+  const productData = [
+    { name: "Món A", value: 120 },
+    { name: "Món B", value: 90 },
+    { name: "Món C", value: 70 },
+    { name: "Món D", value: 50 },
+    { name: "Món E", value: 40 },
+  ];
+
+  const COLORS = ["#226533", "#2f9e44", "#52c41a", "#82ca9d", "#b7eb8f"];
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
@@ -50,7 +85,6 @@ const Home = () => {
           collapsed={collapsed}
           setCollapsed={setCollapsed}
           pageTitle={pageTitle}
-          userMenu={userMenu}
         />
 
         {/* Content */}
@@ -94,25 +128,35 @@ const Home = () => {
           <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
             <Col xs={24} sm={12} md={12} lg={6}>
               <Card>
-                <Title level={5} style={{ fontSize: 14, marginBottom: 8 }}>Số lượng đơn hàng</Title>
+                <Title level={5} style={{ fontSize: 14, marginBottom: 8 }}>
+                  Số lượng đơn hàng
+                </Title>
                 <Text strong style={{ fontSize: 16 }}>36</Text>
               </Card>
             </Col>
             <Col xs={24} sm={12} md={12} lg={6}>
               <Card>
-                <Title level={5} style={{ fontSize: 14, marginBottom: 8 }}>Doanh thu</Title>
+                <Title level={5} style={{ fontSize: 14, marginBottom: 8 }}>
+                  Doanh thu
+                </Title>
                 <Text strong style={{ fontSize: 16 }}>28,010,293 ₫</Text>
               </Card>
             </Col>
             <Col xs={24} sm={12} md={12} lg={6}>
               <Card>
-                <Title level={5} style={{ fontSize: 14, marginBottom: 8 }}>Lợi nhuận</Title>
-                <Text strong style={{ fontSize: 16, color: "#226533" }}>5,220,093 ₫</Text>
+                <Title level={5} style={{ fontSize: 14, marginBottom: 8 }}>
+                  Lợi nhuận
+                </Title>
+                <Text strong style={{ fontSize: 16, color: "#226533" }}>
+                  5,220,093 ₫
+                </Text>
               </Card>
             </Col>
             <Col xs={24} sm={12} md={12} lg={6}>
               <Card>
-                <Title level={5} style={{ fontSize: 14, marginBottom: 8 }}>Sản phẩm đã bán</Title>
+                <Title level={5} style={{ fontSize: 14, marginBottom: 8 }}>
+                  Sản phẩm đã bán
+                </Title>
                 <Text strong style={{ fontSize: 16 }}>77</Text>
               </Card>
             </Col>
@@ -121,30 +165,16 @@ const Home = () => {
           {/* Biểu đồ + Tổng quan doanh thu */}
           <Row gutter={[16, 16]}>
             <Col xs={24} lg={16}>
-              <Card
-                title={<span style={{ fontSize: 14 }}>Báo cáo doanh thu bán hàng</span>}
-                extra={
-                  <Tabs
-                    size="small"
-                    defaultActiveKey="1"
-                    items={[
-                      { key: "1", label: "Biểu đồ doanh thu" },
-                      { key: "2", label: "Theo đơn hàng" },
-                    ]}
-                  />
-                }
-              >
-                <div
-                  style={{
-                    height: 220,
-                    textAlign: "center",
-                    paddingTop: 80,
-                    fontSize: 14,
-                    color: "#888",
-                  }}
-                >
-                  [Biểu đồ doanh thu...]
-                </div>
+              <Card title="Báo cáo doanh thu bán hàng">
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={revenueData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="value" fill="#226533" />
+                  </BarChart>
+                </ResponsiveContainer>
               </Card>
             </Col>
 
@@ -167,48 +197,64 @@ const Home = () => {
 
           {/* Các dashboard bổ sung */}
           <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-            <Col xs={24} md={12}>
-              <Card title="Biểu đồ số lượng đơn hàng" style={{ height: 280 }}>
-                <div style={{ height: "100%", textAlign: "center", paddingTop: 80, fontSize: 14, color: "#888" }}>
-                  [Biểu đồ số lượng đơn hàng...]
-                </div>
-              </Card>
-            </Col>
-
-            <Col xs={24} md={12}>
-              <Card title="Doanh thu theo nhóm" style={{ height: 280 }}>
-                <div style={{ height: "100%", textAlign: "center", paddingTop: 80, fontSize: 14, color: "#888" }}>
-                  [Doanh thu theo nhóm...]
-                </div>
-              </Card>
-            </Col>
-
+            {/* Biểu đồ số lượng đơn hàng */}
             <Col xs={24} md={12}>
               <Card
-                title="Top sản phẩm bán chạy"
+                title="Biểu đồ số lượng đơn hàng"
                 extra={
-                  <Space>
-                    <select style={{ padding: "4px 8px", borderRadius: 4 }}>
-                      <option>Top sản phẩm</option>
-                    </select>
-                    <select style={{ padding: "4px 8px", borderRadius: 4 }}>
-                      <option>Theo số lượng</option>
-                    </select>
-                  </Space>
+                  <Select value={orderView} onChange={setOrderView} size="small">
+                    <Option value="day">Theo ngày</Option>
+                    <Option value="hour">Theo giờ</Option>
+                    <Option value="session">Theo buổi</Option>
+                  </Select>
                 }
-                style={{ height: 280 }}
+                style={{ height: 300 }}
               >
-                <div style={{ height: "100%", textAlign: "center", paddingTop: 80, fontSize: 14, color: "#888" }}>
-                  [Biểu đồ top sản phẩm...]
-                </div>
+                <ResponsiveContainer width="100%" height="100%">
+                  {orderView === "session" ? (
+                    <PieChart>
+                      <Pie
+                        data={orderBySession}
+                        dataKey="value"
+                        nameKey="name"
+                        outerRadius={100}
+                        label
+                      >
+                        {orderBySession.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Legend />
+                    </PieChart>
+                  ) : (
+                    <BarChart data={orderData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="#226533" />
+                    </BarChart>
+                  )}
+                </ResponsiveContainer>
               </Card>
             </Col>
 
+            {/* Top sản phẩm bán chạy */}
             <Col xs={24} md={12}>
-              <Card title="Phân bổ nguồn tiền thực thu" style={{ height: 280 }}>
-                <div style={{ height: "100%", textAlign: "center", paddingTop: 80, fontSize: 14, color: "#888" }}>
-                  [Biểu đồ phân bổ nguồn tiền...]
-                </div>
+              <Card title="Top sản phẩm bán chạy" style={{ height: 300 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    layout="vertical"
+                    data={productData}
+                    margin={{ top: 20, right: 30, left: 40, bottom: 20 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" />
+                    <YAxis dataKey="name" type="category" />
+                    <Tooltip />
+                    <Bar dataKey="value" fill="#226533" />
+                  </BarChart>
+                </ResponsiveContainer>
               </Card>
             </Col>
           </Row>

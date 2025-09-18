@@ -5,9 +5,9 @@ import {
   Input,
   Button,
   Checkbox,
-  message,
+  Modal,
 } from "antd";
-import { GiftOutlined, ArrowLeftOutlined } from "@ant-design/icons";
+import { GiftOutlined, ArrowLeftOutlined, SmileOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 
 const { Header, Content } = Layout;
@@ -16,23 +16,47 @@ const { Title, Text } = Typography;
 export default function CustomerLoyaltyPage() {
   const [phone, setPhone] = useState("");
   const [agree, setAgree] = useState(false);
+  const [error, setError] = useState(""); // ✅ lỗi hiển thị bên dưới
+  const [isSuccessModal, setIsSuccessModal] = useState(false); // ✅ popup thành công
   const navigate = useNavigate();
+
+  // ✅ validate nhập số
+  const handlePhoneChange = (e) => {
+    const value = e.target.value;
+
+    // Nếu nhập ký tự không phải số => reset và báo lỗi
+    if (/[^0-9]/.test(value)) {
+      setPhone("");
+      setError("Vui lòng nhập số điện thoại hợp lệ!");
+      return;
+    }
+
+    setPhone(value);
+    setError(""); // reset lỗi khi nhập đúng
+  };
 
   const handleSubmit = () => {
     if (!phone) {
-      message.error("Vui lòng nhập số điện thoại!");
+      setError("Vui lòng nhập số điện thoại!");
+      return;
+    }
+    if (phone.length < 10) {
+      setError("Số điện thoại phải có ít nhất 10 chữ số!");
       return;
     }
     if (!agree) {
-      message.error("Bạn cần đồng ý với điều khoản trước!");
+      setError("Hãy đồng ý với chính sách dịch vụ trước!");
       return;
     }
-    // ✅ Demo: Giả sử gọi API kiểm tra điểm
-    message.success(`Số ${phone} đã được tích điểm thành công! 🎉`);
-    navigate("/cus/homes"); // chuyển về Home
-  };
+    if (phone.length !== 10 || !/^0\d{9}$/.test(phone)) {
+      setError("Vui lòng nhập số điện thoại hợp lệ (10 số, bắt đầu bằng 0)");
+      return;
+    }
 
-  const isValidPhone = phone.length >= 9;
+    // ✅ Nếu pass hết thì hiển thị popup thành công
+    setIsSuccessModal(true);
+    setError("");
+  };
 
   return (
     <Layout style={{ minHeight: "100vh", background: "#fff" }}>
@@ -56,14 +80,31 @@ export default function CustomerLoyaltyPage() {
           alt="logo"
           style={{ height: 50, marginBottom: 0 }}
         />
-        <Title level={5} style={{ margin: 0, color: "#226533", fontWeight: "bold" , marginTop: 4, fontSize: 24}}>
+        <Title
+          level={5}
+          style={{
+            margin: 0,
+            color: "#226533",
+            fontWeight: "bold",
+            marginTop: 4,
+            fontSize: 24,
+          }}
+        >
           Nhà hàng Phương Nam
         </Title>
       </Header>
 
       {/* -------- CONTENT -------- */}
       <Content style={{ padding: "24px", textAlign: "center" }}>
-        <Title level={4} style={{ marginBottom: 19, color: "#226533", fontWeight: "bold", fontSize: 20 }}>
+        <Title
+          level={4}
+          style={{
+            marginBottom: 19,
+            color: "#226533",
+            fontWeight: "bold",
+            fontSize: 20,
+          }}
+        >
           Nhập số điện thoại
         </Title>
         <GiftOutlined
@@ -85,20 +126,21 @@ export default function CustomerLoyaltyPage() {
         <Input
           placeholder="09xx xxx xxx"
           value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          onChange={handlePhoneChange}
           style={{
             borderRadius: 8,
             height: 45,
-            marginBottom: 16,
+            marginBottom: 8,
             textAlign: "center",
           }}
+          maxLength={10}
         />
 
         {/* Checkbox */}
         <Checkbox
           checked={agree}
           onChange={(e) => setAgree(e.target.checked)}
-          style={{ marginBottom: 24 }}
+          style={{ marginBottom: 8 }}
         >
           Tôi đồng ý với{" "}
           <a href="/cus/" style={{ color: "#226533" }}>
@@ -106,19 +148,58 @@ export default function CustomerLoyaltyPage() {
           </a>
         </Checkbox>
 
+        {/* Hiển thị lỗi dưới checkbox */}
+        {error && (
+          <div style={{ color: "red", fontSize: 13, marginBottom: 16 }}>
+            {error}
+          </div>
+        )}
+
         {/* Button submit */}
         <Button
           type="primary"
           block
           size="large"
           shape="round"
-          disabled={!isValidPhone || !agree}
           onClick={handleSubmit}
-          style={{ background: "#226533", borderColor: "#226533", color: "#fff", fontWeight: "bold", fontSize: 16 }}
+          style={{
+            background: "#226533",
+            borderColor: "#226533",
+            color: "#fff",
+            fontWeight: "bold",
+            fontSize: 16,
+          }}
         >
           Tích điểm
         </Button>
       </Content>
+
+      {/* -------- MODAL THÀNH CÔNG -------- */}
+      <Modal
+        title="🎉 Tích điểm thành công!"
+        centered
+        open={isSuccessModal}
+        onCancel={() => setIsSuccessModal(false)}
+        footer={[
+          <Button
+            key="ok"
+            type="primary"
+            style={{ background: "#226533" }}
+            onClick={() => {
+              setIsSuccessModal(false);
+              navigate("/cus/homes"); // chuyển về Home
+            }}
+          >
+            Xác nhận
+          </Button>,
+        ]}
+      >
+        <div style={{ textAlign: "center", padding: 10 }}>
+          <SmileOutlined style={{ fontSize: 40, color: "#226533", marginBottom: 10 }} />
+          <p>Bạn đã được tích điểm thành công 🎉</p>
+          <p>Cảm ơn bạn đã lựa chọn <b>Phương Nam</b> 💚</p>
+        </div>
+      </Modal>
     </Layout>
   );
 }

@@ -1,24 +1,19 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import CustomerFooterNav from "../../components/CustomerFooterNav";
 import {
   Layout,
   Typography,
   Button,
   Input,
-  Space,
   Tag,
 } from "antd";
 import {
-  HomeOutlined,
-  MessageOutlined,
-  ShoppingCartOutlined,
-  AppstoreOutlined,
-  FileTextOutlined,
   ArrowLeftOutlined,
   SendOutlined,
 } from "@ant-design/icons";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
-const { Header, Content, Footer } = Layout;
+const { Header, Content } = Layout;
 const { Title } = Typography;
 
 export default function CustomerChatbotPage() {
@@ -26,27 +21,33 @@ export default function CustomerChatbotPage() {
     { from: "bot", text: "Xin chào! Tôi có thể giúp gì cho bạn hôm nay?" },
   ]);
   const [input, setInput] = useState("");
+  const [cartCount] = useState(5); // ✅ demo giỏ hàng
 
   const navigate = useNavigate();
-  const location = useLocation();
+  const messagesEndRef = useRef(null);
 
+  // ✅ Auto scroll khi có tin nhắn mới
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
+
+  // ✅ Gửi tin nhắn
   const handleSend = () => {
     if (!input.trim()) return;
-    // thêm tin nhắn của user
-    setMessages([...messages, { from: "user", text: input }]);
+
+    setMessages((prev) => [...prev, { from: "user", text: input }]);
     setInput("");
 
-    // giả lập bot trả lời
+    // Giả lập bot trả lời
     setTimeout(() => {
       setMessages((prev) => [
         ...prev,
-        { from: "bot", text: "Cảm ơn bạn đã nhắn! Nhân viên sẽ hỗ trợ ngay." },
+        { from: "bot", text: "Đang xử lý yêu cầu: " + input },
       ]);
     }, 1000);
   };
-
-  const getActiveColor = (path) =>
-    location.pathname === path ? "orange" : "#226533";
 
   return (
     <Layout style={{ minHeight: "100vh", background: "#fafafa" }}>
@@ -59,6 +60,11 @@ export default function CustomerChatbotPage() {
           alignItems: "center",
           justifyContent: "space-between",
           boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 1000,
         }}
       >
         <Button
@@ -66,25 +72,38 @@ export default function CustomerChatbotPage() {
           icon={<ArrowLeftOutlined />}
           onClick={() => navigate(-1)}
         />
-        <Title level={5} style={{ margin: 0 }}>
-          Chatbot hỗ trợ
+        <Title
+          level={5}
+          style={{
+            margin: 0,
+            color: "#226533",
+            fontWeight: "bold",
+            fontSize: 20,
+          }}
+        >
+          Chatbot
         </Title>
         <Tag color="green" style={{ borderRadius: 12 }}>
           Bàn C8
         </Tag>
       </Header>
 
-      {/* -------- CONTENT -------- */}
+      {/* -------- CONTENT (KHUNG CHAT) -------- */}
       <Content
         style={{
           padding: "12px",
-          paddingBottom: "100px",
-          display: "flex",
-          flexDirection: "column",
-          gap: "8px",
+          paddingTop: "60px", // chừa chỗ cho header
+          paddingBottom: "220px", // ✅ chừa chỗ cho gợi ý + input + footer nav
         }}
       >
-        <div style={{ flex: 1, overflowY: "auto", marginBottom: 12 }}>
+        <div
+          style={{
+            height: "calc(100vh - 230px)", // ✅ khung chat fix chiều cao
+            overflowY: "auto",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
           {messages.map((msg, index) => (
             <div
               key={index}
@@ -102,81 +121,87 @@ export default function CustomerChatbotPage() {
                   padding: "8px 12px",
                   borderRadius: 16,
                   maxWidth: "75%",
+                  fontSize: 16,
                 }}
               >
                 {msg.text}
               </div>
             </div>
           ))}
+          <div ref={messagesEndRef} />
         </div>
-
-        <Space.Compact style={{ width: "100%" }}>
-          <Input
-            placeholder="Nhập tin nhắn..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onPressEnter={handleSend}
-          />
-          <Button type="primary" icon={<SendOutlined />} onClick={handleSend} />
-        </Space.Compact>
       </Content>
 
-      {/* -------- FOOTER NAV -------- */}
-      <Footer
+      {/* -------- GỢI Ý CÂU HỎI -------- */}
+      <div
         style={{
-          background: "#fff",
-          padding: "8px 16px",
-          boxShadow: "0 -2px 8px rgba(0,0,0,0.1)",
           position: "fixed",
-          bottom: 0,
+          bottom: 120,
           left: 0,
           right: 0,
+          padding: "8px 12px",
+          background: "#fff",
+          borderTop: "1px solid #eee",
+          display: "flex",
+          overflowX: "auto",
+          whiteSpace: "nowrap",
+          gap: 8,
+          zIndex: 1000,
         }}
       >
-        <Space
-          style={{
-            width: "100%",
-            justifyContent: "space-around",
-            display: "flex",
-          }}
-        >
+        {[
+          "Món mới gần đây?",
+          "Món đặc trưng của nhà hàng?",
+          "Set đồ ăn cho 2 người?",
+          "Món nào ít cay?",
+        ].map((suggestion, i) => (
           <Button
-            type="primary"
-            shape="circle"
-            icon={<HomeOutlined />}
-            style={{ background: getActiveColor("/cus/homes") }}
-            onClick={() => navigate("/cus/homes")}
-          />
-          <Button
-            type="primary"
-            shape="circle"
-            icon={<MessageOutlined />}
-            style={{ background: getActiveColor("/cus/chatbot") }}
-            onClick={() => navigate("/cus/chatbot")}
-          />
-          <Button
-            type="primary"
-            shape="circle"
-            icon={<ShoppingCartOutlined />}
-            style={{ background: getActiveColor("/cus/carts") }}
-            onClick={() => navigate("/cus/carts")}
-          />
-          <Button
-            type="primary"
-            shape="circle"
-            icon={<FileTextOutlined />}
-            style={{ background: getActiveColor("/cus/bills") }}
-            onClick={() => navigate("/cus/bills")}
-          />
-          <Button
-            type="primary"
-            shape="circle"
-            icon={<AppstoreOutlined />}
-            style={{ background: getActiveColor("/cus/menus") }}
-            onClick={() => navigate("/cus/menus")}
-          />
-        </Space>
-      </Footer>
+            key={i}
+            size="medium"
+            onClick={() => {
+              setMessages((prev) => [
+                ...prev,
+                { from: "user", text: suggestion },
+              ]);
+              setTimeout(() => {
+                setMessages((prev) => [
+                  ...prev,
+                  { from: "bot", text: "Đang xử lý yêu cầu: " + suggestion },
+                ]);
+              }, 800);
+            }}
+          >
+            {suggestion}
+          </Button>
+        ))}
+      </div>
+
+      {/* -------- Ô nhập tin nhắn (cố định) -------- */}
+      <div
+        style={{
+          position: "fixed",
+          bottom: 70, // ✅ ngay trên FooterNav
+          left: 0,
+          right: 0,
+          padding: "8px 12px",
+          background: "#fff",
+          borderTop: "1px solid #eee",
+          display: "flex",
+          gap: 8,
+          zIndex: 1000,
+        }}
+      >
+        <Input
+          placeholder="Nhập tin nhắn..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onPressEnter={handleSend}
+        />
+        <Button type="primary" icon={<SendOutlined />} onClick={handleSend} />
+      </div>
+
+      {/* -------- FOOTER NAV -------- */}
+      <CustomerFooterNav cartCount={cartCount} />
     </Layout>
   );
 }
