@@ -108,7 +108,7 @@ export default function CustomerCartPage() {
           onClick={() => navigate(-1)}
         />
         <Title
-          level={5}
+          level={3}
           style={{
             margin: 0,
             fontSize: 20,

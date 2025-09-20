@@ -1,8 +1,8 @@
 import express from 'express';
-import { callStaff } from '../controllers/callStaff.controller.js';
+import { handleCallStaff } from '../controllers/callStaff.controller.js';
 
 const router = express.Router();
 
-router.get('/', callStaff);
+router.get('/', handleCallStaff);
 
 export default router;

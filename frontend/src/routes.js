@@ -4,6 +4,8 @@ import OrderPage from "./page/management/Main/Orders";
 import MenuPage from "./page/management/Main/Categorys";
 import CustomerPage from "./page/management/Main/Customers";
 import StaffPage from "./page/management/Main/Staffs";
+import ReportPage from "./page/management/Main/Reports";
+
 import HomecsPage from "./page/cus/HomesCus";
 import MenucsPage from "./page/cus/MenusCus";
 import CartcsPage from "./page/cus/CartsCus";
@@ -37,6 +39,10 @@ const routes = [
   {
     path: "/main/staffs",
     element: <StaffPage />,
+  },
+  {
+    path: "/main/reports",
+    element: <ReportPage />,
   },
   {
     path: "/cus/homes",
