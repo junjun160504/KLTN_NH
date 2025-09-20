@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Layout, Menu } from "antd";
 import {
   AppstoreOutlined,
@@ -8,6 +8,8 @@ import {
   TeamOutlined,
   RobotOutlined,
   BarChartOutlined,
+  TableOutlined,
+  WindowsOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 
@@ -16,15 +18,19 @@ const { Sider } = Layout;
 const AppSidebar = ({ collapsed, currentPageKey, setPageTitle }) => {
   const navigate = useNavigate();
 
+  // trạng thái submenu
+  const [openKeys, setOpenKeys] = useState([]);
+
   // map key -> path
   const keyToPath = {
     homes: "/main/homes",
     orders: "/main/orders",
-    categorys: "/main/categorys",
+    categorys: "/main/categorys", // Thực đơn
+    tables: "/main/tables",       // Bàn
     customers: "/main/customers",
     staffs: "/main/staffs",
     chatbot: "/main/chatbot",
-    report: "/main/report",
+    report: "/main/reports",
   };
 
   // map key -> title
@@ -32,10 +38,20 @@ const AppSidebar = ({ collapsed, currentPageKey, setPageTitle }) => {
     homes: "Tổng quan",
     orders: "Đơn hàng",
     categorys: "Thực đơn",
+    tables: "Bàn",
     customers: "Khách hàng",
-    staff: "Nhân viên",
+    staffs: "Nhân viên",
     chatbot: "Chatbot",
     report: "Báo cáo",
+  };
+
+  // toggle header submenu
+  const toggleSubmenu = (key) => {
+    if (openKeys.includes(key)) {
+      setOpenKeys(openKeys.filter((k) => k !== key)); // đang mở thì đóng
+    } else {
+      setOpenKeys([...openKeys, key]); // đang đóng thì mở
+    }
   };
 
   return (
@@ -73,15 +89,25 @@ const AppSidebar = ({ collapsed, currentPageKey, setPageTitle }) => {
       {/* Menu */}
       <Menu
         mode="inline"
-        selectedKeys={[currentPageKey]} // 👈 highlight menu theo trang
+        selectedKeys={[currentPageKey]}
+        openKeys={openKeys} // luôn lấy từ state
         onClick={(e) => {
-          navigate(keyToPath[e.key]); // điều hướng
-          if (setPageTitle) setPageTitle(keyToTitle[e.key]); // cập nhật title
+          navigate(keyToPath[e.key]);
+          if (setPageTitle) setPageTitle(keyToTitle[e.key]);
         }}
         items={[
           { key: "homes", icon: <AppstoreOutlined />, label: "Tổng quan" },
           { key: "orders", icon: <ShoppingCartOutlined />, label: "Đơn hàng" },
-          { key: "categorys", icon: <CoffeeOutlined />, label: "Thực đơn" },
+          {
+            key: "category",
+            icon: <WindowsOutlined />,
+            label: "Danh mục",
+            children: [
+              { key: "categorys", icon: <CoffeeOutlined />, label: "Thực đơn" },
+              { key: "tables", icon: <TableOutlined />, label: "Bàn" },
+            ],
+            onTitleClick: () => toggleSubmenu("category"), // 👈 tự toggle
+          },
           { key: "customers", icon: <UserOutlined />, label: "Khách hàng" },
           { key: "staffs", icon: <TeamOutlined />, label: "Nhân viên" },
           { key: "chatbot", icon: <RobotOutlined />, label: "Chatbot" },

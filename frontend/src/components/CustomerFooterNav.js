@@ -8,10 +8,12 @@ import {
   AppstoreOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useSelector } from "react-redux";
 
-export default function CustomerFooterNav({ cartCount = 0 }) {
+export default function CustomerFooterNav() {
   const navigate = useNavigate();
   const location = useLocation();
+  const count = useSelector((state) => state.cart.count);
 
   // ✅ Màu active cho icon
   const getActiveColor = (path) =>
@@ -72,7 +74,7 @@ export default function CustomerFooterNav({ cartCount = 0 }) {
           onClick={() => navigate("/cus/carts")}
         >
           <Badge
-            count={cartCount}
+            count={count}
             offset={[0, 5]}
             style={{
               backgroundColor: "orange",

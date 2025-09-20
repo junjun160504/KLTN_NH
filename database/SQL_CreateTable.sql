@@ -113,12 +113,12 @@ CREATE TABLE order_items (
 -- Bảng thanh toán
 CREATE TABLE payments (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    order_id BIGINT,
-    method ENUM('MOMO','VNPAY','CASH') NOT NULL,
+    qr_sessions_id BIGINT,
+    method ENUM('BANKING','CASH') NOT NULL,
     amount DECIMAL(12,2),
     paid_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     printed_bill BOOLEAN DEFAULT FALSE,
-    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+    FOREIGN KEY (qr_sessions_id) REFERENCES qr_sessions(id) ON DELETE CASCADE
 );
 
 -- Bảng tích điểm khách hàng

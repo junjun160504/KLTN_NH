@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CustomerFooterNav from "../../components/CustomerFooterNav";
 import {
@@ -6,83 +6,73 @@ import {
   Input,
   Button,
   Typography,
-  Tag,
   Card,
   Row,
   Col,
-  Space,
 } from "antd";
 import { SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
-
+import axios from "axios";
+import Slider from "react-slick";
+import { addToCart } from "../../redux/slices/cartSlice";
+import { useDispatch } from "react-redux";
 const { Header, Content } = Layout;
 const { Title, Text } = Typography;
-
+const REACT_APP_API_URL = process.env.REACT_APP_API_URL;
 export default function CustomerMenuPage() {
   const navigate = useNavigate();
-  const [selectedCategory, setSelectedCategory] = useState("Tất cả");
+  const [selectedCategory, setSelectedCategory] = useState("1");
   const [cartCount, setCartCount] = useState(5); // ✅ Demo giỏ hàng có 5 sản phẩm
   const [searchText, setSearchText] = useState("");
+  const [foods, setFoods] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const dispatch = useDispatch();
+  // GET items
+  async function callApiMenuCus(url) {
+    try {
+      const response = await axios.get(url);
+      console.log("API GET menu/cus/menus", response.data);
+      setFoods(response.data.data);
+    } catch (err) {
+      console.error("API GET error:", err);
+    }
+  }
+  // GET categories
+  async function callApiMenuCategoriesCus(url) {
+    try {
+      const response = await axios.get(url);
+      console.log("API GET menu/cus/menus/categories:", response.data);
+      setCategories(response.data.data);
+    } catch (err) {
+      console.error("API GET error:", err);
+    }
+  }
+  useEffect(() => {
+    if (searchText.trim() !== "") {
+      callApiMenuCus(
+        `${REACT_APP_API_URL}/menu/cus/menus/${encodeURIComponent(searchText)}`
+      );
+    }
+  }, [searchText])
+  //GET items by category
+  async function callApiMenuByCategory(id) {
+    try {
+      const response = await axios.get(`${REACT_APP_API_URL}/menu/cus/menus/category/${id}`);
+      setFoods(response.data.data);
+    } catch (err) {
+      console.error("API GET error:", err);
+    }
+  }
+  useEffect(() => {
+    callApiMenuCus(`${REACT_APP_API_URL}/menu/cus/menus/all`);
+    callApiMenuCategoriesCus(`${REACT_APP_API_URL}/menu/cus/menus/categories`);
 
-  // ✅ Lời chào theo giờ
-  const hour = new Date().getHours();
-  let greeting = "Chào buổi tối";
-  if (hour < 12) greeting = "Chào buổi sáng";
-  else if (hour < 18) greeting = "Chào buổi trưa";
-  else greeting = "Chào buổi chiều";
-
-  // ✅ Danh mục
-  const categories = [
-    "Tất cả",
-    "Món chính",
-    "Đồ uống",
-    "Tráng miệng",
-    "Khuyến mãi",
-  ];
-
-  // ✅ Dữ liệu món ăn mẫu
-  const foods = [
-    {
-      id: 1,
-      name: "Phở Bò Tái",
-      price: 65000,
-      desc: "Phở bò tái truyền thống với nước dùng đậm đà",
-      img: "https://source.unsplash.com/400x300/?pho,vietnamese",
-      category: "Món chính",
-    },
-    {
-      id: 2,
-      name: "Bánh Mì Thịt Nướng",
-      price: 35000,
-      desc: "Bánh mì giòn với thịt nướng thơm ngon",
-      img: "https://source.unsplash.com/400x300/?banhmi,vietnam",
-      category: "Món chính",
-    },
-    {
-      id: 3,
-      name: "Cơm Tấm Sườn Nướng",
-      price: 55000,
-      desc: "Cơm tấm với sườn nướng và trứng",
-      img: "https://source.unsplash.com/400x300/?comtam,vietnam",
-      category: "Món chính",
-    },
-    {
-      id: 4,
-      name: "Cà Phê Sữa Đá",
-      price: 25000,
-      desc: "Cà phê truyền thống Việt Nam thơm ngon",
-      img: "https://source.unsplash.com/400x300/?coffee,vietnam",
-      category: "Đồ uống",
-    },
-  ];
+  }, []);
 
   // ✅ Lọc món ăn theo category + tìm kiếm
-  const filteredFoods = foods.filter((f) => {
-    const matchCategory =
-      selectedCategory === "Tất cả" || f.category === selectedCategory;
-    const matchSearch = f.name.toLowerCase().includes(searchText.toLowerCase());
-    return matchCategory && matchSearch;
-  });
-
+  const filteredFoods = []
+  const handleSetCart = (food) => {
+    dispatch(addToCart());
+  }
   return (
     <Layout style={{ minHeight: "100vh", background: "#fafafa" }}>
       {/* -------- HEADER -------- */}
@@ -107,15 +97,7 @@ export default function CustomerMenuPage() {
         >
           Nhà hàng Phương Nam
         </Title>
-        <Text style={{ fontSize: 13, color: "#666", display: "block" }}>
-          Số 13 Mai Hắc Đế, phường Nguyễn Du, quận Hai Bà Trưng
-        </Text>
-        <Text style={{ fontSize: 13, color: "#666" }}>
-          {greeting} Quý khách • Bàn:{" "}
-          <Tag color="green" style={{ fontSize: 12, borderRadius: 12 }}>
-            C8
-          </Tag>
-        </Text>
+
       </Header>
 
       {/* -------- CONTENT -------- */}
@@ -134,39 +116,47 @@ export default function CustomerMenuPage() {
         />
 
         {/* Bộ lọc category */}
-        <Space
-          size={[8, 8]}
-          wrap
-          style={{
-            marginBottom: 16,
-            display: "flex",
-            justifyContent: "center",
-          }}
-        >
-          {categories.map((cat) => (
-            <Button
-              key={cat}
-              type={selectedCategory === cat ? "primary" : "default"}
-              shape="round"
-              size="small"
-              onClick={() => setSelectedCategory(cat)}
-              
-            >
-              {cat}
-            </Button>
-          ))}
-        </Space>
+        <div style={{ marginBottom: 20 }}>
+          <Slider
+            dots={false}
+            infinite={false}
+            variableWidth={true}
+            swipeToSlide={true}
+            arrows={false}
+          >
+            {categories.map((cat) => (
+              <div key={cat.id} style={{ padding: "0 6px" }}>
+                <Button
+                  type={selectedCategory == cat.id ? "primary" : "default"}
+                  shape="round"
+                  size="middle"
+                  onClick={() => {
+                    setSelectedCategory(cat.id);
+                    callApiMenuByCategory(cat.id); // gọi API lọc theo category
+                  }}
+                  style={{
+                    whiteSpace: "nowrap",
+                    padding: "0 16px",
+                    height: "32px",
+                  }}
+                >
+                  {cat.name}
+                </Button>
+              </div>
+            ))}
+          </Slider>
+        </div>
 
         {/* Danh sách món ăn */}
         <Row gutter={[12, 12]}>
-          {filteredFoods.map((food) => (
+          {foods.map((food) => (
             <Col xs={24} sm={12} key={food.id}>
               <Card
                 hoverable
                 cover={
                   <img
                     alt={food.name}
-                    src={food.img}
+                    src={food.image_url || "/assets/images/no-image.png"}
                     style={{
                       height: 150,
                       objectFit: "cover",
@@ -184,10 +174,10 @@ export default function CustomerMenuPage() {
                   {food.name}
                 </Title>
                 <Text strong style={{ color: "#d4380d" }}>
-                  {food.price.toLocaleString()}đ
+                  {Number(food.price).toLocaleString()}đ
                 </Text>
                 <p style={{ fontSize: 12, color: "#666", margin: "4px 0 8px" }}>
-                  {food.desc}
+                  {food.description}
                 </p>
                 <Button
                   type="primary"
@@ -196,7 +186,7 @@ export default function CustomerMenuPage() {
                   shape="round"
                   onClick={(e) => {
                     e.stopPropagation(); // tránh trigger click card
-                    setCartCount(cartCount + 1);
+                    handleSetCart(food);
                   }}
                 >
                   Thêm vào giỏ

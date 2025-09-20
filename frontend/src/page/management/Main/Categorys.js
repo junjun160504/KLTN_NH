@@ -1,96 +1,186 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import AppHeader from "../../../components/AppHeader";
 import AppSidebar from "../../../components/AppSidebar";
 import {
   Layout,
   Button,
   Space,
-  Card,
-  Row,
-  Col,
   Typography,
   Input,
   Select,
-  Pagination,
+  Table,
   Tag,
+  message,
+  Popconfirm,
 } from "antd";
+import axios from "axios";
 
 const { Content } = Layout;
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const { Option } = Select;
+
+const REACT_APP_API_URL = process.env.REACT_APP_API_URL;
 
 const MenuPage = () => {
   const [collapsed, setCollapsed] = useState(false);
-  const [pageTitle] = useState("Thực đơn");
-  const [activeCategory, setActiveCategory] = useState("Món đặc trưng");
+  const [pageTitle] = useState("Quản lý thực đơn");
 
-  // menu user
-  const userMenu = {
-    items: [
-      { key: "1", label: <span style={{ display: "block", marginBottom: 12 }}>Hồ sơ cá nhân</span> },
-      { key: "2", label: "Đăng xuất" },
-    ],
-  };
+  const [allFoods, setAllFoods] = useState([]); // dữ liệu gốc
+  const [foods, setFoods] = useState([]); // dữ liệu hiển thị
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  // danh sách category
-  const categories = [
-    "Món đặc trưng",
-    "Set Menu",
-    "Cuốn Phương Nam",
-    "Nộm Thanh Mát",
-    "Món ăn chơi",
-    "Món rau nhẹ",
-    "Món ngon vườn nhà",
+  const [searchText, setSearchText] = useState("");
+  const [activeCategory, setActiveCategory] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  // ================= API =================
+  async function fetchFoods() {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${REACT_APP_API_URL}/menu/cus/menus/all`);
+      const data = res.data.data || [];
+      setAllFoods(data);
+      setFoods(data);
+    } catch (err) {
+      console.error("API GET error:", err);
+      message.error("Không tải được món ăn");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function fetchCategories() {
+    try {
+      const res = await axios.get(
+        `${REACT_APP_API_URL}/menu/cus/menus/categories`
+      );
+      setCategories(res.data.data || []);
+    } catch (err) {
+      console.error("API GET error:", err);
+      message.error("Không tải được danh mục");
+    }
+  }
+
+  async function handleDeleteFood(id) {
+    try {
+      await axios.delete(`${REACT_APP_API_URL}/menu/manage/delete/${id}`);
+      message.success("Xóa món ăn thành công");
+      fetchFoods();
+    } catch (err) {
+      console.error("API DELETE error:", err);
+      message.error("Xóa món ăn thất bại");
+    }
+  }
+
+  // ================= Effect =================
+  useEffect(() => {
+    fetchCategories();
+    fetchFoods();
+  }, []);
+
+  // ================= Filter logic =================
+  useEffect(() => {
+    let filtered = [...allFoods];
+
+    // lọc theo tên
+    if (searchText.trim() !== "") {
+      filtered = filtered.filter((f) =>
+        f.name.toLowerCase().includes(searchText.toLowerCase())
+      );
+    }
+
+    // lọc theo danh mục
+    if (activeCategory !== "all") {
+      filtered = filtered.filter(
+        (f) => String(f.categoryId) === String(activeCategory)
+      );
+    }
+
+    // lọc theo trạng thái
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(
+        (f) =>
+          (statusFilter === "active" && f.is_available === 1) ||
+          (statusFilter === "inactive" && f.is_available === 0)
+      );
+    }
+
+    setFoods(filtered);
+  }, [searchText, activeCategory, statusFilter, allFoods]);
+
+  // ================= Columns Table =================
+  const columns = [
+    {
+      title: "Tên món",
+      dataIndex: "name",
+      key: "name",
+      sorter: (a, b) => (a.name || "").localeCompare(b.name || "", "vi"),
+    },
+    {
+      title: "Giá",
+      dataIndex: "price",
+      key: "price",
+      sorter: (a, b) => (a.price || 0) - (b.price || 0),
+      render: (price) => (
+        <Text strong style={{ color: "#226533" }}>
+          {Number(price).toLocaleString()}đ
+        </Text>
+      ),
+    },
+    {
+      title: "Danh mục",
+      dataIndex: "categoryName",
+      key: "categoryName",
+      sorter: (a, b) =>
+        (a.categoryName || "").localeCompare(b.categoryName || "", "vi"),
+      render: (cat) => <Tag color="blue">{cat || "Chưa có"}</Tag>,
+    },
+    {
+      title: "Trạng thái",
+      dataIndex: "is_available",
+      key: "is_available",
+      sorter: (a, b) => (a.is_available || 0) - (b.is_available || 0),
+      render: (val) =>
+        val === 1 ? (
+          <Tag color="green">Đang bán</Tag>
+        ) : (
+          <Tag color="red">Ngừng bán</Tag>
+        ),
+    },
+    {
+      title: "Hành động",
+      key: "action",
+      render: (_, record) => (
+        <Space>
+          <Button size="small">Chỉnh sửa</Button>
+          <Popconfirm
+            title="Bạn có chắc chắn muốn xóa món này?"
+            onConfirm={() => handleDeleteFood(record.id)}
+            okText="Xóa"
+            cancelText="Hủy"
+          >
+            <Button size="small" danger>
+              Xóa
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
   ];
 
-  // dữ liệu món ăn mẫu
-  const foodData = [
-    {
-      key: "1",
-      name: "Phở Bò Tái",
-      price: "85,000đ",
-      category: "Món chính",
-      status: "Đang bán",
-      img: "/assets/images/pho.jpg",
-    },
-    {
-      key: "2",
-      name: "Gỏi Cuốn Tôm",
-      price: "45,000đ",
-      category: "Khai vị",
-      status: "Đang bán",
-      img: "/assets/images/goicuon.jpg",
-    },
-    {
-      key: "3",
-      name: "Cá Nướng Lá Chuối",
-      price: "150,000đ",
-      category: "Món chính",
-      status: "Ngừng bán",
-      img: "/assets/images/canuong.jpg",
-    },
-    {
-      key: "4",
-      name: "Cà Phê Sữa Đá",
-      price: "25,000đ",
-      category: "Đồ uống",
-      status: "Đang bán",
-      img: "/assets/images/caphe.jpg",
-    },
-  ];
-
+  // ================= Render =================
   return (
     <Layout style={{ minHeight: "100vh" }}>
-      {/* Sidebar dùng chung */}
+      {/* Sidebar */}
       <AppSidebar collapsed={collapsed} currentPageKey="categorys" />
 
       <Layout style={{ marginLeft: collapsed ? 80 : 220 }}>
-        {/* Header dùng chung */}
+        {/* Header */}
         <AppHeader
           collapsed={collapsed}
           setCollapsed={setCollapsed}
           pageTitle={pageTitle}
-          userMenu={userMenu}
         />
 
         {/* Content */}
@@ -103,21 +193,47 @@ const MenuPage = () => {
             overflow: "auto",
           }}
         >
-          {/* Bộ lọc và thao tác */}
+          {/* Bộ lọc */}
           <div
             style={{
+              marginBottom: 20,
               display: "flex",
               justifyContent: "space-between",
-              marginBottom: 20,
               flexWrap: "wrap",
               gap: 12,
+              alignItems: "center",
             }}
           >
-            <Input.Search placeholder="Tìm món ăn..." style={{ width: 450 }} />
-            <Select defaultValue="price" style={{ width: 150 }}>
-              <Option value="price">Theo giá</Option>
-              <Option value="name">Theo tên</Option>
+            <Input.Search
+              placeholder="Tìm món ăn..."
+              style={{ width: 250 }}
+              onSearch={(val) => setSearchText(val)}
+              allowClear
+            />
+
+            <Select
+              value={activeCategory}
+              style={{ width: 200 }}
+              onChange={(val) => setActiveCategory(val)}
+            >
+              <Option value="all">Tất cả danh mục</Option>
+              {categories.map((cat) => (
+                <Option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </Option>
+              ))}
             </Select>
+
+            <Select
+              value={statusFilter}
+              style={{ width: 200 }}
+              onChange={(val) => setStatusFilter(val)}
+            >
+              <Option value="all">Tất cả trạng thái</Option>
+              <Option value="active">Đang bán</Option>
+              <Option value="inactive">Ngừng bán</Option>
+            </Select>
+
             <Space>
               <Button>Xuất danh mục</Button>
               <Button type="primary" style={{ background: "#226533" }}>
@@ -126,71 +242,14 @@ const MenuPage = () => {
             </Space>
           </div>
 
-          {/* Nút phân loại món ăn */}
-          <div
-            style={{ marginBottom: 20, display: "flex", flexWrap: "wrap", gap: 10 }}
-          >
-            {categories.map((cat, index) => (
-              <Button
-                key={index}
-                shape="round"
-                type={activeCategory === cat ? "primary" : "default"}
-                style={{
-                  borderColor: "#226533",
-                  color: activeCategory === cat ? "#fff" : "#226533",
-                  background: activeCategory === cat ? "#226533" : "#fff",
-                }}
-                onClick={() => setActiveCategory(cat)}
-              >
-                {cat}
-              </Button>
-            ))}
-          </div>
-
-          {/* Danh sách món ăn */}
-          <Row gutter={[16, 16]}>
-            {foodData.map((item) => (
-              <Col xs={24} sm={12} md={12} lg={6} key={item.key}>
-                <Card
-                  hoverable
-                  cover={
-                    <img
-                      alt={item.name}
-                      src={item.img}
-                      style={{ height: 160, objectFit: "cover" }}
-                    />
-                  }
-                >
-                  <Title level={5}>{item.name}</Title>
-                  <Text strong style={{ color: "#226533" }}>{item.price}</Text>
-                  <br />
-                  <Tag color="blue">{item.category}</Tag>
-                  <p style={{ marginTop: 4 }}>{item.status}</p>
-                  <Space>
-                    <Button size="small">Chỉnh sửa</Button>
-                    {item.status === "Ngừng bán" ? (
-                      <Button danger size="small">Ngừng bán</Button>
-                    ) : (
-                      <Button type="primary" size="small">Ngừng bán</Button>
-                    )}
-                  </Space>
-                </Card>
-              </Col>
-            ))}
-          </Row>
-
-          {/* Phân trang */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginTop: 20,
-            }}
-          >
-            <Text>Hiển thị 1 đến 5 trong tổng số 127 món ăn</Text>
-            <Pagination defaultCurrent={1} total={127} pageSize={5} />
-          </div>
+          {/* Bảng */}
+          <Table
+            rowKey="id"
+            loading={loading}
+            columns={columns}
+            dataSource={foods}
+            pagination={{ pageSize: 8 }}
+          />
         </Content>
       </Layout>
     </Layout>

@@ -64,5 +64,31 @@ INSERT INTO qr_sessions (table_id, customer_id, status) VALUES
 (3, null, 'ACTIVE');
 
 
+-- test thử
+-- Phiên QR tại bàn số 1
+INSERT INTO qr_sessions (id, table_id, customer_id)
+VALUES (1, 1, 1);
 
+-- Giỏ hàng của khách
+INSERT INTO carts (id, customer_id, qr_session_id, status)
+VALUES (1, 1, 1, 'ACTIVE');
+
+-- Chi tiết giỏ hàng
+INSERT INTO cart_items (id, cart_id, menu_item_id, quantity, note, unit_price)
+VALUES 
+(1, 1, 1, 2, 'Ít cay', 128000),
+(2, 1, 2, 1, NULL, 58000); 
+
+-- Đơn hàng
+INSERT INTO orders (id, qr_session_id)
+VALUES (1, 1);
+
+INSERT INTO order_items (id, order_id, menu_item_id, quantity, unit_price, note)
+VALUES
+(1, 1, 1, 2, 128000, 'Ít cay'),   
+(2, 1, 2, 1, 58000, NULL);  
+
+-- Thanh toán
+INSERT INTO payments (qr_session_id, method, printed_bill)
+VALUES (1, 'CASH', 1);
 
