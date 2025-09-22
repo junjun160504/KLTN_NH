@@ -218,7 +218,10 @@ const Home = () => {
                         dataKey="value"
                         nameKey="name"
                         outerRadius={100}
-                        label
+                        label={{
+                          type: "spider", 
+                          content: "{name} {percentage}",
+                        }}
                       >
                         {orderBySession.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

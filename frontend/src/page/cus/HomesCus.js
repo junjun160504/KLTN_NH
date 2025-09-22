@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import  { useState } from "react";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import {
@@ -21,7 +21,8 @@ import {
   WechatOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-
+import { useParams } from "react-router-dom";
+import React, { useEffect } from "react";
 const { Header, Content, Footer } = Layout;
 const { Title, Text } = Typography;
 
@@ -29,6 +30,14 @@ export default function HomecsPage() {
   const navigate = useNavigate();
   const [isModalVisible, setIsModalVisible] = useState(false);
 
+  const { tableId } = useParams();
+  console.log("Table ID from URL:", tableId);
+  useEffect(() => {
+    if (tableId) {
+      // lưu tableId vào sessionStorage
+      sessionStorage.setItem("tableId", tableId);
+    }
+  }, [tableId]);
   // Tính chào theo giờ
   const hour = new Date().getHours();
   let greeting = "Chào buổi tối Quý khách";

@@ -3,9 +3,18 @@ import routes from "./routes";
 import AppTheme from "./components/AppTheme";
 import CustomerMenuPage from "./page/cus/MenusCus";
 import FoodDetailPage from "./page/cus/FoodDetailsCus";
-
+import { useEffect } from "react";
+import { useDispatch } from "react-redux";
+import { addToCart } from "./redux/slices/cartSlice";
 
 function App() {
+  const dispatch = useDispatch();
+  useEffect(() => {
+    const savedOrder = sessionStorage.getItem("order");
+    if (savedOrder) {
+      dispatch(addToCart(JSON.parse(savedOrder)));
+    }
+  }, []);
   return (
     <AppTheme>
       <BrowserRouter>
