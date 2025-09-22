@@ -2,9 +2,13 @@ import LoginPage from "./page/management/auth/Login";
 import Home from "./page/management/Main/Homes";
 import OrderPage from "./page/management/Main/Orders";
 import MenuPage from "./page/management/Main/Categorys";
+import TablePage from "./page/management/Main/Tables";
 import CustomerPage from "./page/management/Main/Customers";
 import StaffPage from "./page/management/Main/Staffs";
-import ReportPage from "./page/management/Main/Reports";
+import ReportsSalesPage from "./page/management/Main/ReportsSales";
+import ReportsProductsPage from "./page/management/Main/ReportsProducts";
+import ReportsCustomersPage from "./page/management/Main/ReportsCustomers";
+import ReportsChatbotPage from "./page/management/Main/ReportsChatbots";
 
 import HomecsPage from "./page/cus/HomesCus";
 import MenucsPage from "./page/cus/MenusCus";
@@ -14,7 +18,7 @@ import ChatbotcsPage from "./page/cus/ChatbotsCus";
 import ReviewcsPage from "./page/cus/ReviewsCus";
 import FoodReviewcsPage from "./page/cus/FoodReviewsCus";
 import LoyaltycsPage from "./page/cus/LoyaltysCus";
-import FoodDetailcsPage from "./page/cus/FoodDetailsCus"; 
+import FoodDetailcsPage from "./page/cus/FoodDetailsCus";
 const routes = [
   {
     path: "/main/auth",
@@ -28,9 +32,13 @@ const routes = [
     path: "/main/orders",
     element: <OrderPage />,
   },
-  { 
+  {
     path: "/main/categorys",
     element: <MenuPage />,
+  },
+  {
+    path: "/main/tables",
+    element: <TablePage />,
   },
   {
     path: "/main/customers",
@@ -41,11 +49,23 @@ const routes = [
     element: <StaffPage />,
   },
   {
-    path: "/main/reports",
-    element: <ReportPage />,
+    path: "/main/reports/sales",
+    element: <ReportsSalesPage />,
   },
   {
-    path: "/cus/homes",
+    path: "/main/reports/products",
+    element: <ReportsProductsPage />,
+  },
+  {
+    path: "/main/reports/customers",
+    element: <ReportsCustomersPage />,
+  },
+  {
+    path: "/main/reports/chatbots",
+    element: <ReportsChatbotPage />,
+  },
+  {
+    path: "/cus/homes/:tableId",
     element: <HomecsPage />,
   },
   {

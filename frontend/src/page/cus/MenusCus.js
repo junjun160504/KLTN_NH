@@ -14,7 +14,8 @@ import { SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 import axios from "axios";
 import Slider from "react-slick";
 import { addToCart } from "../../redux/slices/cartSlice";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
+
 const { Header, Content } = Layout;
 const { Title, Text } = Typography;
 const REACT_APP_API_URL = process.env.REACT_APP_API_URL;
@@ -27,6 +28,7 @@ export default function CustomerMenuPage() {
   const [categories, setCategories] = useState([]);
   const dispatch = useDispatch();
   // GET items
+
   async function callApiMenuCus(url) {
     try {
       const response = await axios.get(url);
@@ -71,7 +73,20 @@ export default function CustomerMenuPage() {
   // ✅ Lọc món ăn theo category + tìm kiếm
   const filteredFoods = []
   const handleSetCart = (food) => {
-    dispatch(addToCart());
+    const tableId = JSON.parse(sessionStorage.getItem("tableId"));
+    const order = JSON.parse(sessionStorage.getItem("order")) || { orderId: tableId, foodOrderList: [] };
+    if (tableId) {
+      if (order.foodOrderList.some(item => item.id === food.id)) {
+        // nếu đã có món trong giỏ, tăng số lượng
+        order.foodOrderList = order.foodOrderList.map(item => item.id === food.id ? { ...item, quantity: item.quantity + 1 } : item);
+      } else {
+
+        // nếu chưa có món trong giỏ, thêm mới
+        order.foodOrderList.push({ ...food, quantity: 1 });
+      }
+      sessionStorage.setItem("order", JSON.stringify({ orderId: tableId, foodOrderList: order.foodOrderList }));
+    }
+    dispatch(addToCart(order));
   }
   return (
     <Layout style={{ minHeight: "100vh", background: "#fafafa" }}>

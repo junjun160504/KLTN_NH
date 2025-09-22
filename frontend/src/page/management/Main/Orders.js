@@ -16,6 +16,9 @@ import {
   message,
   Modal,
 } from "antd";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
+import dayjs from "dayjs"; // thêm thư viện này (cài: npm install dayjs)
 
 const { Content } = Layout;
 const { Option } = Select;
@@ -24,6 +27,10 @@ const OrderPage = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [pageTitle] = useState("Đơn hàng");
   const [currentPage, setCurrentPage] = useState(1);
+  const [modalExport, setModalExport] = useState(false);
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterTime, setFilterTime] = useState("today"); // thêm state lọc thời gian
+  const [searchText, setSearchText] = useState(""); // Thêm state cho tìm kiếm
 
   // danh sách món sẵn
   const menuList = [
@@ -35,7 +42,7 @@ const OrderPage = () => {
     { name: "Bánh mì", price: 30000 },
   ];
 
-  // danh sách đơn hàng
+  // danh sách đơn hàng (thêm trường createdAt)
   const [orders, setOrders] = useState([
     {
       key: "1",
@@ -45,6 +52,7 @@ const OrderPage = () => {
       point: 120,
       total: "275,000đ",
       status: "Chờ xác nhận",
+      createdAt: dayjs().subtract(1, "day").toISOString(), // ví dụ: hôm qua
       items: [
         { name: "Cà phê sữa", qty: 2, price: "35000", note: "ít đá" },
         { name: "Bánh ngọt", qty: 1, price: "50000", note: "" },
@@ -58,6 +66,7 @@ const OrderPage = () => {
       point: 0,
       total: "180,000đ",
       status: "Đang phục vụ",
+      createdAt: dayjs().toISOString(), // hôm nay
       items: [
         { name: "Trà đào", qty: 2, price: "40000", note: "ít đường" },
         { name: "Bánh mì", qty: 1, price: "30000", note: "thêm pate" },
@@ -71,12 +80,69 @@ const OrderPage = () => {
       point: 85,
       total: "320,000đ",
       status: "Hoàn tất",
+      createdAt: dayjs().subtract(8, "day").toISOString(), // 8 ngày trước
       items: [
         { name: "Sinh tố xoài", qty: 1, price: "55000", note: "" },
         { name: "Khoai tây chiên", qty: 2, price: "65000", note: "" },
       ],
     },
   ]);
+
+  const pageSize = 5; // số đơn mỗi trang
+
+  // 👉 lọc đơn hàng theo trạng thái, thời gian và tìm kiếm
+  const filteredOrders = orders.filter((o) => {
+    // Lọc trạng thái
+    const statusMatch = filterStatus === "all" ? true : o.status === filterStatus;
+
+    // Lọc thời gian
+    let timeMatch = true;
+    const created = dayjs(o.createdAt);
+    if (filterTime === "today") {
+      timeMatch = created.isSame(dayjs(), "day");
+    } else if (filterTime === "7days") {
+      timeMatch = created.isAfter(dayjs().subtract(7, "day").startOf("day"));
+    } else if (filterTime === "30days") {
+      timeMatch = created.isAfter(dayjs().subtract(30, "day").startOf("day"));
+    }
+
+    // Lọc tìm kiếm theo mã đơn hoặc số điện thoại
+    const search = searchText.trim().toLowerCase();
+    const searchMatch =
+      !search ||
+      o.code.toLowerCase().includes(search) ||
+      o.phone.toLowerCase().includes(search);
+
+    return statusMatch && timeMatch && searchMatch;
+  });
+
+  // 👉 lấy dữ liệu cho trang hiện tại
+  const pagedOrders = filteredOrders.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  // hàm xuất Excel
+  const handleExportExcel = () => {
+    const data = filteredOrders.map((o) => ({
+      "Mã đơn": o.code,
+      "Bàn": o.table,
+      "SĐT": o.phone,
+      "Điểm": o.point,
+      "Tổng tiền": o.total,
+      "Trạng thái": o.status,
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Đơn hàng");
+
+    const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([excelBuffer], { type: "application/octet-stream" });
+    saveAs(blob, "don_hang.xlsx");
+
+    message.success("Xuất file Excel thành công!");
+  };
 
   const [selectedOrder, setSelectedOrder] = useState(null);
 
@@ -299,23 +365,30 @@ const OrderPage = () => {
             <Input.Search
               placeholder="Nhập mã đơn hoặc số điện thoại..."
               style={{ width: 250 }}
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+              allowClear
             />
-            <Select defaultValue="all" style={{ width: 150 }}>
+            <Select
+              value={filterStatus}
+              onChange={(val) => setFilterStatus(val)}
+              style={{ width: 150 }}
+            >
               <Option value="all">Tất cả trạng thái</Option>
-              <Option value="pending">Chờ xác nhận</Option>
-              <Option value="serving">Đang phục vụ</Option>
-              <Option value="done">Hoàn tất</Option>
-              <Option value="cancel">Hủy món</Option>
-              <Option value="finished">Hoàn đơn</Option>
+              <Option value="Chờ xác nhận">Chờ xác nhận</Option>
+              <Option value="Đang phục vụ">Đang phục vụ</Option>
+              <Option value="Hoàn tất">Hoàn tất</Option>
+              <Option value="Hủy món">Hủy món</Option>
+              <Option value="Hoàn đơn">Hoàn đơn</Option>
             </Select>
-            <Select defaultValue="today" style={{ width: 120 }}>
+            <Select
+              value={filterTime}
+              onChange={setFilterTime}
+              style={{ width: 120 }}
+            >
               <Option value="today">Hôm nay</Option>
               <Option value="7days">7 ngày qua</Option>
               <Option value="30days">30 ngày qua</Option>
-            </Select>
-            <Select defaultValue="newest" style={{ width: 160 }}>
-              <Option value="newest">Mới nhất → Cũ nhất</Option>
-              <Option value="oldest">Cũ nhất → Mới nhất</Option>
             </Select>
             <Button
               type="primary"
@@ -324,12 +397,12 @@ const OrderPage = () => {
             >
               + Tạo đơn mới
             </Button>
-            <Button>Xuất file excel</Button>
+            <Button onClick={() => setModalExport(true)}>Xuất file excel</Button>
           </Space>
 
           {/* Table */}
           <Table
-            dataSource={orders}
+            dataSource={pagedOrders} // sửa lại ở đây
             columns={columns}
             pagination={false}
             bordered
@@ -345,16 +418,41 @@ const OrderPage = () => {
             }}
           >
             <span>
-              Hiển thị 1 đến {orders.length} trong tổng số {orders.length} đơn hàng
+              Hiển thị 1 đến {pagedOrders.length} trong tổng số {orders.length} đơn hàng
             </span>
             <Pagination
               current={currentPage}
-              pageSize={5}
-              total={orders.length}
+              pageSize={pageSize}
+              total={filteredOrders.length}
               onChange={(page) => setCurrentPage(page)}
             />
           </div>
         </Content>
+
+        {/* Modal Xuất Excel */}
+        <Modal
+          title="Xuất file Excel"
+          open={modalExport}
+          onCancel={() => setModalExport(false)}
+          footer={[
+            <Button key="back" onClick={() => setModalExport(false)}>
+              Đóng
+            </Button>,
+            <Button
+              key="submit"
+              type="primary"
+              style={{ background: "#226533" }}
+              onClick={() => {
+                setModalExport(false);
+                handleExportExcel(); // ✅ gọi hàm export
+              }}
+            >
+              Xác nhận xuất
+            </Button>,
+          ]}
+        >
+          <p>Bạn có chắc chắn muốn xuất danh sách đơn hàng ra file Excel không?</p>
+        </Modal>
       </Layout>
 
       {/* Drawer chi tiết đơn */}
@@ -442,12 +540,21 @@ const OrderPage = () => {
             placeholder="Chọn bàn"
             value={newOrder.table}
             onChange={(val) => setNewOrder({ ...newOrder, table: val })}
+            style={{ width: "100%" }}
           >
-            {["Bàn 01", "Bàn 02", "Bàn 03", "Bàn 04", "Bàn 05"].map((b) => (
-              <Option key={b} value={b}>
-                {b}
-              </Option>
-            ))}
+            {["Bàn 01", "Bàn 02", "Bàn 03", "Bàn 04", "Bàn 05"].map((b) => {
+              const hasActiveOrder = orders.some(
+                (o) =>
+                  o.table === b &&
+                  !["Hoàn tất", "Hủy món", "Hoàn đơn"].includes(o.status)
+              );
+
+              return (
+                <Option key={b} value={b} disabled={hasActiveOrder}>
+                  {b} {hasActiveOrder ? "(đang có đơn)" : ""}
+                </Option>
+              );
+            })}
           </Select>
 
           {/* SĐT khách */}
@@ -482,7 +589,9 @@ const OrderPage = () => {
             placeholder="Số lượng"
             type="number"
             value={newItem.qty}
-            onChange={(e) => setNewItem({ ...newItem, qty: parseInt(e.target.value || 1) })}
+            onChange={(e) =>
+              setNewItem({ ...newItem, qty: parseInt(e.target.value || 1) })
+            }
           />
           <Input
             placeholder="Ghi chú"
@@ -514,7 +623,11 @@ const OrderPage = () => {
               >
                 <div style={{ flex: 1 }}>
                   <strong>{item.name}</strong> x{item.qty}
-                  {item.note && <div style={{ fontSize: 12, color: "#888" }}>Ghi chú: {item.note}</div>}
+                  {item.note && (
+                    <div style={{ fontSize: 12, color: "#888" }}>
+                      Ghi chú: {item.note}
+                    </div>
+                  )}
                 </div>
                 <div>{parseInt(item.price).toLocaleString("vi-VN")}đ</div>
               </List.Item>

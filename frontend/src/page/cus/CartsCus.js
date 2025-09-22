@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import CustomerFooterNav from "../../components/CustomerFooterNav";
 import {
   Layout,
@@ -13,37 +13,30 @@ import {
 } from "antd";
 import { DeleteOutlined, ArrowLeftOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 
 const { Header, Content } = Layout;
 const { Title, Text } = Typography;
 
 export default function CustomerCartPage() {
-  const [cart, setCart] = useState([
-    {
-      id: 1,
-      name: "Phở Bò Tái",
-      price: 65000,
-      qty: 2,
-      img: "https://source.unsplash.com/80x80/?pho,vietnamese",
-    },
-    {
-      id: 2,
-      name: "Bánh Mì Thịt Nướng",
-      price: 25000,
-      qty: 1,
-      img: "https://source.unsplash.com/80x80/?banhmi,vietnam",
-    },
-    {
-      id: 3,
-      name: "Gỏi Cuốn Tôm",
-      price: 45000,
-      qty: 3,
-      img: "https://source.unsplash.com/80x80/?springroll,vietnam",
-    },
-  ]);
+  const order = useSelector((state) => state.cart.order);
 
-  const [selectedItems, setSelectedItems] = useState(cart.map((i) => i.id));
-  const [isModalVisible, setIsModalVisible] = useState(false); // ✅ popup
+  const [cart, setCart] = useState([]);
+  useEffect(() => {
+    if (order && order.foodOrderList) {
+      const updatedCart = order.foodOrderList.map((item) => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        qty: item.quantity,
+        img: item.image_url || "https://source.unsplash.com/80x80/?food",
+      }));
+      setCart(updatedCart);
+    }
+  }, [order]);
+
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [isModalVisible, setIsModalVisible] = useState(false);
   const navigate = useNavigate();
 
   // ✅ tổng số lượng trong giỏ
@@ -63,11 +56,13 @@ export default function CustomerCartPage() {
     if (qty <= 0) return;
     setCart(cart.map((item) => (item.id === id ? { ...item, qty } : item)));
   };
+
   const handleCloseModal = () => {
     setIsModalVisible(false);
-    setCart(cart.filter((item) => !selectedItems.includes(item.id))); // ❌ xóa món đã tick
-    setSelectedItems([]); // reset tick
+    setCart(cart.filter((item) => !selectedItems.includes(item.id)));
+    setSelectedItems([]);
   };
+
   const removeItem = (id) => {
     setCart(cart.filter((item) => item.id !== id));
     setSelectedItems(selectedItems.filter((sid) => sid !== id));
@@ -85,7 +80,7 @@ export default function CustomerCartPage() {
   };
 
   return (
-    <Layout style={{ minHeight: "100vh", background: "#fafafa" }}>
+    <Layout style={{ minHeight: "100vh", background: "#fafafa", overflowX: "hidden" }}>
       {/* -------- HEADER -------- */}
       <Header
         style={{
@@ -95,11 +90,12 @@ export default function CustomerCartPage() {
           alignItems: "center",
           justifyContent: "space-between",
           boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-          position: "fixed", // cố định header
+          position: "fixed",
           top: 0,
           left: 0,
           right: 0,
           zIndex: 1000,
+          height: 64,
         }}
       >
         <Button
@@ -115,25 +111,33 @@ export default function CustomerCartPage() {
             color: "#226533",
             fontWeight: "bold",
             textAlign: "center",
+            flex: 1,
+            minWidth: 0,
           }}
         >
           Giỏ hàng của bạn{" "}
           <span style={{ color: "orangered" }}>({cartCount})</span>
         </Title>
 
-        <Tag color="green" style={{ borderRadius: 12 }}>
+        <Tag color="green" style={{ borderRadius: 12, flexShrink: 0 }}>
           Bàn C8
         </Tag>
       </Header>
 
       {/* -------- CONTENT -------- */}
       <Content
-        style={{ padding: "12px", paddingTop: "60px", paddingBottom: "220px" }}
+        style={{
+          padding: "12px",
+          paddingTop: 72,
+          paddingBottom: 200,
+          maxWidth: "100%",
+          overflowX: "hidden",
+        }}
       >
         {/* Chọn tất cả */}
         <div style={{ marginBottom: 12 }}>
           <Checkbox
-            checked={selectedItems.length === cart.length}
+            checked={selectedItems.length === cart.length && cart.length > 0}
             indeterminate={
               selectedItems.length > 0 && selectedItems.length < cart.length
             }
@@ -154,12 +158,13 @@ export default function CustomerCartPage() {
               display: "flex",
               alignItems: "center",
               boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+              maxWidth: "100%",
             }}
           >
             <Checkbox
               checked={selectedItems.includes(item.id)}
               onChange={(e) => toggleSelect(item.id, e.target.checked)}
-              style={{ marginRight: 8 }}
+              style={{ marginRight: 8, flexShrink: 0 }}
             />
             <img
               src={item.img}
@@ -169,10 +174,21 @@ export default function CustomerCartPage() {
                 height: 60,
                 borderRadius: 8,
                 marginRight: 10,
+                flexShrink: 0,
               }}
             />
-            <div style={{ flex: 1 }}>
-              <Text strong>{item.name}</Text>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <Text
+                strong
+                style={{
+                  display: "block",         
+                  width: "180px",          
+                  whiteSpace: "normal",   
+                  wordBreak: "break-word",
+                }}
+              >
+                {item.name}
+              </Text>
               <br />
               <Text type="secondary">{item.price.toLocaleString()} VND</Text>
               <div style={{ marginTop: 5 }}>
@@ -204,16 +220,17 @@ export default function CustomerCartPage() {
               type="text"
               danger
               onClick={() => removeItem(item.id)}
+              style={{ flexShrink: 0 }}
             />
           </div>
         ))}
       </Content>
 
-      {/* -------- TỔNG KẾT (cố định) -------- */}
+      {/* -------- TỔNG KẾT -------- */}
       <div
         style={{
           position: "fixed",
-          bottom: 70, // nằm trên CustomerFooterNav
+          bottom: 70,
           left: 0,
           right: 0,
           background: "#fff",
@@ -221,6 +238,7 @@ export default function CustomerCartPage() {
           borderTop: "1px solid #eee",
           boxShadow: "0 -2px 8px rgba(0,0,0,0.1)",
           zIndex: 1000,
+          maxWidth: "100%",
         }}
       >
         <div
@@ -259,7 +277,7 @@ export default function CustomerCartPage() {
             borderRadius: 8,
           }}
           disabled={selectedItems.length === 0}
-          onClick={() => setIsModalVisible(true)} // ✅ bật popup
+          onClick={() => setIsModalVisible(true)}
         >
           Đặt hàng ngay
         </Button>
@@ -287,16 +305,18 @@ export default function CustomerCartPage() {
             style={{ marginRight: 8 }}
             onClick={() => {
               setIsModalVisible(false);
-              navigate("/cus/menus"); // 👉 đi đến menu order thêm
+              navigate("/cus/menus");
             }}
           >
             Order tiếp
           </Button>
-          <Button onClick={() => {
-            setIsModalVisible(false);
-            navigate("/cus/homes"); // 👉 quay về màn chính
-          }}>
-            Về màn chính
+          <Button
+            onClick={() => {
+              setIsModalVisible(false);
+              navigate("/cus/bills");
+            }}
+          >
+            Xem đơn hàng
           </Button>
         </div>
       </Modal>

@@ -13,7 +13,7 @@ import { useSelector } from "react-redux";
 export default function CustomerFooterNav() {
   const navigate = useNavigate();
   const location = useLocation();
-  const count = useSelector((state) => state.cart.count);
+  const order = useSelector((state) => state.cart.order);
 
   // ✅ Màu active cho icon
   const getActiveColor = (path) =>
@@ -74,7 +74,7 @@ export default function CustomerFooterNav() {
           onClick={() => navigate("/cus/carts")}
         >
           <Badge
-            count={count}
+            count={order?.foodOrderList?.length || 0}
             offset={[0, 5]}
             style={{
               backgroundColor: "orange",
