@@ -59,7 +59,9 @@ export async function getAllItems() {
       mc.name AS categoryName
     FROM menu_items mi
     LEFT JOIN menu_item_categories mic ON mi.id = mic.item_id
-    LEFT JOIN menu_categories mc ON mc.id = mic.category_id;
+    LEFT JOIN menu_categories mc ON mc.id = mic.category_id
+    WHERE mc.is_available = 1;
+
   `;
   return await query(sql);
 }

@@ -21,8 +21,10 @@ export async function createMenuItem(req, res) {
     }
 }
 export async function getMenuCategories(req, res) {
+    console.log("getMenuCategories called");
     try {
         const categories = await menuService.getMenuCategories();
+        console.log(categories)
         res.status(201).json({ status: 201, data: categories });
     } catch (err) {
         console.error('createMenuCategory error:', err);
