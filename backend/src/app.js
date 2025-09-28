@@ -5,6 +5,7 @@ dotenv.config();
 
 
 import menuRoutes from './routes/menu.routes.js';
+import cartRoutes from './routes/cart.routes.js';
 import orderRoutes from './routes/order.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
 import customerRoutes from './routes/customer.routes.js';
@@ -20,6 +21,7 @@ app.use(express.json());
 
 
 app.use('/api/menu', menuRoutes);
+app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/customers', customerRoutes);
