@@ -1,18 +1,32 @@
-import React from "react";
-import { Form, Input, Button, Checkbox, Typography } from "antd";
+import React, { useState } from "react";
+import { Form, Input, Button, Checkbox, Typography, message } from "antd";
 import { UserOutlined, LockOutlined } from "@ant-design/icons";
 import logo from "../../../assets/imgs/Logo.png";
 import { useNavigate } from "react-router-dom";
+import { loginAdmin } from "../../../api/admin"; // ✅ IMPORT API
 
 const { Title, Text } = Typography;
 
 const LoginPage = () => {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
-  const onFinish = (values) => {
-    console.log("Success:", values);
-    // chỉ chạy khi form hợp lệ
-    navigate("/main/homes");
+  const onFinish = async (values) => {
+    setLoading(true);
+    try {
+      const res = await loginAdmin(values); // ✅ GỌI API
+      console.log("Login response", res);
+      if (res.status === 200) {
+        message.success("Đăng nhập thành công!");
+        navigate("/main/homes"); // ✅ Điều hướng về trang chính
+      } else {
+        message.error(res.msg || "Sai tài khoản hoặc mật khẩu");
+      }
+    } catch (err) {
+      message.error(err.msg || "Đăng nhập thất bại");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const onFinishFailed = (errorInfo) => {
@@ -31,7 +45,7 @@ const LoginPage = () => {
     >
       <div
         style={{
-          width: 600,
+          width: 800,
           padding: 30,
           borderRadius: 12,
           background: "#fff",
@@ -104,6 +118,7 @@ const LoginPage = () => {
               type="primary"
               htmlType="submit"
               block
+              loading={loading}
               style={{
                 background: "#245c2a",
                 width: 300,
