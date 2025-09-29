@@ -3,7 +3,8 @@ import { Form, Input, Button, Checkbox, Typography, message } from "antd";
 import { UserOutlined, LockOutlined } from "@ant-design/icons";
 import logo from "../../../assets/imgs/Logo.png";
 import { useNavigate } from "react-router-dom";
-import { loginAdmin } from "../../../api/auth"; // ✅ import hàm API (bạn tạo file api/auth.js)
+import { loginAdmin } from "../../../api/admin";
+
 
 const { Title, Text } = Typography;
 

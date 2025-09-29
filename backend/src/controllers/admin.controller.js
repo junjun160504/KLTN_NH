@@ -42,11 +42,4 @@ export async function registerAdminController(req, res) {
         res.status(500).json({ error: error.message });
     }
 }
-export async function getLoginAdmin(req, res) {
-    try {
-        const logins = await adminService.getLogins();
-        res.status(200).json({ status: 200, data: logins });
-    } catch (err) {
-        console.error('getLoginAdmin error:', err);
-        res.status(500).json({ status: 500, message: 'Internal server error' });
-    }}
+
