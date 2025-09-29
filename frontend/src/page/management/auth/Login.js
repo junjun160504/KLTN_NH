@@ -3,31 +3,37 @@ import { Form, Input, Button, Checkbox, Typography, message } from "antd";
 import { UserOutlined, LockOutlined } from "@ant-design/icons";
 import logo from "../../../assets/imgs/Logo.png";
 import { useNavigate } from "react-router-dom";
-import { loginAdmin } from "../../../../"; // ✅ IMPORT API
+import { loginAdmin } from "../../../api/auth"; // ✅ import hàm API (bạn tạo file api/auth.js)
+
 const { Title, Text } = Typography;
 
 const LoginPage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
+  // ✅ Hàm xử lý khi submit form thành công
   const onFinish = async (values) => {
     setLoading(true);
     try {
-      const res = await loginAdmin(values); // ✅ GỌI API
-      console.log("Login response", res);
+      const res = await loginAdmin(values);
+
+      console.log("Login response:", res);
+
       if (res.status === 200) {
         message.success("Đăng nhập thành công!");
-        navigate("/main/homes"); // ✅ Điều hướng về trang chính
+        navigate("/main/homes");
       } else {
         message.error(res.msg || "Sai tài khoản hoặc mật khẩu");
       }
     } catch (err) {
+      console.error("Login error:", err);
       message.error(err.msg || "Đăng nhập thất bại");
     } finally {
       setLoading(false);
     }
   };
 
+  // ✅ Hàm xử lý khi submit thất bại
   const onFinishFailed = (errorInfo) => {
     console.log("Failed:", errorInfo);
   };
