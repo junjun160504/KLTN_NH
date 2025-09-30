@@ -13,7 +13,11 @@ import callStaffRoutes from './routes/callStaff.routes.js';
 import chatbotRoutes from './routes/chatbot.routes.js';
 import reviewRoutes from './routes/review.routes.js';
 import adminRoutes from './routes/admin.routes.js';
-
+import qrSessionRoutes from './routes/qrSession.routes.js';   // QR sessions
+import staffOrderRoutes from './routes/staffOrder.routes.js'; // Nhân viên xác nhận/huỷ đơn
+import tableRoutes from './routes/table.routes.js';           // Quản lý bàn
+import auditRoutes from './routes/audit.routes.js';           // Audit log
+import menuItem from './routes/menuItem.routes.js'; 
 
 const app = express();
 app.use(cors());
@@ -29,6 +33,11 @@ app.use('/api/call-staff', callStaffRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/review', reviewRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/qr-sessions', qrSessionRoutes);
+app.use('/api/staff/orders', staffOrderRoutes);
+app.use('/api/tables', tableRoutes);
+app.use('/api/audit', auditRoutes);
+app.use('/api/menu-item', menuItem);
 
 
 app.get('/', (req, res) => res.send('Restaurant API running...'));

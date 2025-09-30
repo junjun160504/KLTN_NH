@@ -1,10 +1,12 @@
 import express from 'express';
-import { getCart, addToCart} from '../controllers/cart.controller.js';
+import { getCart, addToCart } from '../controllers/cart.controller.js';
 
 const router = express.Router();
 
-router.get('/cus/cart/', getCart);    
-router.post('/cus/cart/', addToCart);     
+// Xem giỏ hàng theo qr_session
+router.get('/cus/cart', getCart);
 
+// Thêm món vào giỏ hàng
+router.post('/cus/cart', addToCart);
 
 export default router;
