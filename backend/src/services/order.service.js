@@ -1,4 +1,4 @@
-import pool from "../config/db.js";
+import { pool } from "../config/db.js";
 
 // Tạo đơn mới cho 1 qr_session
 export async function createOrder({ qr_session_id }) {

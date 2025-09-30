@@ -1,4 +1,4 @@
-import pool from "../config/db.js";
+import { pool } from "../config/db.js";
 
 export async function addPhone({ phone }) {
   // check trùng số điện thoại

@@ -1,4 +1,4 @@
-import pool from "../config/db.js";
+import { pool } from "../config/db.js";
 
 // Lấy danh sách món theo tên (cho khách hàng)
 export async function getAllMenuItems(name) {

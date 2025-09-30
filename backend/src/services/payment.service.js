@@ -1,4 +1,4 @@
-import pool from "../config/db.js";
+import { pool } from "../config/db.js";
 import { buildVietQR } from "../utils/vietqr.js";
 
 // 1. Thanh toán

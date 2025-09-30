@@ -1,4 +1,4 @@
-import chatbotService from "../services/chatbot.service.js";
+import * as chatbotService from "../services/chatbot.service.js";
 
 export async function chatWithBot(req, res) {
   try {

@@ -1,4 +1,4 @@
-import pool from '../config/db.js';
+import { pool } from '../config/db.js';
 
 export async function addToCart({ qr_session_id, menu_item_id, quantity, note }) {
   // 1. Tìm hoặc tạo giỏ hàng ACTIVE cho session
