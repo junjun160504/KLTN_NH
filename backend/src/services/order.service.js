@@ -1,4 +1,4 @@
-import pool from "../config/db.js";
+import { pool, query } from "../config/db.js";
 
 // Tạo đơn mới cho 1 qr_session
 export async function createOrder({ qr_session_id }) {
@@ -10,23 +10,24 @@ export async function createOrder({ qr_session_id }) {
 }
 
 // Thêm món vào đơn
-export async function addItem(orderId, { menu_item_id, quantity, note, cart_item_id }) {
-  const [[menu]] = await pool.query("SELECT * FROM menu_items WHERE id = ?", [menu_item_id]);
+export async function addItem(orderId, { menu_item_id, quantity, note }) {
+  const [menuRows] = await pool.query("SELECT * FROM menu_items WHERE id = ?", [menu_item_id]);
+  const menu = menuRows[0];
   if (!menu) throw new Error("Menu item not found");
 
   const unitPrice = menu.price;
   const subtotal = unitPrice * (quantity || 1);
 
   await pool.query(
-    `INSERT INTO order_items (order_id, menu_item_id, quantity, note, unit_price, cart_item_id)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [orderId, menu_item_id, quantity || 1, note || null, unitPrice, cart_item_id || null]
+    `INSERT INTO order_items (order_id, menu_item_id, quantity, note, unit_price)
+     VALUES (?, ?, ?, ?, ?)`,
+    [orderId, menu_item_id, quantity || 1, note || null, unitPrice]
   );
 
-  await pool.query("UPDATE orders SET total_price = total_price + ? WHERE id = ?", [
-    subtotal,
-    orderId,
-  ]);
+  await pool.query(
+    "UPDATE orders SET total_price = total_price + ? WHERE id = ?",
+    [subtotal, orderId]
+  );
 
   return { orderId, menu_item_id, quantity, unitPrice, subtotal };
 }
