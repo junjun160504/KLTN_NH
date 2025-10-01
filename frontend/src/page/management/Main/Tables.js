@@ -26,26 +26,7 @@ const REACT_APP_API_URL = process.env.REACT_APP_API_URL;
 const TablesPage = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [pageTitle] = useState("Quản lý bàn");
-  const [tables, setTables] = useState([
-    {
-      id: 1,
-      name: "Bàn 01",
-      status: "opened",
-      qr: "https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=Ban01",
-    },
-    {
-      id: 2,
-      name: "Bàn 02",
-      status: "closed",
-      qr: "https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=Ban02",
-    },
-    {
-      id: 3,
-      name: "Bàn VIP",
-      status: "opened",
-      qr: "https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=BanVIP",
-    },
-  ]); // <-- Thêm data mẫu ở đây
+  const [tables, setTables] = useState([]); // Dữ liệu từ API
   const [loading, setLoading] = useState(false);
 
   const [searchText, setSearchText] = useState("");
@@ -62,7 +43,7 @@ const TablesPage = () => {
   async function fetchTables() {
     try {
       setLoading(true);
-      const res = await axios.get(`${REACT_APP_API_URL}/table/all`);
+      const res = await axios.get(`${REACT_APP_API_URL}/tables`);
       setTables(res.data.data || []);
     } catch (err) {
       console.error("API GET error:", err);
@@ -74,12 +55,13 @@ const TablesPage = () => {
 
   async function handleDeleteTable(id) {
     try {
-      await axios.delete(`${REACT_APP_API_URL}/table/delete/${id}`);
+      await axios.delete(`${REACT_APP_API_URL}/tables/${id}`);
       message.success("Xóa bàn thành công");
       fetchTables();
     } catch (err) {
       console.error("API DELETE error:", err);
-      message.error("Xóa bàn thất bại");
+      const errorMsg = err.response?.data?.message || "Xóa bàn thất bại";
+      message.error(errorMsg);
     }
   }
 
@@ -87,18 +69,17 @@ const TablesPage = () => {
   const handleAddTable = async () => {
     try {
       const values = await addForm.validateFields();
-      await axios.post(`${REACT_APP_API_URL}/table`, {
-        name: values.name,
-        status: values.status,
-        note: values.note || "",
+      await axios.post(`${REACT_APP_API_URL}/tables`, {
+        table_number: values.table_number,
       });
-      message.success("Thêm bàn mới thành công!");
+      message.success("Thêm bàn mới thành công! QR code đã được tạo tự động.");
       setDrawerOpen(false);
       addForm.resetFields();
       fetchTables();
     } catch (err) {
       if (err?.errorFields) return;
-      message.error("Thêm bàn mới thất bại!");
+      const errorMsg = err.response?.data?.message || "Thêm bàn mới thất bại!";
+      message.error(errorMsg);
     }
   };
 
@@ -106,7 +87,8 @@ const TablesPage = () => {
   const openEditDrawer = (table) => {
     setEditingTable(table);
     editForm.setFieldsValue({
-      ...table,
+      table_number: table.table_number,
+      is_active: table.is_active,
     });
     setEditDrawerOpen(true);
   };
@@ -115,10 +97,9 @@ const TablesPage = () => {
   const handleEditTable = async () => {
     try {
       const values = await editForm.validateFields();
-      await axios.put(`${REACT_APP_API_URL}/table/update/${editingTable.id}`, {
-        name: values.name,
-        status: values.status,
-        note: values.note || "",
+      await axios.put(`${REACT_APP_API_URL}/tables/${editingTable.id}`, {
+        table_number: values.table_number,
+        is_active: values.is_active,
       });
       message.success("Cập nhật bàn thành công!");
       setEditDrawerOpen(false);
@@ -126,13 +107,270 @@ const TablesPage = () => {
       fetchTables();
     } catch (err) {
       if (err?.errorFields) return;
-      message.error("Cập nhật bàn thất bại!");
+      const errorMsg = err.response?.data?.message || "Cập nhật bàn thất bại!";
+      message.error(errorMsg);
     }
+  };
+
+  // ================= Print QR Functions =================
+
+  // Phương án in đơn giản - trực tiếp từ browser hiện tại
+  const handleSimplePrint = (content, title = "In QR Code") => {
+    // Tạo element ẩn để in
+    const printElement = document.createElement('div');
+    printElement.innerHTML = content;
+    printElement.style.display = 'none';
+    document.body.appendChild(printElement);
+
+    // Backup CSS gốc
+    const originalContents = document.body.innerHTML;
+    const originalTitle = document.title;
+
+    // Thay thế nội dung page
+    document.title = title;
+    document.body.innerHTML = content;
+
+    // Gọi print dialog
+    window.print();
+
+    // Khôi phục nội dung gốc
+    document.title = originalTitle;
+    document.body.innerHTML = originalContents;
+
+    // Remove element ẩn
+    if (document.body.contains(printElement)) {
+      document.body.removeChild(printElement);
+    }
+  };
+
+  // In QR cho một bàn
+  const handlePrintSingleQR = (table) => {
+    if (!table.qr_code_url) {
+      message.error("Bàn này chưa có mã QR!");
+      return;
+    }
+
+    const qrUrl = `${replaceUrlServer(REACT_APP_API_URL)}${table.qr_code_url}`;
+
+    const printStyles = `
+      <style>
+        body {
+          margin: 0;
+          padding: 20px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          font-family: Arial, sans-serif;
+        }
+        .qr-container {
+          text-align: center;
+          page-break-inside: avoid;
+          margin-bottom: 30px;
+        }
+        .qr-title {
+          font-size: 24px;
+          font-weight: bold;
+          margin-bottom: 15px;
+          color: #333;
+        }
+        .qr-image {
+          width: 200px;
+          height: 200px;
+          border: 2px solid #ddd;
+          border-radius: 8px;
+        }
+        .qr-info {
+          margin-top: 15px;
+          font-size: 16px;
+          color: #666;
+        }
+        @media print {
+          body { margin: 0; }
+          .qr-container { page-break-inside: avoid; }
+        }
+      </style>
+    `;
+
+    const printBody = `
+      <div class="qr-container">
+        <div class="qr-title">Bàn ${table.table_number}</div>
+        <img src="${qrUrl}" alt="QR Code Bàn ${table.table_number}" class="qr-image" />
+        <div class="qr-info">Quét mã QR để xem menu</div>
+      </div>
+    `;
+
+    // Thử phương án window mới trước
+    try {
+      const printWindow = window.open('', '_blank', 'width=800,height=600');
+      if (printWindow) {
+        const htmlContent = `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>In QR Code - Bàn ${table.table_number}</title>
+              ${printStyles}
+            </head>
+            <body>
+              ${printBody}
+              <script>
+                setTimeout(() => {
+                  window.print();
+                  window.close();
+                }, 500);
+              </script>
+            </body>
+          </html>
+        `;
+
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+
+        // Backup timer
+        setTimeout(() => {
+          if (printWindow && !printWindow.closed) {
+            printWindow.print();
+            printWindow.close();
+          }
+        }, 1000);
+      } else {
+        throw new Error('Popup blocked');
+      }
+    } catch (error) {
+      // Fallback: In trực tiếp từ trang hiện tại
+      console.log('Using fallback print method');
+      const fallbackContent = printStyles + printBody;
+      handleSimplePrint(fallbackContent, `In QR Code - Bàn ${table.table_number}`);
+    }
+  };
+
+  // In tất cả QR
+  const handlePrintAllQR = () => {
+    const tablesWithQR = filteredTables.filter(table => table.qr_code_url);
+
+    if (tablesWithQR.length === 0) {
+      message.error("Không có bàn nào có mã QR để in!");
+      return;
+    }
+
+    let qrItems = '';
+    tablesWithQR.forEach((table) => {
+      const qrUrl = `${replaceUrlServer(REACT_APP_API_URL)}${table.qr_code_url}`;
+      qrItems += `
+        <div class="qr-container">
+          <div class="qr-title">Bàn ${table.table_number}</div>
+          <img src="${qrUrl}" alt="QR Code Bàn ${table.table_number}" class="qr-image" />
+          <div class="qr-info">Quét mã QR để xem menu</div>
+        </div>
+      `;
+    });
+
+    const printStyles = `
+      <style>
+        body {
+          margin: 0;
+          padding: 20px;
+          font-family: Arial, sans-serif;
+        }
+        .print-header {
+          text-align: center;
+          margin-bottom: 30px;
+          font-size: 28px;
+          font-weight: bold;
+          color: #333;
+        }
+        .qr-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+          gap: 30px;
+          justify-items: center;
+        }
+        .qr-container {
+          text-align: center;
+          page-break-inside: avoid;
+          border: 1px solid #eee;
+          padding: 20px;
+          border-radius: 8px;
+        }
+        .qr-title {
+          font-size: 20px;
+          font-weight: bold;
+          margin-bottom: 15px;
+          color: #333;
+        }
+        .qr-image {
+          width: 180px;
+          height: 180px;
+          border: 2px solid #ddd;
+          border-radius: 8px;
+        }
+        .qr-info {
+          margin-top: 15px;
+          font-size: 14px;
+          color: #666;
+        }
+        @media print {
+          body { margin: 0; }
+          .qr-container { page-break-inside: avoid; }
+        }
+      </style>
+    `;
+
+    const printBody = `
+      <div class="print-header">Danh sách QR Code các bàn</div>
+      <div class="qr-grid">
+        ${qrItems}
+      </div>
+    `;
+
+    // Thử phương án window mới trước
+    try {
+      const printWindow = window.open('', '_blank', 'width=1000,height=800');
+      if (printWindow) {
+        const htmlContent = `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>In tất cả QR Code</title>
+              ${printStyles}
+            </head>
+            <body>
+              ${printBody}
+              <script>
+                setTimeout(() => {
+                  window.print();
+                  window.close();
+                }, 1000);
+              </script>
+            </body>
+          </html>
+        `;
+
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+
+        // Backup timer
+        setTimeout(() => {
+          if (printWindow && !printWindow.closed) {
+            printWindow.print();
+            printWindow.close();
+          }
+        }, 2000);
+      } else {
+        throw new Error('Popup blocked');
+      }
+    } catch (error) {
+      // Fallback: In trực tiếp từ trang hiện tại
+      console.log('Using fallback print method for all QR');
+      const fallbackContent = printStyles + printBody;
+      handleSimplePrint(fallbackContent, 'In tất cả QR Code');
+    }
+
+    message.success(`Đang chuẩn bị in ${tablesWithQR.length} mã QR...`);
   };
 
   // ================= Effect =================
   useEffect(() => {
-    // fetchTables();
+    fetchTables();
   }, []);
 
   // ================= Filter logic =================
@@ -140,59 +378,102 @@ const TablesPage = () => {
     // Lọc theo tên bàn
     const search = searchText.trim().toLowerCase();
     const searchMatch =
-      !search || (t.name || "").toLowerCase().includes(search);
+      !search || (t.table_number || "").toLowerCase().includes(search);
 
     // Lọc theo trạng thái
     let statusMatch = true;
     if (statusFilter !== "all") {
       statusMatch =
-        (statusFilter === "active" && t.status === "opened") ||
-        (statusFilter === "inactive" && t.status === "closed");
+        (statusFilter === "active" && t.is_active === 1) ||
+        (statusFilter === "inactive" && t.is_active === 0);
     }
     return searchMatch && statusMatch;
   });
 
+  const replaceUrlServer = (url) => {
+    return url.replace("/api", "");
+  }
+
   // ================= Columns Table =================
   const columns = [
     {
-      title: "Tên bàn",
-      dataIndex: "name",
-      key: "name",
-      sorter: (a, b) => (a.name || "").localeCompare(b.name || "", "vi"),
+      title: "ID",
+      dataIndex: "id",
+      key: "id",
+      width: 80,
+      align: "center",
+      sorter: (a, b) => a.id - b.id,
+    },
+    {
+      title: "Số bàn",
+      dataIndex: "table_number",
+      key: "table_number",
+      align: "center",
+      sorter: (a, b) => (a.table_number || "").localeCompare(b.table_number || "", "vi"),
     },
     {
       title: "Trạng thái",
-      dataIndex: "status",
-      key: "status",
-      sorter: (a, b) => (a.status || "").localeCompare(b.status || ""),
+      dataIndex: "is_active",
+      key: "is_active",
+      align: "center",
+      sorter: (a, b) => a.is_active - b.is_active,
       render: (val) =>
-        val === "opened" ? (
-          <Tag color="green">Đang mở</Tag>
+        val === 1 ? (
+          <Tag color="green">Hoạt động</Tag>
         ) : (
-          <Tag color="red">Đã đóng</Tag>
+          <Tag color="red">Tạm ngừng</Tag>
         ),
     },
     {
       title: "QR Code",
-      dataIndex: "qr",
-      key: "qr",
-      render: (qr) =>
-        qr ? (
-          <img src={qr} alt="QR code" style={{ width: 60, height: 60 }} />
-        ) : (
-          <span style={{ color: "#aaa" }}>-</span>
-        ),
+      dataIndex: "qr_code_url",
+      key: "qr_code_url",
+      align: "center",
+      render: (qrUrl, record) => {
+        if (qrUrl) {
+          // Backend QR URL: /qr/table-1.png (served statically)
+
+          const fullQrUrl = `${replaceUrlServer(REACT_APP_API_URL)}${qrUrl}`;
+          return (
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
+              <img
+                src={fullQrUrl}
+                alt={`QR code for ${record.table_number}`}
+                style={{ width: 60, height: 60 }}
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
+              />
+              <span style={{ color: "#aaa", display: "none" }}>QR lỗi</span>
+            </div>
+          );
+        } else {
+          return <span style={{ color: "#aaa" }}>Chưa có QR</span>;
+        }
+      },
     },
     {
       title: "Hành động",
       key: "action",
+      align: "center",
       render: (_, record) => (
         <Space>
+          <Button
+            size="small"
+            type="default"
+            disabled={!record.qr_code_url}
+            onClick={() => handlePrintSingleQR(record)}
+            style={{ color: "#1890ff" }}
+          >
+            In QR
+          </Button>
           <Button size="small" onClick={() => openEditDrawer(record)}>
             Chỉnh sửa
           </Button>
+
           <Popconfirm
             title="Bạn có chắc chắn muốn xóa bàn này?"
+            description="Không thể xóa nếu bàn đang có khách hoặc đơn hàng pending."
             onConfirm={() => handleDeleteTable(record.id)}
             okText="Xóa"
             cancelText="Hủy"
@@ -271,6 +552,13 @@ const TablesPage = () => {
               }}
             >
               <Button
+                type="default"
+                onClick={handlePrintAllQR}
+                disabled={filteredTables.filter(t => t.qr_code_url).length === 0}
+              >
+                🖨️ In tất cả QR
+              </Button>
+              <Button
                 type="primary"
                 style={{ background: "#226533" }}
                 onClick={() => setDrawerOpen(true)}
@@ -326,28 +614,29 @@ const TablesPage = () => {
             <Form
               form={addForm}
               layout="vertical"
-              initialValues={{ status: "opened" }}
+              initialValues={{}}
             >
               <Form.Item
-                label="Tên bàn"
-                name="name"
-                rules={[{ required: true, message: "Nhập tên bàn!" }]}
+                label="Số bàn"
+                name="table_number"
+                rules={[
+                  { required: true, message: "Nhập số bàn!" },
+                  { pattern: /^[A-Za-z0-9\s]+$/, message: "Số bàn chỉ chứa chữ, số và khoảng trắng!" }
+                ]}
               >
-                <Input />
+                <Input placeholder="Ví dụ: B01, VIP-1, Bàn 05..." />
               </Form.Item>
-              <Form.Item
-                label="Trạng thái"
-                name="status"
-                rules={[{ required: true, message: "Chọn trạng thái!" }]}
-              >
-                <Select>
-                  <Option value="opened">Đang mở</Option>
-                  <Option value="closed">Đã đóng</Option>
-                </Select>
-              </Form.Item>
-              <Form.Item label="QR Code (URL)" name="qr">
-                <Input placeholder="Dán link ảnh QR code hoặc để trống để tự sinh" />
-              </Form.Item>
+              <div style={{
+                background: '#f6ffed',
+                border: '1px solid #b7eb8f',
+                borderRadius: 6,
+                padding: 12,
+                marginBottom: 16
+              }}>
+                <Text style={{ color: '#52c41a', fontSize: 14 }}>
+                  💡 QR Code sẽ được tạo tự động khi tạo bàn mới
+                </Text>
+              </div>
             </Form>
           </Drawer>
 
@@ -383,28 +672,41 @@ const TablesPage = () => {
             <Form
               form={editForm}
               layout="vertical"
-              initialValues={{ status: "opened" }}
             >
               <Form.Item
-                label="Tên bàn"
-                name="name"
-                rules={[{ required: true, message: "Nhập tên bàn!" }]}
+                label="Số bàn"
+                name="table_number"
+                rules={[
+                  { required: true, message: "Nhập số bàn!" },
+                  { pattern: /^[A-Za-z0-9\s]+$/, message: "Số bàn chỉ chứa chữ, số và khoảng trắng!" }
+                ]}
               >
-                <Input />
+                <Input placeholder="Ví dụ: B01, VIP-1, Bàn 05..." />
               </Form.Item>
               <Form.Item
                 label="Trạng thái"
-                name="status"
+                name="is_active"
                 rules={[{ required: true, message: "Chọn trạng thái!" }]}
               >
                 <Select>
-                  <Option value="opened">Đang mở</Option>
-                  <Option value="closed">Đã đóng</Option>
+                  <Option value={1}>Hoạt động</Option>
+                  <Option value={0}>Tạm ngừng</Option>
                 </Select>
               </Form.Item>
-              <Form.Item label="QR Code (URL)" name="qr">
-                <Input placeholder="Dán link ảnh QR code hoặc để trống để tự sinh" />
-              </Form.Item>
+              {editingTable?.qr_code_url && (
+                <Form.Item label="QR Code hiện tại">
+                  <div style={{ textAlign: 'center' }}>
+                    <img
+                      src={`${replaceUrlServer(REACT_APP_API_URL)}${editingTable.qr_code_url}`}
+                      alt="Current QR"
+                      style={{ width: 180, height: 180, border: '1px solid #d9d9d9', borderRadius: 8 }}
+                    />
+                    <div style={{ marginTop: 8, color: '#666', fontSize: 12 }}>
+                      QR Code cho bàn {editingTable.table_number}
+                    </div>
+                  </div>
+                </Form.Item>
+              )}
             </Form>
           </Drawer>
         </Content>
