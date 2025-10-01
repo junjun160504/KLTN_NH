@@ -6,14 +6,12 @@ import {
   getItemsByCategory,
   getAllItemsController,
 } from "../controllers/menu.controller.js";
-
+console.log("Mounting /api/menu routes...");
 const router = express.Router();
-
-// Khách hàng xem món theo tên
-router.get("/cus/menus/:name", getMenuItems);
-
 // Khách hàng xem danh mục
 router.get("/cus/menus/categories", getMenuCategories);
+// Khách hàng xem món theo tên
+router.get("/cus/menus/:name", getMenuItems);
 
 // Khách hàng xem món theo danh mục
 router.get("/cus/menus/category/:id", getItemsByCategory);

@@ -1,4 +1,5 @@
-import pool from "../config/db.js";
+import { pool, query } from "../config/db.js";
+
 
 // Lấy danh sách món theo tên (cho khách hàng)
 export async function getAllMenuItems(name) {
@@ -51,10 +52,11 @@ export async function addMenuItem({ name, price, description, category_id, image
 
 // Lấy danh mục món
 export async function getMenuCategories() {
-  const [rows] = await pool.query("SELECT * FROM menu_categories WHERE is_available = 1");
+  const sql = "SELECT * FROM menu_categories WHERE is_available = 1";
+  const rows = await query(sql);
+  console.log("[getMenuCategories] rows:", rows);   // 👈 log ra để xem
   return rows;
 }
-
 // Lấy món theo category
 export async function getItemsByCategory(id) {
   const [rows] = await pool.query(

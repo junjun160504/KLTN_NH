@@ -27,9 +27,10 @@ export async function createMenuItem(req, res) {
 export async function getMenuCategories(req, res) {
   try {
     const categories = await menuService.getMenuCategories();
-    res.status(200).json({ status: 200, data: categories });
+    console.log("[Controller] categories:", categories); // 👈 log thêm
+    res.status(201).json({ status: 201, data: categories });
   } catch (err) {
-    console.error("getMenuCategories error:", err);
+    console.error("createMenuCategory error:", err);
     res.status(500).json({ status: 500, message: "Internal server error" });
   }
 }
