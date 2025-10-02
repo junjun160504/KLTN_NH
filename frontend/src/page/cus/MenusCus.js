@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CustomerFooterNav from "../../components/CustomerFooterNav";
+import QRProcessingStatus from "../../components/QRProcessingStatus";
+import { useQRHandler } from "../../hooks/useQRHandler";
+import { useSession } from "../../contexts/SessionContext";
 import {
   Layout,
   Input,
@@ -9,6 +12,7 @@ import {
   Card,
   Row,
   Col,
+  notification
 } from "antd";
 import { SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 import axios from "axios";
@@ -39,6 +43,29 @@ const styles = {
 };
 export default function CustomerMenuPage() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const { session, isAuthenticated } = useSession();
+
+  // QR Handler cho auto-processing QR parameters
+  const { isProcessing, qrError } = useQRHandler({
+    redirectPath: '/cus/homes',
+    autoRedirect: false, // Stay on menu page after QR processing
+    onSuccess: (sessionData) => {
+      notification.success({
+        message: 'QR Code thành công!',
+        description: `Chào mừng đến ${sessionData.table_number}`,
+        duration: 3
+      });
+    },
+    onError: (error) => {
+      notification.error({
+        message: 'Lỗi QR Code',
+        description: error.message || 'Không thể xử lý QR Code',
+        duration: 5
+      });
+    }
+  });
+
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchText, setSearchText] = useState("");
   const [foods, setFoods] = useState([]);
@@ -46,7 +73,6 @@ export default function CustomerMenuPage() {
   const [loading, setLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false); // State để track scroll
-  const dispatch = useDispatch();
   // GET items
   async function callApiMenuCus(url) {
     try {
@@ -553,6 +579,28 @@ export default function CustomerMenuPage() {
           </Row>
         )}
       </Content>
+
+      {/* QR Processing Status */}
+      {(isProcessing || qrError) && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <QRProcessingStatus
+            isProcessing={isProcessing}
+            error={qrError}
+            onRetry={() => window.location.reload()}
+          />
+        </div>
+      )}
 
       {/* Footer giỏ hàng */}
       <CustomerFooterNav />

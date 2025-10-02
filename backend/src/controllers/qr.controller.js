@@ -228,6 +228,7 @@ export async function scanQR(req, res) {
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     const qrUrl = `${baseUrl}/menu?table=${table}&session=${session}`;
 
+
     const result = await tableQRService.validateTableQR(qrUrl);
 
     if (result.valid) {

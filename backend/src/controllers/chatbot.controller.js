@@ -7,6 +7,7 @@ export async function chatWithBot(req, res) {
       return res.status(400).json({ status: 400, message: "Thiếu nội dung message" });
     }
 
+    // dùng chatbotService.reply vì import * as
     const result = await chatbotService.reply(message);
     res.status(200).json({ status: 200, data: result });
   } catch (err) {

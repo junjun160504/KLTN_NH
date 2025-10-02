@@ -1,4 +1,4 @@
-import  { useState } from "react";
+import { useState } from "react";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import {
@@ -189,7 +189,7 @@ export default function HomecsPage() {
                   {item.icon}
                   <Text
                     style={{
-                      fontSize: item.fontSize, 
+                      fontSize: item.fontSize,
                       color: item.color || "#333",
                       marginTop: 6,
                       fontWeight: 500,
@@ -261,7 +261,7 @@ export default function HomecsPage() {
         ]}
       >
         <p>Nhân viên sẽ tới ngay, vui lòng đợi chút.</p>
-        
+
       </Modal>
     </Layout>
   );

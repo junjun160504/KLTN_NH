@@ -65,7 +65,7 @@ const routes = [
     element: <ReportsChatbotPage />,
   },
   {
-    path: "/cus/homes/:tableId",
+    path: "/cus/homes",
     element: <HomecsPage />,
   },
   {

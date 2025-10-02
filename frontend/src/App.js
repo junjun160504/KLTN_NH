@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import routes from "./routes";
 import AppTheme from "./components/AppTheme";
+import { SessionProvider } from "./contexts/SessionContext";
 import CustomerMenuPage from "./page/cus/MenusCus";
 import FoodDetailPage from "./page/cus/FoodDetailsCus";
 import { useEffect } from "react";
@@ -14,21 +15,25 @@ function App() {
     if (savedOrder) {
       dispatch(addToCart(JSON.parse(savedOrder)));
     }
-  }, []);
+  }, [dispatch]);
+
   return (
     <AppTheme>
-      <BrowserRouter>
-        <Routes>
-          {/* Map các route đã định nghĩa sẵn */}
-          {routes.map((r, i) => (
-            <Route key={i} path={r.path} element={r.element} />
-          ))}
+      <SessionProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Map các route đã định nghĩa sẵn */}
+            {routes.map((r, i) => (
+              <Route key={i} path={r.path} element={r.element} />
+            ))}
 
-          {/* Các route tĩnh bạn muốn thêm */}
-          <Route path="/" element={<CustomerMenuPage />} />
-          <Route path="/food/:id" element={<FoodDetailPage />} />
-        </Routes>
-      </BrowserRouter>
+            {/* Các route tĩnh bạn muốn thêm */}
+            <Route path="/" element={<CustomerMenuPage />} />
+            <Route path="/menu" element={<CustomerMenuPage />} />
+            <Route path="/food/:id" element={<FoodDetailPage />} />
+          </Routes>
+        </BrowserRouter>
+      </SessionProvider>
     </AppTheme>
   );
 }

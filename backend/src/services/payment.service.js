@@ -1,18 +1,18 @@
-import { pool } from "../config/db.js";
+import { pool, query } from "../config/db.js";
 import { buildVietQR } from "../utils/vietqr.js";
 
 // 1. Thanh toán
-export async function payOrder({ qr_session_id, method, print_bill }) {
-  // Lấy các order chưa thanh toán
+export async function payOrder({ order_id, method, print_bill }) {
+  // Kiểm tra đơn chưa thanh toán
   const [orders] = await pool.query(
-    "SELECT id, total_price FROM orders WHERE qr_session_id = ? AND status != 'PAID'",
-    [qr_session_id]
+    "SELECT id, total_price, status FROM orders WHERE id = ? AND status != 'PAID'",
+    [order_id]
   );
   if (orders.length === 0) throw new Error("Không có đơn nào để thanh toán");
 
-  const amount = orders.reduce((sum, o) => sum + Number(o.total_price), 0);
+  const amount = Number(orders[0].total_price);
 
-  // Sinh QR nếu BANKING
+  // Nếu là BANKING → tạo QR
   let qr = null;
   if (method === "BANKING") {
     qr = await buildVietQR({
@@ -20,25 +20,28 @@ export async function payOrder({ qr_session_id, method, print_bill }) {
       bankCode: process.env.VIETQR_BANK_CODE,
       accountName: process.env.VIETQR_ACCOUNT_NAME,
       amount,
-      addInfo: `Thanh toan ban ${qr_session_id}`
+      addInfo: `Thanh toan don ${order_id}`
     });
   }
 
-  // Insert payment
+  // Lưu payment
   const [result] = await pool.query(
-    `INSERT INTO payments (qr_sessions_id, method, amount, printed_bill)
+    `INSERT INTO payments (order_id, method, amount, printed_bill)
      VALUES (?, ?, ?, ?)`,
-    [qr_session_id, method, amount, print_bill ?? false]
+    [order_id, method, amount, print_bill ?? false]
   );
 
-  // Nếu tiền mặt update luôn orders
+  // Nếu là CASH → update luôn orders thành PAID
   if (method === "CASH") {
-    await pool.query("UPDATE orders SET status = 'PAID' WHERE qr_session_id = ?", [qr_session_id]);
+    await pool.query("UPDATE orders SET status = 'PAID' WHERE id = ?", [order_id]);
+  } else if (method === "BANKING") {
+    // Có thể update thành trạng thái chờ xác nhận
+    await pool.query("UPDATE orders SET status = 'PENDING' WHERE id = ?", [order_id]);
   }
 
   return {
     payment_id: result.insertId,
-    qr_session_id,
+    order_id,
     method,
     amount,
     status: method === "CASH" ? "PAID" : "PENDING",
