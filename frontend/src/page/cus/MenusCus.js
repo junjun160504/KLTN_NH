@@ -44,7 +44,7 @@ const styles = {
 export default function CustomerMenuPage() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { session, isAuthenticated } = useSession();
+  const { session } = useSession();
 
   // QR Handler cho auto-processing QR parameters
   const { isProcessing, qrError } = useQRHandler({
@@ -177,20 +177,42 @@ export default function CustomerMenuPage() {
   }, []);
 
   const handleSetCart = (food) => {
-    const tableId = JSON.parse(sessionStorage.getItem("tableId"));
-    const order = JSON.parse(sessionStorage.getItem("order")) || { orderId: tableId, foodOrderList: [] };
-    if (tableId) {
-      if (order.foodOrderList.some(item => item.id === food.id)) {
-        // nếu đã có món trong giỏ, tăng số lượng
-        order.foodOrderList = order.foodOrderList.map(item => item.id === food.id ? { ...item, quantity: item.quantity + 1 } : item);
-      } else {
+    // Lấy tableId từ SessionContext thay vì sessionStorage
+    const tableId = session?.table_id;
 
-        // nếu chưa có món trong giỏ, thêm mới
-        order.foodOrderList.push({ ...food, quantity: 1 });
-      }
-      sessionStorage.setItem("order", JSON.stringify({ orderId: tableId, foodOrderList: order.foodOrderList }));
+    if (!tableId) {
+      notification.error({
+        message: 'Lỗi',
+        description: 'Vui lòng quét QR Code trước khi đặt món',
+        duration: 3
+      });
+      return;
     }
+
+    const order = JSON.parse(sessionStorage.getItem("order")) || { orderId: tableId, foodOrderList: [] };
+
+    if (order.foodOrderList.some(item => item.id === food.id)) {
+      // nếu đã có món trong giỏ, tăng số lượng
+      order.foodOrderList = order.foodOrderList.map(item =>
+        item.id === food.id ? { ...item, quantity: item.quantity + 1 } : item
+      );
+    } else {
+      // nếu chưa có món trong giỏ, thêm mới
+      order.foodOrderList.push({ ...food, quantity: 1 });
+    }
+
+    // Lưu vào sessionStorage
+    sessionStorage.setItem("order", JSON.stringify({ orderId: tableId, foodOrderList: order.foodOrderList }));
+
+    // Cập nhật Redux state
     dispatch(addToCart(order));
+
+    // Thông báo thành công
+    notification.success({
+      message: 'Thêm vào giỏ hàng',
+      description: `Đã thêm ${food.name} vào giỏ hàng`,
+      duration: 2
+    });
   }
   return (
     <Layout style={{ minHeight: "100vh", background: "#fafafa" }}>
@@ -415,164 +437,194 @@ export default function CustomerMenuPage() {
             )}
           </div>
         ) : (
-          <Row gutter={[16, 16]}>
+          <Row gutter={[0, 12]}>
             {foods.map((food) => (
-              <Col xs={24} md={12} lg={8} xl={6} key={food.id}>
+              <Col xs={24} key={food.id}>
                 <Card
                   hoverable
-                  className="food-card"
-                  cover={
-                    <div style={{ position: "relative", overflow: "hidden" }}>
+                  className="food-card-horizontal"
+                  onClick={() => navigate(`/food/${food.id}`, { state: food })}
+                  style={{
+                    borderRadius: 12,
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+                    border: "1px solid #f0f0f0",
+                    transition: "all 0.2s ease",
+                    overflow: "hidden",
+                  }}
+                  bodyStyle={{ padding: 0 }}
+                >
+                  <div style={{ display: "flex", position: "relative" }}>
+                    {/* ===== IMAGE LEFT ===== */}
+                    <div style={{
+                      position: "relative",
+                      width: 120,
+                      height: 120,
+                      flexShrink: 0,
+                    }}>
                       <img
                         alt={food.name}
                         src={food.image_url || "/assets/images/no-image.png"}
                         style={{
                           width: "100%",
-                          height: 180,
+                          height: "100%",
                           objectFit: "cover",
-                          transition: "transform 0.3s ease",
-                          borderRadius: "8px 8px 0 0",
-                        }}
-                        onMouseOver={(e) => {
-                          e.target.style.transform = "scale(1.05)";
-                        }}
-                        onMouseOut={(e) => {
-                          e.target.style.transform = "scale(1)";
                         }}
                       />
-                      {/* Badge giảm giá hoặc hot */}
-                      {food.is_featured && (
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: 8,
-                            right: 8,
-                            background: "linear-gradient(45deg, #ff6b6b, #ee5a52)",
-                            color: "white",
-                            padding: "4px 8px",
-                            borderRadius: 12,
-                            fontSize: 11,
-                            fontWeight: "bold",
-                            boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
-                          }}
-                        >
-                          HOT
+
+                      {/* Rating Badge - Top Left */}
+                      {food.average_rating && (
+                        <div style={{
+                          position: "absolute",
+                          bottom: 4,
+                          left: 4,
+                          background: "rgba(0, 0, 0, 0.7)",
+                          backdropFilter: "blur(4px)",
+                          color: "#ffd700",
+                          padding: "2px 6px",
+                          borderRadius: 4,
+                          fontSize: 11,
+                          fontWeight: "600",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 2,
+                        }}>
+                          ⭐ {Number(food.average_rating).toFixed(1)}
                         </div>
                       )}
                     </div>
-                  }
-                  onClick={() => navigate(`/food/${food.id}`, { state: food })}
-                  style={{
-                    borderRadius: 16,
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                    border: "1px solid #f0f0f0",
-                    transition: "all 0.3s ease",
-                    overflow: "hidden",
-                  }}
-                  bodyStyle={{ padding: "16px" }}
-                  onMouseEnter={(e) => {
-                    e.target.style.boxShadow = "0 8px 24px rgba(0,0,0,0.12)";
-                    e.target.style.transform = "translateY(-2px)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)";
-                    e.target.style.transform = "translateY(0)";
-                  }}
-                >
-                  <div style={{ marginBottom: 12 }}>
-                    <Title
-                      level={5}
-                      style={{
-                        marginBottom: 6,
-                        fontSize: 16,
-                        fontWeight: 600,
-                        color: "#2c3e50",
-                        lineHeight: "1.3",
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {food.name}
-                    </Title>
 
+                    {/* ===== CONTENT RIGHT ===== */}
                     <div style={{
+                      flex: 1,
+                      padding: "10px 12px",
                       display: "flex",
-                      alignItems: "center",
-                      marginBottom: 8,
-                      gap: 8
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                      minHeight: 100,
                     }}>
-                      <Text
-                        strong
-                        style={{
-                          color: "#e74c3c",
-                          fontSize: 18,
-                          fontWeight: 700,
-                        }}
-                      >
-                        {Number(food.price).toLocaleString()}đ
-                      </Text>
-                      {/* Hiển thị giá gốc nếu có giảm giá */}
-                      {food.original_price && food.original_price > food.price && (
-                        <Text
-                          delete
+                      {/* Top Section - Title and Description */}
+                      <div>
+                        <Title
+                          level={5}
                           style={{
-                            color: "#95a5a6",
-                            fontSize: 14
+                            margin: 0,
+                            marginBottom: 4,
+                            fontSize: 15,
+                            fontWeight: 600,
+                            color: "#1a1a1a",
+                            lineHeight: "1.3",
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
                           }}
                         >
-                          {Number(food.original_price).toLocaleString()}đ
-                        </Text>
-                      )}
+                          {food.name}
+                        </Title>
+
+                        {/* Description */}
+                        {food.description && (
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              color: "#999",
+                              lineHeight: "1.3",
+                              display: "-webkit-box",
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: "vertical",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              marginBottom: 4,
+                            }}
+                          >
+                            {food.description}
+                          </Text>
+                        )}
+                      </div>
+
+                      {/* Bottom Section */}
+                      <div>
+                        {/* Price and badges row */}
+                        <div style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                        }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <Text
+                              strong
+                              style={{
+                                color: "#ee4d2d",
+                                fontSize: 16,
+                                fontWeight: 700,
+                              }}
+                            >
+                              {Number(food.price).toLocaleString()}đ
+                            </Text>
+                          </div>
+
+                          {/* Badges */}
+                          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                            {food.is_featured && (
+                              <span style={{
+                                background: "#fff4e6",
+                                color: "#ff8c00",
+                                fontSize: 10,
+                                padding: "2px 6px",
+                                borderRadius: 4,
+                                fontWeight: "600",
+                                border: "1px solid #ffd591",
+                              }}>
+                                HOT
+                              </span>
+                            )}
+                            {food.discount_percent && (
+                              <span style={{
+                                background: "#fff1f0",
+                                color: "#ee4d2d",
+                                fontSize: 10,
+                                padding: "2px 6px",
+                                borderRadius: 4,
+                                fontWeight: "600",
+                                border: "1px solid #ffccc7",
+                              }}>
+                                Giảm {food.discount_percent}%
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        color: "#7f8c8d",
-                        lineHeight: "1.4",
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                        height: 36,
-                      }}
-                    >
-                      {food.description || "Món ăn ngon, được nhiều khách hàng yêu thích"}
-                    </Text>
+                    {/* Add to cart button - Right side */}
+                    <div style={{
+                      width: 42,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderLeft: "1px solid #f0f0f0",
+                      background: "#fafafa",
+                    }}>
+                      <Button
+                        type="text"
+                        icon={<ShoppingCartOutlined style={{ fontSize: 20, color: "#226533" }} />}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSetCart(food);
+                        }}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          border: "none",
+                          borderRadius: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      />
+                    </div>
                   </div>
-
-                  <Button
-                    type="primary"
-                    icon={<ShoppingCartOutlined />}
-                    block
-                    size="middle"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSetCart(food);
-                    }}
-                    style={{
-                      background: "linear-gradient(135deg, #226533, #2d8f47)",
-                      border: "none",
-                      borderRadius: 12,
-                      height: 42,
-                      fontWeight: 600,
-                      fontSize: 14,
-                      boxShadow: "0 4px 12px rgba(34, 101, 51, 0.25)",
-                      transition: "all 0.3s ease",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.transform = "translateY(-1px)";
-                      e.target.style.boxShadow = "0 6px 16px rgba(34, 101, 51, 0.35)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.transform = "translateY(0)";
-                      e.target.style.boxShadow = "0 4px 12px rgba(34, 101, 51, 0.25)";
-                    }}
-                  >
-                    Thêm vào giỏ
-                  </Button>
                 </Card>
               </Col>
             ))}

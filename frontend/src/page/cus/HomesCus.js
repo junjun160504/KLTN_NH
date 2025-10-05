@@ -49,7 +49,8 @@ export default function HomecsPage() {
     greeting = "Chào buổi chiều Quý khách";
   }
 
-  const tableNumber = 8;
+  const qrSession = JSON.parse(localStorage.getItem("qr_session")) || {};
+  const tableNumber = qrSession.table_id || "N/A";
 
   const banners = [
     "/assets/images/Banner1.jpg",

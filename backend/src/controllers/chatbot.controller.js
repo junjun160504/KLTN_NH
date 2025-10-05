@@ -2,13 +2,13 @@ import * as chatbotService from "../services/chatbot.service.js";
 
 export async function chatWithBot(req, res) {
   try {
-    const { message } = req.body;
+    const { message, history } = req.body;
     if (!message) {
       return res.status(400).json({ status: 400, message: "Thiếu nội dung message" });
     }
 
-    // dùng chatbotService.reply vì import * as
-    const result = await chatbotService.reply(message);
+    // Pass conversation history to service (default to empty array)
+    const result = await chatbotService.reply(message, history || []);
     res.status(200).json({ status: 200, data: result });
   } catch (err) {
     console.error("chatWithBot error:", err);
