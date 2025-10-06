@@ -14,7 +14,7 @@ import {
   Col,
   notification
 } from "antd";
-import { SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
+import { SearchOutlined, PlusOutlined } from "@ant-design/icons";
 import axios from "axios";
 import Slider from "react-slick";
 import { addToCart } from "../../redux/slices/cartSlice";
@@ -73,6 +73,39 @@ export default function CustomerMenuPage() {
   const [loading, setLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false); // State để track scroll
+
+  // Function để thực hiện tìm kiếm
+  const performSearch = (text) => {
+    const trimmedText = text.trim();
+    if (trimmedText !== "") {
+      setIsSearching(true);
+      setSelectedCategory("all");
+      callApiMenuCus(
+        `${REACT_APP_API_URL}/menu/cus/menus/${encodeURIComponent(trimmedText)}`
+      );
+    } else {
+      setIsSearching(false);
+      if (selectedCategory === "all") {
+        callApiMenuCus(`${REACT_APP_API_URL}/menu/cus/menus/all`);
+      } else {
+        callApiMenuByCategory(selectedCategory);
+      }
+    }
+  };
+
+  // Handle search button click
+  const handleSearchClick = () => {
+    performSearch(searchText);
+  };
+
+  // Handle Enter key
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.target.blur(); // Đóng bàn phím trên mobile
+      performSearch(searchText);
+    }
+  };
   // GET items
   async function callApiMenuCus(url) {
     try {
@@ -120,7 +153,7 @@ export default function CustomerMenuPage() {
     }, 500); // Debounce 500ms
 
     return () => clearTimeout(delayDebounce);
-  }, [searchText]);
+  }, [searchText, selectedCategory]); // Added selectedCategory to dependencies
   //GET items by category
   async function callApiMenuByCategory(id) {
     try {
@@ -270,9 +303,19 @@ export default function CustomerMenuPage() {
         <div style={{ padding: "0 12px 12px 12px" }}>
           <Input
             placeholder={isSearching ? "Đang tìm kiếm..." : "Tìm món ăn, đồ uống..."}
-            prefix={<SearchOutlined style={{ color: isSearching ? "#226533" : "#7f8c8d" }} />}
+            prefix={
+              <SearchOutlined
+                onClick={handleSearchClick}
+                style={{
+                  color: isSearching ? "#226533" : "#7f8c8d",
+                  cursor: "pointer",
+                  fontSize: 16,
+                }}
+              />
+            }
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
+            onKeyPress={handleKeyPress}
             style={{
               borderRadius: 24,
               height: isScrolled ? 40 : 44,
@@ -298,7 +341,15 @@ export default function CustomerMenuPage() {
                 <Button
                   type="text"
                   size="small"
-                  onClick={() => setSearchText("")}
+                  onClick={() => {
+                    setSearchText("");
+                    setIsSearching(false);
+                    if (selectedCategory === "all") {
+                      callApiMenuCus(`${REACT_APP_API_URL}/menu/cus/menus/all`);
+                    } else {
+                      callApiMenuByCategory(selectedCategory);
+                    }
+                  }}
                   style={{
                     color: "#7f8c8d",
                     minWidth: "auto",
@@ -346,6 +397,7 @@ export default function CustomerMenuPage() {
                 style={{
                   whiteSpace: "nowrap",
                   padding: "0 20px",
+                  marginRight: "3px",
                   height: "36px",
                   fontSize: "14px",
                   fontWeight: selectedCategory === "all" ? "600" : "400",
@@ -377,6 +429,7 @@ export default function CustomerMenuPage() {
                   style={{
                     whiteSpace: "nowrap",
                     padding: "0 20px",
+                    margin: "0 3px",
                     height: "36px",
                     fontSize: "14px",
                     fontWeight: selectedCategory === cat.id ? "600" : "400",
@@ -597,27 +650,26 @@ export default function CustomerMenuPage() {
                       </div>
                     </div>
 
-                    {/* Add to cart button - Right side */}
+                    {/* Add to cart button - Bottom Right Corner */}
                     <div style={{
-                      width: 42,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      borderLeft: "1px solid #f0f0f0",
-                      background: "#fafafa",
+                      position: "absolute",
+                      bottom: 8,
+                      right: 8,
                     }}>
                       <Button
-                        type="text"
-                        icon={<ShoppingCartOutlined style={{ fontSize: 20, color: "#226533" }} />}
+                        type="primary"
+                        shape="circle"
+                        icon={<PlusOutlined style={{ fontSize: 16 }} />}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleSetCart(food);
                         }}
                         style={{
-                          width: "100%",
-                          height: "100%",
+                          width: 32,
+                          height: 32,
+                          background: "#226533",
                           border: "none",
-                          borderRadius: 0,
+                          boxShadow: "0 2px 8px rgba(34, 101, 51, 0.3)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",

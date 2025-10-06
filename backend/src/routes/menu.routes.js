@@ -5,16 +5,11 @@ import {
   getMenuCategories,
   getItemsByCategory,
   getAllItemsController,
-  getMenuItemDetail,
 } from "../controllers/menu.controller.js";
 console.log("Mounting /api/menu routes...");
 const router = express.Router();
 // Khách hàng xem danh mục
 router.get("/cus/menus/categories", getMenuCategories);
-
-// Khách hàng xem chi tiết món ăn (với reviews)
-router.get("/cus/menus/item/:id", getMenuItemDetail);
-
 // Khách hàng xem món theo tên
 router.get("/cus/menus/:name", getMenuItems);
 

@@ -57,26 +57,3 @@ export async function getAllItemsController(req, res) {
     res.status(500).json({ status: 500, message: "Internal server error" });
   }
 }
-
-// Lấy chi tiết món ăn kèm reviews
-export async function getMenuItemDetail(req, res) {
-  try {
-    const { id } = req.params;
-    const item = await menuService.getMenuItemDetail(id);
-    
-    if (!item) {
-      return res.status(404).json({ 
-        status: 404, 
-        message: "Menu item not found" 
-      });
-    }
-    
-    res.json({ status: 200, data: item });
-  } catch (err) {
-    console.error("getMenuItemDetail error:", err);
-    res.status(500).json({ 
-      status: 500, 
-      message: "Internal server error" 
-    });
-  }
-}
