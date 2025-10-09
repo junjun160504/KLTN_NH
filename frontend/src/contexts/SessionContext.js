@@ -61,38 +61,14 @@ const SessionContext = createContext();
 export const SessionProvider = ({ children }) => {
   const [state, dispatch] = useReducer(sessionReducer, initialState);
 
-  // Initialize session from localStorage on app start
-  useEffect(() => {
-    const initSession = () => {
-      try {
-        const savedSession = localStorage.getItem('qr_session');
-        if (savedSession) {
-          const sessionData = JSON.parse(savedSession);
-
-          // Validate session data structure
-          if (isValidSessionData(sessionData)) {
-            dispatch({ type: SESSION_ACTIONS.SET_SESSION, payload: sessionData });
-            setupAxiosInterceptor(sessionData.session_id);
-          } else {
-            // Invalid session data, clear it
-            clearSession();
-          }
-        }
-      } catch (error) {
-        console.error('Error initializing session:', error);
-        clearSession();
-      }
-    };
-
-    initSession();
-  }, []);
-
+  // Helper functions defined before useEffect
   const isValidSessionData = (sessionData) => {
+    // Relaxed validation - only check essential fields
     return sessionData &&
       sessionData.session_id &&
-      sessionData.table_id &&
-      sessionData.table_number &&
-      sessionData.status === 'ACTIVE';
+      sessionData.table_id
+    // &&sessionData.table_number;
+    // Removed strict status check to allow session persistence
   };
 
   const clearSession = () => {
@@ -128,6 +104,44 @@ export const SessionProvider = ({ children }) => {
     // Store interceptor ID for cleanup
     axios.defaults.sessionInterceptorId = interceptorId;
   };
+
+  // Initialize session from localStorage on app start
+  useEffect(() => {
+    const initSession = () => {
+      try {
+        const savedSession = localStorage.getItem('qr_session');
+        console.log('🔍 Checking localStorage for qr_session:', savedSession);
+
+        if (savedSession) {
+          const sessionData = JSON.parse(savedSession);
+          console.log('📦 Parsed session data:', sessionData);
+
+          // Validate session data structure
+          if (isValidSessionData(sessionData)) {
+            console.log('✅ Session is valid, restoring...');
+            dispatch({ type: SESSION_ACTIONS.SET_SESSION, payload: sessionData });
+            setupAxiosInterceptor(sessionData.session_id);
+          } else {
+            console.warn('⚠️ Invalid session data structure:', sessionData);
+            console.log('Missing fields:', {
+              hasSessionId: !!sessionData.session_id,
+              hasTableId: !!sessionData.table_id,
+              hasTableNumber: !!sessionData.table_number
+            });
+            // Don't auto-clear, just log warning
+          }
+        } else {
+          console.log('ℹ️ No saved session found in localStorage');
+        }
+      } catch (error) {
+        console.error('❌ Error initializing session:', error);
+        // Don't auto-clear on error, just log it
+      }
+    };
+
+    initSession();
+  }, []); // Empty dependency array - only run once on mount
+
 
   const createSession = async (tableId, sessionToken) => {
     dispatch({ type: SESSION_ACTIONS.SET_LOADING, payload: true });

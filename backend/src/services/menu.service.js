@@ -88,3 +88,74 @@ export async function getAllItems() {
   );
   return rows;
 }
+
+// Lấy chi tiết món ăn kèm reviews và rating
+export async function getMenuItemDetail(itemId) {
+  const connection = await pool.getConnection();
+  try {
+    // 1. Get menu item info
+    const [[item]] = await connection.query(
+      `SELECT 
+        mi.*,
+        mc.id as category_id,
+        mc.name as category_name
+      FROM menu_items mi
+      LEFT JOIN menu_item_categories mic ON mi.id = mic.item_id
+      LEFT JOIN menu_categories mc ON mc.id = mic.category_id
+      WHERE mi.id = ?`,
+      [itemId]
+    );
+
+    if (!item) return null;
+
+    // 2. Get reviews statistics từ menu_reviews (không phải reviews)
+    const [[stats]] = await connection.query(
+      `SELECT 
+        COUNT(*) as total_reviews,
+        COALESCE(AVG(rating), 0) as average_rating,
+        SUM(CASE WHEN rating = 5 THEN 1 ELSE 0 END) as rating_5,
+        SUM(CASE WHEN rating = 4 THEN 1 ELSE 0 END) as rating_4,
+        SUM(CASE WHEN rating = 3 THEN 1 ELSE 0 END) as rating_3,
+        SUM(CASE WHEN rating = 2 THEN 1 ELSE 0 END) as rating_2,
+        SUM(CASE WHEN rating = 1 THEN 1 ELSE 0 END) as rating_1
+      FROM menu_reviews
+      WHERE item_id = ?`,
+      [itemId]
+    );
+
+    // 3. Get recent reviews (10 most recent)
+    const [recentReviews] = await connection.query(
+      `SELECT id, rating, comment, created_at
+       FROM menu_reviews
+       WHERE item_id = ?
+       ORDER BY created_at DESC
+       LIMIT 10`,
+      [itemId]
+    );
+
+    // 4. Build response
+    const avgRating = stats.average_rating ? parseFloat(Number(stats.average_rating).toFixed(1)) : 0;
+
+    return {
+      ...item,
+      category: item.category_id ? {
+        id: item.category_id,
+        name: item.category_name
+      } : null,
+      reviews: {
+        total: stats.total_reviews || 0,
+        average_rating: avgRating,
+        rating_distribution: {
+          5: stats.rating_5 || 0,
+          4: stats.rating_4 || 0,
+          3: stats.rating_3 || 0,
+          2: stats.rating_2 || 0,
+          1: stats.rating_1 || 0
+        },
+        recent_reviews: recentReviews
+      }
+    };
+  } finally {
+    connection.release();
+  }
+}
