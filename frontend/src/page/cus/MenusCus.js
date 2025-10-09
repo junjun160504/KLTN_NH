@@ -14,7 +14,7 @@ import {
   Col,
   notification
 } from "antd";
-import { SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
+import { SearchOutlined, PlusOutlined } from "@ant-design/icons";
 import axios from "axios";
 import Slider from "react-slick";
 import { addToCart } from "../../redux/slices/cartSlice";
@@ -529,13 +529,15 @@ export default function CustomerMenuPage() {
                             style={{
                               fontSize: 12,
                               color: "#999",
-                              lineHeight: "1.3",
+                              lineHeight: "1.4",
                               display: "-webkit-box",
                               WebkitLineClamp: 2,
                               WebkitBoxOrient: "vertical",
                               overflow: "hidden",
                               textOverflow: "ellipsis",
                               marginBottom: 4,
+                              maxHeight: "33.6px", // 12px * 1.4 * 2 = 33.6px for exactly 2 lines
+                              wordBreak: "break-word",
                             }}
                           >
                             {food.description}
@@ -597,27 +599,26 @@ export default function CustomerMenuPage() {
                       </div>
                     </div>
 
-                    {/* Add to cart button - Right side */}
+                    {/* Add to cart button - Bottom Right Corner */}
                     <div style={{
-                      width: 42,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      borderLeft: "1px solid #f0f0f0",
-                      background: "#fafafa",
+                      position: "absolute",
+                      bottom: 8,
+                      right: 8,
                     }}>
                       <Button
-                        type="text"
-                        icon={<ShoppingCartOutlined style={{ fontSize: 20, color: "#226533" }} />}
+                        type="primary"
+                        shape="circle"
+                        icon={<PlusOutlined style={{ fontSize: 16 }} />}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleSetCart(food);
                         }}
                         style={{
-                          width: "100%",
-                          height: "100%",
+                          width: 32,
+                          height: 32,
+                          background: "#226533",
                           border: "none",
-                          borderRadius: 0,
+                          boxShadow: "0 2px 8px rgba(34, 101, 51, 0.3)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
