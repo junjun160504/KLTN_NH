@@ -54,7 +54,6 @@ export async function addMenuItem({ name, price, description, category_id, image
 export async function getMenuCategories() {
   const sql = "SELECT * FROM menu_categories WHERE is_available = 1";
   const rows = await query(sql);
-  console.log("[getMenuCategories] rows:", rows);   // 👈 log ra để xem
   return rows;
 }
 // Lấy món theo category

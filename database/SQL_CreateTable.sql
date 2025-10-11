@@ -59,7 +59,7 @@ CREATE TABLE menu_price_history (
     changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     changed_by BIGINT,
     FOREIGN KEY (item_id) REFERENCES menu_items(id) ON DELETE CASCADE,
-    FOREIGN KEY (changed_by) REFERENCES admins(id) ON DELETE SET NULL
+    adminsFOREIGN KEY (changed_by) REFERENCES admins(id) ON DELETE SET NULL
 );
 
 -- Tạo bảng carts

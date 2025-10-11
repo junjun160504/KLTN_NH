@@ -1,3 +1,19 @@
+INSERT INTO employees (name, phone, email, gender, address, created_at)
+VALUES 
+('Admin', '0342845584', 'admin@gmail.com', 'FEMALE', 'Hà Nội', '2025-08-27 21:42:30'),
+('Ngô Thùy Dung', '0902222222', 'vydung0504@gmail.com', 'FEMALE', 'Hải Dương', '2025-08-27 21:42:30'),
+('Ngô Viết Tùng', '0903333333', 'tungngo@gmail.com', 'MALE', 'Hải Dương', '2025-08-27 21:42:30');
+
+INSERT INTO admins (employee_id, username, password, role, is_active, created_at)
+VALUES
+(1, 'admin', '123456', 'OWNER', 1, '2025-08-27 21:49:42'),
+(2, 'dungnt', '123456', 'STAFF', 1, '2025-08-27 21:49:42'),
+(3, 'tungnv', '123456', 'STAFF', 1, '2025-08-27 21:49:42');
+
+INSERT INTO customers (phone, created_at)
+VALUES ('0900000001', '2025-08-27 21:51:11');
+
+
 -- menu
 INSERT INTO menu_categories (name, description) VALUES
 ('Món đặc trưng','Các món đặc sản nổi bật, mang hương vị đặc trưng của nhà hàng.'),
