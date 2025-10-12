@@ -1,4 +1,5 @@
 import { pool, query } from "../config/db.js";
+import * as notificationService from "./notification.service.js";
 
 // Tạo hoặc thêm items vào đơn hiện tại (Smart logic)
 export async function createOrder({ qr_session_id, items }) {
@@ -33,10 +34,12 @@ export async function createOrder({ qr_session_id, items }) {
     );
 
     let orderId;
+    let isNewOrder = false;
 
     if (existingOrder) {
       // 2a. Reuse existing active order
       orderId = existingOrder.id;
+      isNewOrder = false;
       console.log(`✅ Adding items to existing order #${orderId} (status: ${existingOrder.status})`);
     } else {
       // 2b. Create new order (no active order found, or previous order was PAID/DONE/CANCELLED)
@@ -45,6 +48,7 @@ export async function createOrder({ qr_session_id, items }) {
         [qr_session_id]
       );
       orderId = orderResult.insertId;
+      isNewOrder = true;
       console.log(`✅ Created new order #${orderId}`);
     }
 
@@ -85,8 +89,76 @@ export async function createOrder({ qr_session_id, items }) {
 
     await connection.commit();
 
-    // 6. Return complete order with items
-    return await getOrderById(orderId);
+    // 6. Get complete order data for notification
+    const orderData = await getOrderById(orderId);
+
+    // 7. Lấy thông tin bàn
+    const [[tableInfo]] = await connection.query(
+      `SELECT t.id, t.table_number 
+       FROM qr_sessions qs 
+       JOIN tables t ON qs.table_id = t.id 
+       WHERE qs.id = ?`,
+      [qr_session_id]
+    );
+
+    // 8. Tạo notification cho STAFF
+    try {
+      const itemNames = items.map((item, index) => {
+        const orderItem = orderItems[index];
+        return `${item.quantity}x món (giá: ${orderItem[4].toLocaleString()}đ)`;
+      }).join(', ');
+
+      const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+      const tableName = tableInfo ? `Bàn ${tableInfo.table_number}` : 'Bàn N/A';
+
+      if (isNewOrder) {
+        // Thông báo order mới
+        await notificationService.createNotification({
+          target_type: "STAFF",
+          target_id: null,
+          type: "ORDER_NEW",
+          title: `🆕 ${tableName} - Đơn hàng mới #${orderId}`,
+          message: `Khách hàng vừa tạo đơn hàng mới với ${totalItems} món: ${itemNames}`,
+          priority: "high",
+          action_url: `/management/orders/${orderId}`,
+          metadata: {
+            orderId,
+            qrSessionId: qr_session_id,
+            tableId: tableInfo?.id,
+            tableName: tableInfo?.table_number,
+            totalItems,
+            isNewOrder: true
+          },
+        });
+        console.log(`📤 Notification sent: New order #${orderId} - ${tableName}`);
+      } else {
+        // Thông báo thêm món vào order cũ
+        await notificationService.createNotification({
+          target_type: "STAFF",
+          target_id: null,
+          type: "ORDER_UPDATE",
+          title: `${tableName} - Thêm món vào đơn #${orderId}`,
+          message: `Khách hàng vừa thêm ${totalItems} món: ${itemNames}`,
+          priority: "medium",
+          action_url: `/management/orders/${orderId}`,
+          metadata: {
+            orderId,
+            qrSessionId: qr_session_id,
+            tableId: tableInfo?.id,
+            tableName: tableInfo?.table_number,
+            totalItems,
+            isNewOrder: false
+          },
+        });
+        console.log(`📤 Notification sent: Added items to order #${orderId} - ${tableName}`);
+      }
+    } catch (notifError) {
+      // Không throw error nếu notification fail, vẫn return order thành công
+      console.error('⚠️ Failed to send notification:', notifError);
+    }
+
+    // 9. Return complete order with items
+    return orderData;
 
   } catch (err) {
     await connection.rollback();
@@ -156,8 +228,54 @@ export async function addItem(orderId, itemsData) {
 
     await connection.commit();
 
-    // 6. Return updated order with all items
-    return await getOrderById(orderId);
+    // 6. Get complete order data for notification
+    const orderData = await getOrderById(orderId);
+
+    // 7. Lấy thông tin bàn từ order
+    const [[tableInfo]] = await connection.query(
+      `SELECT t.id, t.table_number, o.qr_session_id
+       FROM orders o
+       JOIN qr_sessions qs ON o.qr_session_id = qs.id
+       JOIN tables t ON qs.table_id = t.id
+       WHERE o.id = ?`,
+      [orderId]
+    );
+
+    // 8. Tạo notification cho STAFF khi thêm món vào order cũ
+    try {
+      const itemNames = items.map((item, index) => {
+        const orderItem = orderItems[index];
+        return `${item.quantity}x món (giá: ${orderItem[4].toLocaleString()}đ)`;
+      }).join(', ');
+
+      const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+      const tableName = tableInfo ? `Bàn ${tableInfo.table_number}` : 'Bàn N/A';
+
+      await notificationService.createNotification({
+        target_type: "STAFF",
+        target_id: null,
+        type: "ORDER_UPDATE",
+        title: `➕ ${tableName} - Thêm món vào đơn #${orderId}`,
+        message: `Khách hàng vừa thêm ${totalItems} món: ${itemNames}`,
+        priority: "medium",
+        action_url: `/management/orders/${orderId}`,
+        metadata: {
+          orderId,
+          qrSessionId: tableInfo?.qr_session_id,
+          tableId: tableInfo?.id,
+          tableName: tableInfo?.table_number,
+          totalItems,
+          isAddItem: true
+        },
+      });
+      console.log(`📤 Notification sent: Added items to order #${orderId} - ${tableName}`);
+    } catch (notifError) {
+      // Không throw error nếu notification fail, vẫn return order thành công
+      console.error('⚠️ Failed to send notification:', notifError);
+    }
+
+    // 9. Return updated order with all items
+    return orderData;
 
   } catch (err) {
     await connection.rollback();

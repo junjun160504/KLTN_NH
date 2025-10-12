@@ -17,6 +17,7 @@
     "react-slick": "^0.31.0",
     "recharts": "^3.2.1",
     "slick-carousel": "^1.8.1",
+    "socket.io-client": "^4.8.1",
     "xlsx": "^0.18.5"
   },
   "scripts": {

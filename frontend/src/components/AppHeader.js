@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Layout, Button, Dropdown, Space, List, Typography, Badge } from "antd";
+import { Layout, Button, Dropdown, Space, Badge } from "antd";
 import {
   MenuUnfoldOutlined,
   MenuFoldOutlined,
@@ -8,19 +8,16 @@ import {
   DownOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import { useNotifications } from "../contexts/NotificationContext";
+import NotificationDropdown from "./NotificationDropdown";
 
 const { Header } = Layout;
-const { Text } = Typography;
 
 const AppHeader = ({ collapsed, setCollapsed, pageTitle }) => {
   const [isMobile, setIsMobile] = useState(false);
-  const [notifications, setNotifications] = useState([
-    { id: 1, message: "Đơn hàng #123 đã được thanh toán", read: false },
-    { id: 2, message: "Nguyên liệu mới đã nhập kho", read: true },
-    { id: 3, message: "Có 1 đánh giá mới từ khách hàng", read: false },
-  ]);
-
+  const [dropdownVisible, setDropdownVisible] = useState(false);
   const navigate = useNavigate();
+  const { unreadCount } = useNotifications();
 
   // Menu user
   const handleMenuClick = ({ key }) => {
@@ -51,40 +48,6 @@ const AppHeader = ({ collapsed, setCollapsed, pageTitle }) => {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-
-  // Menu thông báo
-  const notificationMenu = (
-    <div style={{ width: 360, maxHeight: 400, overflowY: "auto" }}>
-      {notifications.length === 0 ? (
-        <div style={{ padding: 16, textAlign: "center", color: "#888" }}>
-          Không có thông báo nào
-        </div>
-      ) : (
-        <List
-          dataSource={notifications}
-          renderItem={(item) => (
-            <List.Item
-              style={{
-                background: item.read ? "#fff" : "#e6f7e6",
-                cursor: "pointer",
-                padding: "12px 16px",
-                borderBottom: "1px solid #f0f0f0",
-              }}
-              onClick={() =>
-                setNotifications((prev) =>
-                  prev.map((n) =>
-                    n.id === item.id ? { ...n, read: true } : n
-                  )
-                )
-              }
-            >
-              <Text strong={!item.read}>{item.message}</Text>
-            </List.Item>
-          )}
-        />
-      )}
-    </div>
-  );
 
   return (
     <Header
@@ -117,11 +80,21 @@ const AppHeader = ({ collapsed, setCollapsed, pageTitle }) => {
       </div>
 
       {/* Bên phải: Notifications + User */}
-      <div style={{ display: "flex", alignItems: "center" }}>
-        <Dropdown dropdownRender={() => notificationMenu} trigger={["click"]}>
+      <div style={{ display: "flex", alignItems: "center", position: "relative" }}>
+        <Dropdown
+          popupRender={() => (
+            <NotificationDropdown onClose={() => setDropdownVisible(false)} />
+          )}
+          trigger={["click"]}
+          open={dropdownVisible}
+          onOpenChange={setDropdownVisible}
+          placement="bottomRight"
+          getPopupContainer={(trigger) => trigger.parentElement}
+        >
           <Badge
-            count={notifications.filter((n) => !n.read).length}
-            overflowCount={9}
+            count={unreadCount}
+            overflowCount={99}
+            offset={[-4, 4]}
           >
             <BellOutlined
               style={{
