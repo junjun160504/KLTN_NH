@@ -14,6 +14,7 @@ import HomecsPage from "./page/cus/HomesCus";
 import MenucsPage from "./page/cus/MenusCus";
 import CartcsPage from "./page/cus/CartsCus";
 import BillcsPage from "./page/cus/BillsCus";
+import PaymentcsPage from "./page/cus/PaymentCus";
 import ChatbotcsPage from "./page/cus/ChatbotsCus";
 import ReviewcsPage from "./page/cus/ReviewsCus";
 import FoodReviewcsPage from "./page/cus/FoodReviewsCus";
@@ -89,6 +90,10 @@ const routes = [
   {
     path: "/cus/bills",
     element: <BillcsPage />,
+  },
+  {
+    path: "/cus/payment",
+    element: <PaymentcsPage />,
   },
   {
     path: "/cus/chatbot",

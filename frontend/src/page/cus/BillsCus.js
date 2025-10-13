@@ -1,24 +1,20 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Layout,
   Typography,
   Tag,
   Button,
-  Divider,
   Modal,
   message,
-  Progress,
   Skeleton,
   Empty,
 } from "antd";
 import {
   ArrowLeftOutlined,
-  DownloadOutlined,
   SmileOutlined,
   ClockCircleOutlined,
   CheckCircleOutlined,
   FireOutlined,
-  CoffeeOutlined,
   SyncOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
@@ -30,36 +26,81 @@ const { Title, Text } = Typography;
 
 const REACT_APP_API_URL = process.env.REACT_APP_API_URL;
 
+// ✅ Format giá tiền theo chuẩn VN: 500000 => 500.000
+const formatPrice = (price) => {
+  return Math.round(price).toLocaleString('vi-VN');
+};
+
+// ✅ Status config cho ORDER (không phải item) - Move ra ngoài để tránh re-create
+const STATUS_CONFIG = {
+  NEW: {
+    label: "Đang chờ",
+    color: "blue",
+    bgColor: "bg-blue-50",
+    borderColor: "border-blue-200",
+    icon: <ClockCircleOutlined className="text-blue-500" />,
+    progress: 0,
+  },
+  IN_PROGRESS: {
+    label: "Đang làm",
+    color: "orange",
+    bgColor: "bg-orange-50",
+    borderColor: "border-orange-200",
+    icon: <FireOutlined className="text-orange-500" />,
+    progress: 50,
+  },
+  DONE: {
+    label: "Hoàn thành",
+    color: "green",
+    bgColor: "bg-green-50",
+    borderColor: "border-green-200",
+    icon: <CheckCircleOutlined className="text-green-500" />,
+    progress: 100,
+  },
+  PAID: {
+    label: "Đã thanh toán",
+    color: "purple",
+    bgColor: "bg-purple-50",
+    borderColor: "border-purple-200",
+    icon: <CheckCircleOutlined className="text-purple-500" />,
+    progress: 100,
+  },
+  CANCELLED: {
+    label: "Đã hủy",
+    color: "red",
+    bgColor: "bg-red-50",
+    borderColor: "border-red-200",
+    icon: <ClockCircleOutlined className="text-red-500" />,
+    progress: 0,
+  },
+};
+
 export default function CustomerBillPage() {
   const navigate = useNavigate();
 
   // ✅ State
-  const [orders, setOrders] = useState([]); // Danh sách đơn hàng
   const [orderItems, setOrderItems] = useState([]); // Tất cả items từ các orders
   const [loading, setLoading] = useState(true);
-  const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
   const [isThankYouVisible, setIsThankYouVisible] = useState(false);
+  const [expandedOrders, setExpandedOrders] = useState({}); // Track which orders are expanded
 
-  // ✅ Fetch orders khi component mount
-  useEffect(() => {
-    fetchOrders();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ✅ Auto refresh mỗi 30s để cập nhật trạng thái
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchOrders();
-    }, 30000); // 30 seconds
-
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Toggle expand/collapse for an order
+  const toggleOrderExpand = (orderId) => {
+    setExpandedOrders(prev => ({
+      ...prev,
+      [orderId]: !prev[orderId]
+    }));
+  };
 
   // ✅ Fetch danh sách orders theo qr_session_id
-  const fetchOrders = async () => {
+  // @param {boolean} silent - Nếu true, không hiển thị loading skeleton
+  // Wrap trong useCallback để tránh re-create function mỗi render
+  const fetchOrders = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      // Chỉ set loading khi không phải silent refresh
+      if (!silent) {
+        setLoading(true);
+      }
 
       // Lấy qr_session_id từ localStorage
       const sessionData = localStorage.getItem("qr_session");
@@ -77,100 +118,70 @@ export default function CustomerBillPage() {
       );
 
       const fetchedOrders = response.data.data || [];
-      setOrders(fetchedOrders);
 
-      // Flatten tất cả items từ các orders
-      const allItems = fetchedOrders.flatMap((order) =>
-        (order.items || []).map((item) => ({
-          ...item,
-          orderId: order.id,
-          orderStatus: order.status,
-          orderCreatedAt: order.created_at,
-        }))
-      );
-      setOrderItems(allItems);
+      // Transform orders để thêm computed fields
+      const transformedOrders = fetchedOrders.map(order => ({
+        ...order,
+        totalItems: order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0,
+        totalPrice: order.items?.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0) || 0
+      }));
+
+      setOrderItems(transformedOrders);
 
     } catch (error) {
       console.error("Error fetching orders:", error);
       if (error.response?.status === 404) {
         // Chưa có order nào
-        setOrders([]);
         setOrderItems([]);
       } else {
-        message.error("Không thể tải đơn hàng. Vui lòng thử lại!");
+        // Chỉ hiển thị error message khi không phải silent refresh
+        if (!silent) {
+          message.error("Không thể tải đơn hàng. Vui lòng thử lại!");
+        }
       }
     } finally {
-      setLoading(false);
+      // Chỉ set loading = false khi không phải silent
+      if (!silent) {
+        setLoading(false);
+      }
     }
-  };
+  }, [navigate]); // Dependencies: navigate
 
-  // ✅ Tính toán
-  const totalQty = orderItems.reduce((sum, item) => sum + item.quantity, 0);
-  const totalPrice = orderItems.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
+  // ✅ Fetch orders khi component mount
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
 
-  // Group items by order status (trạng thái của đơn hàng)
-  const newOrders = orders.filter(o => o.status === "NEW");
-  const inProgressOrders = orders.filter(o => o.status === "IN_PROGRESS");
-  const doneOrders = orders.filter(o => o.status === "DONE");
+  // ✅ Auto refresh mỗi 30s để cập nhật trạng thái (silent mode)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchOrders(true); // Silent refresh - không hiển thị loading
+    }, 30000); // 30 seconds
 
-  // ✅ Status config cho ORDER (không phải item)
-  const statusConfig = {
-    NEW: {
-      label: "Đang chờ",
-      color: "blue",
-      bgColor: "bg-blue-50",
-      borderColor: "border-blue-200",
-      icon: <ClockCircleOutlined className="text-blue-500" />,
-      progress: 0,
-    },
-    IN_PROGRESS: {
-      label: "Đang làm",
-      color: "orange",
-      bgColor: "bg-orange-50",
-      borderColor: "border-orange-200",
-      icon: <FireOutlined className="text-orange-500" />,
-      progress: 50,
-    },
-    DONE: {
-      label: "Hoàn thành",
-      color: "green",
-      bgColor: "bg-green-50",
-      borderColor: "border-green-200",
-      icon: <CheckCircleOutlined className="text-green-500" />,
-      progress: 100,
-    },
-    PAID: {
-      label: "Đã thanh toán",
-      color: "purple",
-      bgColor: "bg-purple-50",
-      borderColor: "border-purple-200",
-      icon: <CheckCircleOutlined className="text-purple-500" />,
-      progress: 100,
-    },
-    CANCELLED: {
-      label: "Đã hủy",
-      color: "red",
-      bgColor: "bg-red-50",
-      borderColor: "border-red-200",
-      icon: <ClockCircleOutlined className="text-red-500" />,
-      progress: 0,
-    },
-  };
+    return () => clearInterval(interval);
+  }, [fetchOrders]);
+
+  // ✅ Tính toán tổng - CHỈ các đơn CHƯA thanh toán (status !== 'PAID')
+  // Dùng useMemo để tránh tính toán lại không cần thiết
+  const unpaidOrders = useMemo(() =>
+    orderItems.filter(order => order.status !== 'PAID'),
+    [orderItems]
+  );
+
+  const totalQty = useMemo(() =>
+    unpaidOrders.reduce((sum, order) => sum + (order.totalItems || 0), 0),
+    [unpaidOrders]
+  );
+
+  const totalPrice = useMemo(() =>
+    unpaidOrders.reduce((sum, order) => sum + (order.totalPrice || 0), 0),
+    [unpaidOrders]
+  );
 
   // ✅ Format time
   const formatTime = (isoString) => {
     const date = new Date(isoString);
     return date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
-  };
-
-  // ✅ Handler thanh toán
-  const handleDownloadQR = () => {
-    const link = document.createElement("a");
-    link.href = "/mock-qr.png";
-    link.download = "vietqr.png";
-    link.click();
-    setIsPaymentModalVisible(false);
-    setIsThankYouVisible(true);
   };
 
   return (
@@ -206,7 +217,7 @@ export default function CustomerBillPage() {
         <Button
           type="text"
           icon={<SyncOutlined style={{ color: "#226533", fontSize: 18 }} />}
-          onClick={fetchOrders}
+          onClick={() => fetchOrders(false)} // Manual refresh - hiển thị loading
           loading={loading}
         />
       </Header>
@@ -214,185 +225,273 @@ export default function CustomerBillPage() {
       {/* ========== CONTENT ========== */}
       <Content
         style={{
-          padding: "12px",
-          paddingTop: "76px",
-          paddingBottom: "190px",
+          padding: "1px",
+          paddingTop: "72px",
+          paddingBottom: "180px",
         }}
       >
-        {/* ===== STATUS TABS ===== */}
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-2" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
-          <div
-            className="flex-shrink-0 rounded-full bg-blue-50 border border-blue-200 transition-all cursor-pointer hover:shadow-md"
-            style={{ padding: "8px 12px", display: "flex", alignItems: "center", gap: 8 }}
-          >
-            <ClockCircleOutlined style={{ color: "#1890ff", fontSize: 16 }} />
-            <div>
-              <Text style={{ fontSize: 11, color: "#666", display: "block" }}>Đang chờ</Text>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#1890ff", lineHeight: 1 }}>{newOrders.length}</div>
-            </div>
-          </div>
-
-          <div
-            className="flex-shrink-0 rounded-full bg-orange-50 border border-orange-200 transition-all cursor-pointer hover:shadow-md"
-            style={{ padding: "8px 12px", display: "flex", alignItems: "center", gap: 8 }}
-          >
-            <FireOutlined style={{ color: "#fa8c16", fontSize: 16 }} />
-            <div>
-              <Text style={{ fontSize: 11, color: "#666", display: "block" }}>Đang làm</Text>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#fa8c16", lineHeight: 1 }}>{inProgressOrders.length}</div>
-            </div>
-          </div>
-
-          <div
-            className="flex-shrink-0 rounded-full bg-green-50 border border-green-200 transition-all cursor-pointer hover:shadow-md"
-            style={{ padding: "8px 12px", display: "flex", alignItems: "center", gap: 8 }}
-          >
-            <CheckCircleOutlined style={{ color: "#52c41a", fontSize: 16 }} />
-            <div>
-              <Text style={{ fontSize: 11, color: "#666", display: "block" }}>Hoàn thành</Text>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#52c41a", lineHeight: 1 }}>{doneOrders.length}</div>
-            </div>
-          </div>
-        </div>
-
         {/* ===== ORDERS LIST ===== */}
         {loading ? (
           <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} active avatar paragraph={{ rows: 1 }} />
+            {[1, 2].map((i) => (
+              <Skeleton key={i} active paragraph={{ rows: 3 }} />
             ))}
           </div>
         ) : orderItems.length === 0 ? (
           <Empty
-            description="Chưa có món nào trong đơn hàng"
+            description="Chưa có đơn hàng nào"
             image={Empty.PRESENTED_IMAGE_SIMPLE}
           />
         ) : (
           <div style={{ marginBottom: 16 }}>
-            {orderItems.map((item) => {
-              const config = statusConfig[item.orderStatus]; // Lấy config theo ORDER status
+            {/* Render each ORDER as a card */}
+            {orderItems.map((order) => {
+              const config = STATUS_CONFIG[order.status];
+              const isExpanded = expandedOrders[order.id];
+
               return (
                 <div
-                  key={item.id}
-                  className={`${config.bgColor} border ${config.borderColor} rounded-xl transition-all duration-300 hover:shadow-md`}
+                  key={order.id}
                   style={{
-                    position: "relative",
-                    overflow: "hidden",
                     marginBottom: 12,
-                    padding: 12,
+                    background: "#fff",
+                    borderRadius: 8,
+                    overflow: "hidden",
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+                    border: "1px solid #f0f0f0",
+                    opacity: order.status === 'PAID' ? 0.8 : 1, // Mờ đi nếu đã thanh toán
                   }}
                 >
-                  {/* Progress Bar */}
+                  {/* Order Header - Compact & Clean */}
                   <div
                     style={{
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      height: 3,
+                      padding: "10px 12px",
+                      background: config.bgColor.replace("bg-", "").replace("-50", ""),
+                      backgroundColor:
+                        order.status === "NEW" ? "#e6f7ff" :
+                          order.status === "IN_PROGRESS" ? "#fff7e6" :
+                            order.status === "DONE" ? "#f6ffed" :
+                              order.status === "PAID" ? "#f9f0ff" : "#fff1f0",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      {/* Status Icon */}
+                      <div
+                        style={{
+                          fontSize: 16,
+                          display: "flex",
+                          alignItems: "center",
+                        }}
+                      >
+                        {config.icon}
+                      </div>
+
+                      {/* Order Info */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        <Text strong style={{ fontSize: 13, color: "#333", lineHeight: 1 }}>
+                          Đơn hàng #{order.id}
+                        </Text>
+                        <Text type="secondary" style={{ fontSize: 11, lineHeight: 1 }}>
+                          {formatTime(order.created_at)}
+                        </Text>
+                      </div>
+                    </div>
+
+                    {/* Status Badge */}
+                    <Tag
+                      color={config.color}
+                      style={{
+                        borderRadius: 4,
+                        fontSize: 10,
+                        padding: "2px 6px",
+                        margin: 0,
+                        fontWeight: 500,
+                      }}
+                    >
+                      {config.label}
+                    </Tag>
+                  </div>
+
+                  {/* Order Items List - Optimized for Mobile */}
+                  <div style={{ padding: "10px 12px" }}>
+                    {/* Reverse items array to show newest first */}
+                    {[...(order.items || [])].reverse()
+                      .slice(0, isExpanded ? order.items.length : 1)
+                      .map((item, index, array) => (
+                        <div
+                          key={item.id}
+                          style={{
+                            display: "flex",
+                            gap: 10,
+                            paddingBottom: index < array.length - 1 ? 10 : 0,
+                            marginBottom: index < array.length - 1 ? 10 : 0,
+                            borderBottom: index < array.length - 1 ? "1px dashed #f0f0f0" : "none",
+                          }}
+                        >
+                          {/* Item Image - Smaller for mobile */}
+                          <img
+                            src={item.image_url || "https://via.placeholder.com/70"}
+                            alt={item.menu_item_name}
+                            style={{
+                              width: 70,
+                              height: 70,
+                              objectFit: "cover",
+                              borderRadius: 6,
+                              border: "1px solid #e8e8e8",
+                              flexShrink: 0,
+                            }}
+                          />
+
+                          {/* Item Info - Vertical Layout */}
+                          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+                            {/* Item Name - 2 lines max */}
+                            <Text
+                              strong
+                              style={{
+                                fontSize: 13,
+                                lineHeight: "18px",
+                                display: "-webkit-box",
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: "vertical",
+                                overflow: "hidden",
+                                color: "#333",
+                              }}
+                            >
+                              {item.menu_item_name}
+                            </Text>
+
+                            {/* Price Row - Compact (MOVED UP) */}
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                              }}
+                            >
+                              {/* Unit Price */}
+                              <Text type="secondary" style={{ fontSize: 11 }}>
+                                {formatPrice(item.unit_price)}đ
+                              </Text>
+
+                              {/* Quantity & Total */}
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <Text type="secondary" style={{ fontSize: 11 }}>
+                                  x{item.quantity}
+                                </Text>
+                                <Text
+                                  strong
+                                  style={{
+                                    fontSize: 14,
+                                    color: "#226533",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {formatPrice(item.unit_price * item.quantity)}đ
+                                </Text>
+                              </div>
+                            </div>
+
+                            {/* Note (if exists) - Compact (MOVED DOWN) */}
+                            {item.note && (
+                              <div
+                                style={{
+                                  padding: "3px 6px",
+                                  borderRadius: 3,
+                                  background: "#f5f5f5",
+                                  display: "inline-block",
+                                  alignSelf: "flex-start",
+                                }}
+                              >
+                                <Text style={{ fontSize: 10, color: "#666" }}>
+                                  💬 {item.note}
+                                </Text>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+
+                    {/* Show More / Show Less Button - Compact */}
+                    {order.items && order.items.length > 1 && (
+                      <div
+                        onClick={() => toggleOrderExpand(order.id)}
+                        style={{
+                          marginTop: 8,
+                          padding: "6px 0",
+                          textAlign: "center",
+                          color: "#226533",
+                          fontSize: 12,
+                          fontWeight: 500,
+                          cursor: "pointer",
+                          borderTop: "1px solid #f5f5f5",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 4,
+                        }}
+                      >
+                        <span style={{ fontSize: 10 }}>
+                          {isExpanded ? "▲" : "▼"}
+                        </span>
+                        <span>
+                          {isExpanded
+                            ? "Thu gọn"
+                            // : `Xem thêm ${order.items.length - 1} món`
+                            : `Xem thêm`
+                          }
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Order Footer - Compact Total */}
+                  <div
+                    style={{
+                      padding: "8px 12px",
+                      background: "#fafafa",
+                      borderTop: "1px solid #f0f0f0",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text type="secondary" style={{ fontSize: 11 }}>
+                      {order.totalItems} món
+                    </Text>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                      <Text type="secondary" style={{ fontSize: 11 }}>
+                        Tổng:
+                      </Text>
+                      <Text
+                        strong
+                        style={{
+                          fontSize: 15,
+                          color: "#226533",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {formatPrice(order.totalPrice)}đ
+                      </Text>
+                    </div>
+                  </div>
+
+                  {/* Progress Bar - Thin indicator at bottom */}
+                  <div
+                    style={{
+                      height: 2,
                       width: `${config.progress}%`,
                       background:
-                        item.orderStatus === "NEW"
+                        order.status === "NEW"
                           ? "#1890ff"
-                          : item.orderStatus === "IN_PROGRESS"
+                          : order.status === "IN_PROGRESS"
                             ? "#fa8c16"
                             : "#52c41a",
                       transition: "width 0.5s ease",
                     }}
                   />
-
-                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                    {/* Image with Status Icon */}
-                    <div style={{ position: "relative", flexShrink: 0 }}>
-                      <img
-                        src={item.image_url || "https://via.placeholder.com/70"}
-                        alt={item.menu_item_name}
-                        className="rounded-lg shadow-sm"
-                        style={{
-                          width: 70,
-                          height: 70,
-                          objectFit: "cover",
-                        }}
-                      />
-                      {/* Status Icon - Top Left Corner of Image */}
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: -6,
-                          left: -6,
-                          width: 28,
-                          height: 28,
-                          borderRadius: "50%",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          background: "rgba(255,255,255,0.95)",
-                          boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-                          zIndex: 1,
-                        }}
-                      >
-                        {config.icon}
-                      </div>
-                    </div>
-
-                    {/* Info */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
-                        <Text strong style={{ fontSize: 14, display: "block", marginRight: 8 }}>
-                          {item.menu_item_name}
-                        </Text>
-                        <Tag color={config.color} style={{ borderRadius: 8, fontSize: 11, padding: "0 6px", flexShrink: 0 }}>
-                          {config.label}
-                        </Tag>
-                      </div>
-
-                      <Text type="secondary" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
-                        {formatTime(item.orderCreatedAt)} • x{item.quantity}
-                      </Text>
-
-                      {item.note && (
-                        <div
-                          style={{
-                            marginTop: 4,
-                            padding: "4px 8px",
-                            borderRadius: 6,
-                            background: "rgba(0,0,0,0.03)",
-                            marginBottom: 6,
-                          }}
-                        >
-                          <Text style={{ fontSize: 11, color: "#666" }}>
-                            💬 {item.note}
-                          </Text>
-                        </div>
-                      )}
-
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <Text style={{ fontSize: 12, color: "#999" }}>
-                          {item.unit_price.toLocaleString()}đ × {item.quantity}
-                        </Text>
-                        <Text
-                          strong
-                          style={{
-                            fontSize: 16,
-                            color: "#226533",
-                            fontWeight: 700,
-                          }}
-                        >
-                          {(item.unit_price * item.quantity).toLocaleString()}đ
-                        </Text>
-                      </div>
-
-                      {/* Progress for IN_PROGRESS */}
-                      {item.orderStatus === "IN_PROGRESS" && (
-                        <Progress
-                          percent={50}
-                          size="small"
-                          strokeColor="#fa8c16"
-                          showInfo={false}
-                          style={{ marginTop: 6 }}
-                        />
-                      )}
-                    </div>
-                  </div>
                 </div>
               );
             })}
@@ -401,7 +500,8 @@ export default function CustomerBillPage() {
       </Content>
 
       {/* ========== FIXED FOOTER PAYMENT ========== */}
-      {orderItems.length > 0 && (
+      {/* Chỉ hiển thị khi có đơn chưa thanh toán */}
+      {unpaidOrders.length > 0 && (
         <div
           className="animate-slide-up"
           style={{
@@ -410,7 +510,7 @@ export default function CustomerBillPage() {
             left: 0,
             right: 0,
             background: "#fff",
-            padding: "10px 16px",
+            padding: "10px 12px",
             borderTop: "2px solid #f0f0f0",
             boxShadow: "0 -4px 16px rgba(0,0,0,0.08)",
             zIndex: 1000,
@@ -427,7 +527,7 @@ export default function CustomerBillPage() {
             <div style={{ flex: 1 }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 2 }}>
                 <Text strong style={{ fontSize: 16, color: "#226533" }}>
-                  {totalPrice.toLocaleString()}đ
+                  {formatPrice(totalPrice)}đ
                 </Text>
                 <Text type="secondary" style={{ fontSize: 12 }}>
                   ({totalQty} món)
@@ -446,15 +546,20 @@ export default function CustomerBillPage() {
                 fontSize: 15,
                 fontWeight: 600,
                 height: 44,
-                paddingLeft: 24,
-                paddingRight: 24,
+                paddingLeft: 16,
+                paddingRight: 16,
                 background: "linear-gradient(135deg, #226533 0%, #2d8e47 100%)",
                 border: "none",
                 borderRadius: 10,
                 boxShadow: "0 4px 12px rgba(34, 101, 51, 0.3)",
                 flexShrink: 0,
               }}
-              onClick={() => setIsPaymentModalVisible(true)}
+              onClick={() => navigate('/cus/payment', {
+                state: {
+                  totalPrice,
+                  unpaidOrders
+                }
+              })}
             >
               💳 Thanh toán
             </Button>
@@ -462,85 +567,8 @@ export default function CustomerBillPage() {
         </div>
       )}
 
-      {/* ========== MODAL THANH TOÁN ========== */}
-      <Modal
-        title={
-          <div style={{ textAlign: "center", fontSize: 18, fontWeight: 600 }}>
-            Chọn phương thức thanh toán
-          </div>
-        }
-        centered
-        open={isPaymentModalVisible}
-        onCancel={() => setIsPaymentModalVisible(false)}
-        footer={null}
-        width={400}
-      >
-        <div style={{ padding: "8px 0" }}>
-          {/* Tổng tiền */}
-          <div
-            className="mb-4 p-4 rounded-xl text-center"
-            style={{
-              background: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-              color: "#fff",
-            }}
-          >
-            <Text style={{ color: "rgba(255,255,255,0.9)", fontSize: 14 }}>
-              Tổng thanh toán
-            </Text>
-            <div style={{ fontSize: 32, fontWeight: 700, marginTop: 4 }}>
-              {totalPrice.toLocaleString()}đ
-            </div>
-          </div>
-
-          {/* Tiền mặt */}
-          <Button
-            type="primary"
-            size="large"
-            block
-            className="mb-3 hover:scale-105 transition-transform"
-            style={{
-              height: 56,
-              fontSize: 16,
-              fontWeight: 600,
-              background: "#226533",
-              borderRadius: 12,
-            }}
-            onClick={() => {
-              setIsPaymentModalVisible(false);
-              message.success("Nhân viên sẽ tới trong vài phút để hỗ trợ!");
-              setTimeout(() => setIsThankYouVisible(true), 500);
-            }}
-          >
-            💵 Thanh toán tiền mặt
-          </Button>
-
-          <Divider>hoặc</Divider>
-
-          {/* VietQR */}
-          <div
-            className="text-center p-4 rounded-xl border-2 border-dashed border-gray-300 hover:border-blue-400 transition-all"
-            style={{ background: "#fafafa" }}
-          >
-            <CoffeeOutlined style={{ fontSize: 48, color: "#226533", marginBottom: 12 }} />
-            <Text strong style={{ display: "block", marginBottom: 8, fontSize: 16 }}>
-              Quét mã VietQR
-            </Text>
-            <Text type="secondary" style={{ fontSize: 13, display: "block", marginBottom: 16 }}>
-              Quét mã để thanh toán nhanh chóng
-            </Text>
-            <Button
-              icon={<DownloadOutlined />}
-              onClick={handleDownloadQR}
-              style={{
-                borderRadius: 8,
-                fontWeight: 600,
-              }}
-            >
-              Tải mã QR
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      {/* ========== MODAL THANH TOÁN - Đã thay bằng trang mới /cus/payment ========== */}
+      {/* Giữ lại code cũ để tham khảo, có thể xóa sau */}
 
       {/* ========== MODAL CẢM ƠN ========== */}
       <Modal
@@ -550,7 +578,7 @@ export default function CustomerBillPage() {
         footer={null}
         width={360}
       >
-        <div style={{ textAlign: "center", padding: "24px 8px" }}>
+        <div style={{ textAlign: "center", padding: "16px 8px" }}>
           <div
             className="animate-bounce"
             style={{
