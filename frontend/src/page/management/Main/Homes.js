@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import AppHeader from "../../../components/AppHeader";
 import AppSidebar from "../../../components/AppSidebar";
+import useSidebarCollapse from "../../../hooks/useSidebarCollapse";
 import {
   Layout,
   DatePicker,
@@ -32,7 +33,7 @@ const { Title, Text } = Typography;
 const { Option } = Select;
 
 const Home = () => {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useSidebarCollapse();
   const [pageTitle] = useState("Tổng quan");
   const [activeButton, setActiveButton] = useState("today");
   const [orderView, setOrderView] = useState("day"); // trạng thái cho biểu đồ đơn hàng

@@ -16,6 +16,7 @@ import {
 import axios from "axios";
 import AppHeader from "../../../components/AppHeader";
 import AppSidebar from "../../../components/AppSidebar";
+import useSidebarCollapse from "../../../hooks/useSidebarCollapse";
 
 const { Content } = Layout;
 const { Text } = Typography;
@@ -24,7 +25,7 @@ const { Option } = Select;
 const REACT_APP_API_URL = process.env.REACT_APP_API_URL;
 
 const TablesPage = () => {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useSidebarCollapse();
   const [pageTitle] = useState("Quản lý bàn");
   const [tables, setTables] = useState([]); // Dữ liệu từ API
   const [loading, setLoading] = useState(false);
@@ -504,85 +505,93 @@ const TablesPage = () => {
         <Content
           style={{
             marginTop: 64,
-            padding: 20,
             background: "#f9f9f9",
             minHeight: "calc(100vh - 64px)",
-            overflow: "auto",
+            height: "calc(100vh - 64px)",
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
           }}
         >
-          {/* Bộ lọc */}
-          <div style={{ marginBottom: 20 }}>
-            {/* Dòng 1: Tìm kiếm và lọc */}
+          {/* Bộ lọc - Fixed */}
+          <div style={{
+            backgroundColor: '#fff',
+            padding: '16px 20px',
+            borderBottom: '1px solid #e8e8e8',
+            flexShrink: 0,
+          }}>
             <div
               style={{
                 display: "flex",
                 gap: 12,
                 flexWrap: "wrap",
                 alignItems: "center",
-                justifyContent: "flex-start",
-                marginBottom: 12,
+                justifyContent: "space-between",
               }}
             >
-              <Input.Search
-                placeholder="Tìm tên bàn..."
-                style={{ width: 300 }}
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                allowClear
-              />
+              {/* Left side: Search & Filter */}
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                <Input.Search
+                  placeholder="Tìm tên bàn..."
+                  style={{ width: 250 }}
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  allowClear
+                />
 
-              <Select
-                value={statusFilter}
-                style={{ width: 200 }}
-                onChange={(val) => setStatusFilter(val)}
-              >
-                <Option value="all">Tất cả trạng thái</Option>
-                <Option value="active">Đang hoạt động</Option>
-                <Option value="inactive">Đã đóng</Option>
-              </Select>
-            </div>
+                <Select
+                  value={statusFilter}
+                  style={{ width: 180 }}
+                  onChange={(val) => setStatusFilter(val)}
+                >
+                  <Option value="all">Tất cả trạng thái</Option>
+                  <Option value="active">Đang hoạt động</Option>
+                  <Option value="inactive">Đã đóng</Option>
+                </Select>
+              </div>
 
-            {/* Dòng 2: Button, căn phải */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 8,
-                flexWrap: "wrap",
-              }}
-            >
-              <Button
-                type="default"
-                onClick={handlePrintAllQR}
-                disabled={filteredTables.filter(t => t.qr_code_url).length === 0}
-              >
-                🖨️ In tất cả QR
-              </Button>
-              <Button
-                type="primary"
-                style={{ background: "#226533" }}
-                onClick={() => setDrawerOpen(true)}
-              >
-                + Thêm bàn mới
-              </Button>
+              {/* Right side: Actions */}
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <Button
+                  type="default"
+                  onClick={handlePrintAllQR}
+                  disabled={filteredTables.filter(t => t.qr_code_url).length === 0}
+                >
+                  🖨️ In tất cả QR
+                </Button>
+                <Button
+                  type="primary"
+                  style={{ background: "#226533" }}
+                  onClick={() => setDrawerOpen(true)}
+                >
+                  + Thêm bàn mới
+                </Button>
+              </div>
             </div>
           </div>
 
-          {/* Bảng */}
-          <Table
-            rowKey="id"
-            loading={loading}
-            columns={columns}
-            dataSource={filteredTables}
-            pagination={{
-              pageSizeOptions: ["5", "8", "10", "20", "50"],
-              showSizeChanger: true,
-              showQuickJumper: true,
-              defaultPageSize: 8,
-              showTotal: (total, range) =>
-                `${range[0]}-${range[1]} trên tổng ${total} bàn`,
-            }}
-          />
+          {/* Bảng - Scrollable Area */}
+          <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
+            <Table
+              rowKey="id"
+              loading={loading}
+              columns={columns}
+              dataSource={filteredTables}
+              locale={{
+                triggerDesc: 'Nhấn để sắp xếp giảm dần',
+                triggerAsc: 'Nhấn để sắp xếp tăng dần',
+                cancelSort: 'Nhấn để hủy sắp xếp',
+              }}
+              pagination={{
+                pageSizeOptions: ["5", "8", "10", "20", "50"],
+                showSizeChanger: true,
+                showQuickJumper: true,
+                defaultPageSize: 8,
+                showTotal: (total, range) =>
+                  `${range[0]}-${range[1]} trên tổng ${total} bàn`,
+              }}
+            />
+          </div>
 
           {/* Drawer thêm bàn mới */}
           <Drawer

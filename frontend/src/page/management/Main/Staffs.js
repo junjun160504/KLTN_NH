@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import AppHeader from "../../../components/AppHeader";
 import AppSidebar from "../../../components/AppSidebar";
+import useSidebarCollapse from "../../../hooks/useSidebarCollapse";
 import {
   Layout,
   Button,
@@ -79,7 +80,7 @@ const mockStaffs = [
 ];
 
 const StaffsPage = () => {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useSidebarCollapse();
   const [pageTitle] = useState("Nhân viên");
 
   const [allStaffs, setAllStaffs] = useState([]);
@@ -295,113 +296,130 @@ const StaffsPage = () => {
         <Content
           style={{
             marginTop: 64,
-            padding: 20,
             background: "#f9f9f9",
             minHeight: "calc(100vh - 64px)",
-            overflow: "auto",
+            height: "calc(100vh - 64px)",
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
           }}
         >
-          {/* Bộ lọc + Button 1 dòng */}
+          {/* Bộ lọc - Fixed */}
           <div
             style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 20,
-              flexWrap: "wrap",
-              gap: 12,
+              backgroundColor: '#fff',
+              padding: '16px 20px',
+              borderBottom: '1px solid #e8e8e8',
+              flexShrink: 0,
             }}
           >
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <Input.Search
-                placeholder="Nhập tên, email hoặc số điện thoại..."
-                style={{ width: 250 }}
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                allowClear
-              />
-              <Select
-                value={roleFilter}
-                style={{ width: 150 }}
-                onChange={(val) => setRoleFilter(val)}
-              >
-                <Option value="all">Tất cả</Option>
-                <Option value="Thu ngân">Thu ngân</Option>
-                <Option value="Phục vụ">Phục vụ</Option>
-                <Option value="Bếp">Bếp</Option>
-              </Select>
-              <Select
-                value={statusFilter}
-                style={{ width: 150 }}
-                onChange={(val) => setStatusFilter(val)}
-              >
-                <Option value="all">Tất cả</Option>
-                <Option value="active">Hoạt động</Option>
-                <Option value="inactive">Ngừng hoạt động</Option>
-              </Select>
-            </div>
-            <Space>
-              <Button onClick={handleExportExcel}>Xuất danh sách</Button>
-              <label style={{ position: "relative" }}>
-                <Button type="dashed">Nhập từ Excel</Button>
-                <input
-                  type="file"
-                  accept=".xlsx, .xls"
-                  style={{
-                    position: "absolute",
-                    left: 0,
-                    top: 0,
-                    width: "100%",
-                    height: "100%",
-                    opacity: 0,
-                    cursor: "pointer",
-                  }}
-                  onChange={handleImportExcel}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: 12,
+              }}
+            >
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                <Input.Search
+                  placeholder="Nhập tên, email hoặc số điện thoại..."
+                  style={{ width: 250 }}
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  allowClear
                 />
-              </label>
-              <Button
-                type="primary"
-                style={{ background: "#226533" }}
-                onClick={() => setDrawerOpen(true)}
-              >
-                + Thêm nhân viên
-              </Button>
-            </Space>
+                <Select
+                  value={roleFilter}
+                  style={{ width: 150 }}
+                  onChange={(val) => setRoleFilter(val)}
+                >
+                  <Option value="all">Tất cả</Option>
+                  <Option value="Thu ngân">Thu ngân</Option>
+                  <Option value="Phục vụ">Phục vụ</Option>
+                  <Option value="Bếp">Bếp</Option>
+                </Select>
+                <Select
+                  value={statusFilter}
+                  style={{ width: 150 }}
+                  onChange={(val) => setStatusFilter(val)}
+                >
+                  <Option value="all">Tất cả</Option>
+                  <Option value="active">Hoạt động</Option>
+                  <Option value="inactive">Ngừng hoạt động</Option>
+                </Select>
+              </div>
+              <Space>
+                <Button onClick={handleExportExcel}>Xuất danh sách</Button>
+                <label style={{ position: "relative" }}>
+                  <Button type="dashed">Nhập từ Excel</Button>
+                  <input
+                    type="file"
+                    accept=".xlsx, .xls"
+                    style={{
+                      position: "absolute",
+                      left: 0,
+                      top: 0,
+                      width: "100%",
+                      height: "100%",
+                      opacity: 0,
+                      cursor: "pointer",
+                    }}
+                    onChange={handleImportExcel}
+                  />
+                </label>
+                <Button
+                  type="primary"
+                  style={{ background: "#226533" }}
+                  onClick={() => setDrawerOpen(true)}
+                >
+                  + Thêm nhân viên
+                </Button>
+              </Space>
+            </div>
           </div>
 
-          {/* Table */}
-          <Table
-            dataSource={paginatedData}
-            columns={columns}
-            pagination={false}
-            rowKey="id"
-            bordered
-            style={{ background: "#fff", marginBottom: 16 }}
-          />
-
-          {/* Pagination */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <span>
-              Hiển thị {(currentPage - 1) * pageSize + 1} đến{" "}
-              {Math.min(currentPage * pageSize, staffs.length)} trong tổng số{" "}
-              {staffs.length} nhân viên
-            </span>
-            <Pagination
-              current={currentPage}
-              pageSize={pageSize}
-              total={staffs.length}
-              showSizeChanger
-              onChange={(page, size) => {
-                setCurrentPage(page);
-                setPageSize(size);
+          {/* Table - Scrollable Area */}
+          <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
+            <Table
+              dataSource={paginatedData}
+              columns={columns}
+              pagination={false}
+              rowKey="id"
+              bordered
+              locale={{
+                triggerDesc: 'Nhấn để sắp xếp giảm dần',
+                triggerAsc: 'Nhấn để sắp xếp tăng dần',
+                cancelSort: 'Nhấn để hủy sắp xếp',
               }}
+              style={{ background: "#fff", marginBottom: 16 }}
             />
+
+            {/* Pagination */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <span>
+                Hiển thị {(currentPage - 1) * pageSize + 1} đến{" "}
+                {Math.min(currentPage * pageSize, staffs.length)} trong tổng số{" "}
+                {staffs.length} nhân viên
+              </span>
+              <Pagination
+                current={currentPage}
+                pageSize={pageSize}
+                total={staffs.length}
+                showSizeChanger
+                onChange={(page, size) => {
+                  setCurrentPage(page);
+                  setPageSize(size);
+                }}
+              />
+            </div>
           </div>
 
           {/* Drawer thêm nhân viên */}
@@ -456,22 +474,22 @@ const StaffsPage = () => {
               >
                 <Input placeholder="Nhập email (@gmail.com)" />
               </Form.Item>
-                <Form.Item
-                  label="Số điện thoại"
-                  name="phone"
-                  rules={[
-                    { required: true, message: "Nhập số điện thoại!" },
-                    {
-                      pattern: /^0\d{9}$/,
-                      message: "Số điện thoại phải có 10 số và bắt đầu bằng 0!",
-                    },
-                  ]}
-                >
-                  <Input
-                    placeholder="Nhập số điện thoại"
-                    maxLength={10}
-                  />
-                </Form.Item>
+              <Form.Item
+                label="Số điện thoại"
+                name="phone"
+                rules={[
+                  { required: true, message: "Nhập số điện thoại!" },
+                  {
+                    pattern: /^0\d{9}$/,
+                    message: "Số điện thoại phải có 10 số và bắt đầu bằng 0!",
+                  },
+                ]}
+              >
+                <Input
+                  placeholder="Nhập số điện thoại"
+                  maxLength={10}
+                />
+              </Form.Item>
 
               <Form.Item label="Vai trò" name="role">
                 <Select>

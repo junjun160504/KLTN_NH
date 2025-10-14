@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import AppHeader from "../../../components/AppHeader";
 import AppSidebar from "../../../components/AppSidebar";
+import useSidebarCollapse from "../../../hooks/useSidebarCollapse";
 import {
   Layout,
   Button,
@@ -24,7 +25,7 @@ const { RangePicker } = DatePicker;
 const { Option } = Select;
 
 const CustomerPage = () => {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useSidebarCollapse();
   const [pageTitle] = useState("Khách hàng");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(8);
@@ -221,21 +222,21 @@ const CustomerPage = () => {
         <Content
           style={{
             marginTop: 64,
-            padding: 20,
             background: "#f9f9f9",
             minHeight: "calc(100vh - 64px)",
-            overflow: "auto",
+            height: "calc(100vh - 64px)",
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
           }}
         >
-          {/* Bộ lọc khách hàng */}
+          {/* Bộ lọc khách hàng - Fixed */}
           <div
             style={{
-              marginBottom: 20,
-              display: "flex",
-              gap: 12,
-              flexWrap: "wrap",
-              alignItems: "center",
-              justifyContent: "space-between",
+              backgroundColor: '#fff',
+              padding: '16px 20px',
+              borderBottom: '1px solid #e8e8e8',
+              flexShrink: 0,
             }}
           >
             <div
@@ -244,87 +245,104 @@ const CustomerPage = () => {
                 gap: 12,
                 flexWrap: "wrap",
                 alignItems: "center",
+                justifyContent: "space-between",
               }}
             >
-              <Input.Search
-                placeholder="Tìm kiếm theo SDT"
-                style={{ width: 420 }}
-                value={searchText}
-                onChange={e => {
-                  setSearchText(e.target.value);
-                  setCurrentPage(1);
-                }}
-                allowClear
-              />
-              <Select
-                value={statusFilter}
-                style={{ width: 120 }}
-                onChange={val => {
-                  setStatusFilter(val);
-                  setCurrentPage(1);
+              <div
+                style={{
+                  display: "flex",
+                  gap: 12,
+                  flexWrap: "wrap",
+                  alignItems: "center",
                 }}
               >
-                <Option value="all">Tất cả</Option>
-                <Option value="old">Khách cũ</Option>
-                <Option value="new">Khách mới</Option>
-              </Select>
+                <Input.Search
+                  placeholder="Tìm kiếm theo SDT"
+                  style={{ width: 250 }}
+                  value={searchText}
+                  onChange={e => {
+                    setSearchText(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  allowClear
+                />
+                <Select
+                  value={statusFilter}
+                  style={{ width: 150 }}
+                  onChange={val => {
+                    setStatusFilter(val);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <Option value="all">Tất cả</Option>
+                  <Option value="old">Khách cũ</Option>
+                  <Option value="new">Khách mới</Option>
+                </Select>
+              </div>
+              <Space>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  style={{ background: "#226533" }}
+                  onClick={() => setAddDrawerOpen(true)}
+                >
+                  Đăng ký
+                </Button>
+                <Button icon={<DownloadOutlined />} onClick={handleExportExcel}>
+                  Xuất danh sách
+                </Button>
+              </Space>
             </div>
-            <Space>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                style={{ background: "#226533" }}
-                onClick={() => setAddDrawerOpen(true)}
-              >
-                Đăng ký
-              </Button>
-              <Button icon={<DownloadOutlined />} onClick={handleExportExcel}>
-                Xuất danh sách
-              </Button>
-            </Space>
           </div>
 
-          {/* Bảng khách hàng */}
-          <Table
-            rowKey="key"
-            loading={loading}
-            columns={columns}
-            dataSource={pagedData}
-            pagination={false}
-            bordered
-            style={{ background: "#fff", marginBottom: 16 }}
-          />
-
-          {/* Pagination */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <span>
-              Hiển thị{" "}
-              {filteredData.length === 0
-                ? 0
-                : (currentPage - 1) * pageSize + 1}
-              {" "}
-              đến{" "}
-              {Math.min(currentPage * pageSize, filteredData.length)} trong tổng số{" "}
-              {filteredData.length} khách hàng
-            </span>
-            <Pagination
-              current={currentPage}
-              pageSize={pageSize}
-              total={filteredData.length}
-              showSizeChanger
-              pageSizeOptions={["5", "8", "10", "20", "50"]}
-              showQuickJumper
-              onChange={(page, size) => {
-                setCurrentPage(page);
-                setPageSize(size);
+          {/* Bảng khách hàng - Scrollable Area */}
+          <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
+            <Table
+              rowKey="key"
+              loading={loading}
+              columns={columns}
+              dataSource={pagedData}
+              pagination={false}
+              bordered
+              locale={{
+                triggerDesc: 'Nhấn để sắp xếp giảm dần',
+                triggerAsc: 'Nhấn để sắp xếp tăng dần',
+                cancelSort: 'Nhấn để hủy sắp xếp',
               }}
+              style={{ background: "#fff", marginBottom: 16 }}
             />
+
+            {/* Pagination */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <span>
+                Hiển thị{" "}
+                {filteredData.length === 0
+                  ? 0
+                  : (currentPage - 1) * pageSize + 1}
+                {" "}
+                đến{" "}
+                {Math.min(currentPage * pageSize, filteredData.length)} trong tổng số{" "}
+                {filteredData.length} khách hàng
+              </span>
+              <Pagination
+                current={currentPage}
+                pageSize={pageSize}
+                total={filteredData.length}
+                showSizeChanger
+                pageSizeOptions={["5", "8", "10", "20", "50"]}
+                showQuickJumper
+                onChange={(page, size) => {
+                  setCurrentPage(page);
+                  setPageSize(size);
+                }}
+              />
+            </div>
           </div>
 
           {/* Drawer thêm khách hàng */}

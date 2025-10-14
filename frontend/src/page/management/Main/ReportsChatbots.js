@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import AppHeader from "../../../components/AppHeader";
 import AppSidebar from "../../../components/AppSidebar";
+import useSidebarCollapse from "../../../hooks/useSidebarCollapse";
 import {
   Layout,
   Card,
@@ -28,7 +29,7 @@ const { RangePicker } = DatePicker;
 const { Option } = Select;
 
 const ReportsChatbots = () => {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useSidebarCollapse();
   const [pageTitle] = useState("Báo cáo Chatbot");
 
   // Mock data thống kê
@@ -111,7 +112,7 @@ const ReportsChatbots = () => {
   return (
     <Layout style={{ minHeight: "100vh" }}>
       {/* Sidebar */}
-      <AppSidebar collapsed={collapsed} currentPageKey="reportsChatbot" />
+      <AppSidebar collapsed={collapsed} currentPageKey="report_chatbot" />
 
       <Layout style={{ marginLeft: collapsed ? 80 : 220 }}>
         {/* Header */}
@@ -138,7 +139,7 @@ const ReportsChatbots = () => {
               <Option value="week">Tuần này</Option>
               <Option value="month">Tháng này</Option>
             </Select>
-              <Select defaultValue="all" style={{ width: 150 }}>
+            <Select defaultValue="all" style={{ width: 150 }}>
               <Option value="all">Tất cả ca</Option>
               <Option value="morning">Ca sáng</Option>
               <Option value="evening">Ca tối</Option>

@@ -22,9 +22,6 @@ const AppHeader = ({ collapsed, setCollapsed, pageTitle }) => {
   // Menu user
   const handleMenuClick = ({ key }) => {
     if (key === "1") {
-      console.log("Mở hồ sơ cá nhân...");
-    }
-    if (key === "2") {
       localStorage.removeItem("token");
       sessionStorage.clear();
       navigate("/main/auth");
@@ -33,8 +30,7 @@ const AppHeader = ({ collapsed, setCollapsed, pageTitle }) => {
 
   const userMenu = {
     items: [
-      { key: "1", label: "Hồ sơ cá nhân" },
-      { key: "2", label: "Đăng xuất" },
+      { key: "1", label: "Đăng xuất" },
     ],
     onClick: handleMenuClick,
   };

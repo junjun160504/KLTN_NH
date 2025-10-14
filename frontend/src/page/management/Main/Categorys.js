@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import AppHeader from "../../../components/AppHeader";
 import AppSidebar from "../../../components/AppSidebar";
+import useSidebarCollapse from "../../../hooks/useSidebarCollapse";
 import {
   Layout,
   Button,
@@ -25,7 +26,7 @@ const { Option } = Select;
 const REACT_APP_API_URL = process.env.REACT_APP_API_URL;
 
 const MenuPage = () => {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useSidebarCollapse();
   const [pageTitle] = useState("Quản lý thực đơn");
 
   const [allFoods, setAllFoods] = useState([]); // dữ liệu gốc
@@ -184,22 +185,28 @@ const MenuPage = () => {
       dataIndex: "name",
       key: "name",
       sorter: (a, b) => (a.name || "").localeCompare(b.name || "", "vi"),
+      onHeaderCell: () => ({ style: { textAlign: 'center' } }),
+      render: (text) => <div style={{ textAlign: 'left' }}>{text}</div>,
     },
     {
       title: "Giá",
       dataIndex: "price",
       key: "price",
       sorter: (a, b) => (a.price || 0) - (b.price || 0),
+      onHeaderCell: () => ({ style: { textAlign: 'center' } }),
       render: (price) => (
-        <Text strong style={{ color: "#226533" }}>
-          {Number(price).toLocaleString()}đ
-        </Text>
+        <div style={{ textAlign: 'right' }}>
+          <Text strong style={{ color: "#226533" }}>
+            {Number(price).toLocaleString()}đ
+          </Text>
+        </div>
       ),
     },
     {
       title: "Trạng thái",
       dataIndex: "is_available",
       key: "is_available",
+      align: "center",
       sorter: (a, b) => (a.is_available || 0) - (b.is_available || 0),
       render: (val) =>
         val === 1 ? (
@@ -211,6 +218,7 @@ const MenuPage = () => {
     {
       title: "Hành động",
       key: "action",
+      align: "center",
       render: (_, record) => (
         <Space>
           <Button size="small" onClick={() => openEditDrawer(record)}>
@@ -298,119 +306,124 @@ const MenuPage = () => {
         <Content
           style={{
             marginTop: 64,
-            padding: 20,
             background: "#f9f9f9",
             minHeight: "calc(100vh - 64px)",
-            overflow: "auto",
+            height: "calc(100vh - 64px)",
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
           }}
         >
-          {/* Bộ lọc */}
-          <div style={{ marginBottom: 20 }}>
-            {/* Dòng 1: Tìm kiếm và lọc */}
-            <div
-              style={{
-                display: "flex",
-                gap: 12,
-                flexWrap: "wrap",
-                alignItems: "center",
-                justifyContent: "flex-start",
-                marginBottom: 12,
-              }}
-            >
-              <Input.Search
-                placeholder="Tìm món ăn..."
-                style={{ width: 450 }}
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                allowClear
-              />
-
-              <Select
-                value={activeCategory}
-                style={{ width: 320, fontWeight: "bold", fontSize: 16 }} // tăng width, chữ to và đậm hơn
-                onChange={(val) => setActiveCategory(val)}
-              >
-                <Option
-                  value="all"
-                  style={{
-                    fontWeight: "bold",
-                    fontSize: 16,
-                    color: "#226533",
-                    background: "#e6f4ea",
-                  }}
-                >
-                  Tất cả danh mục
-                </Option>
-                {categories.map((cat) => (
-                  <Option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </Option>
-                ))}
-              </Select>
-
-              <Select
-                value={statusFilter}
-                style={{ width: 200 }}
-                onChange={(val) => setStatusFilter(val)}
-              >
-                <Option value="all">Tất cả trạng thái</Option>
-                <Option value="active">Đang bán</Option>
-                <Option value="inactive">Ngừng bán</Option>
-              </Select>
-            </div>
-
-            {/* Dòng 2: Button, căn phải */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 8,
-                flexWrap: "wrap",
-              }}
-            >
-              <Button onClick={handleExportExcel}>Xuất file Excel</Button>
-              <label style={{ position: "relative" }}>
-                <Button type="dashed">Nhập từ Excel</Button>
-                <input
-                  type="file"
-                  accept=".xlsx, .xls"
-                  style={{
-                    position: "absolute",
-                    left: 0,
-                    top: 0,
-                    width: "100%",
-                    height: "100%",
-                    opacity: 0,
-                    cursor: "pointer",
-                  }}
-                  onChange={handleImportExcel}
+          {/* Bộ lọc - Fixed */}
+          <div style={{
+            backgroundColor: '#fff',
+            padding: '16px 20px',
+            borderBottom: '1px solid #e8e8e8',
+            flexShrink: 0,
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 12
+            }}>
+              {/* Left side: Search & Filters */}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <Input.Search
+                  placeholder="Tìm món ăn..."
+                  style={{ width: 250 }}
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  allowClear
                 />
-              </label>
-              <Button
-                type="primary"
-                style={{ background: "#226533" }}
-                onClick={() => setDrawerOpen(true)}
-              >
-                + Thêm món mới
-              </Button>
+
+                <Select
+                  value={activeCategory}
+                  style={{ width: 200, fontWeight: "bold" }}
+                  onChange={(val) => setActiveCategory(val)}
+                >
+                  <Option
+                    value="all"
+                    style={{
+                      fontWeight: "bold",
+                      color: "#226533",
+                      background: "#e6f4ea",
+                    }}
+                  >
+                    Tất cả danh mục
+                  </Option>
+                  {categories.map((cat) => (
+                    <Option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </Option>
+                  ))}
+                </Select>
+
+                <Select
+                  value={statusFilter}
+                  style={{ width: 150 }}
+                  onChange={(val) => setStatusFilter(val)}
+                >
+                  <Option value="all">Tất cả trạng thái</Option>
+                  <Option value="active">Đang bán</Option>
+                  <Option value="inactive">Ngừng bán</Option>
+                </Select>
+              </div>
+
+              {/* Right side: Actions */}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <Button onClick={handleExportExcel}>Xuất file Excel</Button>
+                <label style={{ position: "relative" }}>
+                  <Button type="dashed">Nhập từ Excel</Button>
+                  <input
+                    type="file"
+                    accept=".xlsx, .xls"
+                    style={{
+                      position: "absolute",
+                      left: 0,
+                      top: 0,
+                      width: "100%",
+                      height: "100%",
+                      opacity: 0,
+                      cursor: "pointer",
+                    }}
+                    onChange={handleImportExcel}
+                  />
+                </label>
+                <Button
+                  type="primary"
+                  style={{ background: "#226533" }}
+                  onClick={() => setDrawerOpen(true)}
+                >
+                  + Thêm món mới
+                </Button>
+              </div>
             </div>
           </div>
 
-          {/* Bảng */}
-          <Table
-            rowKey="id"
-            loading={loading}
-            columns={columns}
-            dataSource={foods}
-            pagination={{
-              pageSizeOptions: ["5", "8", "10", "20", "50"],
-              showSizeChanger: true,
-              showQuickJumper: true,
-              defaultPageSize: 8,
-              showTotal: (total, range) =>
-                `${range[0]}-${range[1]} trên tổng ${total} món`,
-            }}
-          />
+          {/* Bảng - Scrollable Area */}
+          <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
+            <Table
+              rowKey="id"
+              loading={loading}
+              columns={columns}
+              dataSource={foods}
+              locale={{
+                triggerDesc: 'Nhấn để sắp xếp giảm dần',
+                triggerAsc: 'Nhấn để sắp xếp tăng dần',
+                cancelSort: 'Nhấn để hủy sắp xếp',
+              }}
+              pagination={{
+                pageSizeOptions: ["5", "8", "10", "20", "50"],
+                showSizeChanger: true,
+                showQuickJumper: true,
+                defaultPageSize: 8,
+                showTotal: (total, range) =>
+                  `${range[0]}-${range[1]} trên tổng ${total} món`,
+              }}
+            />
+          </div>
 
           {/* Drawer thêm món mới */}
           <Drawer

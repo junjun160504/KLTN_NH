@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import AppHeader from "../../../components/AppHeader";
 import AppSidebar from "../../../components/AppSidebar";
+import useSidebarCollapse from "../../../hooks/useSidebarCollapse";
 import {
   Layout,
   Card,
@@ -38,7 +39,7 @@ const mockTopCustomers = [
 ];
 
 const ReportsCustomerPage = () => {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useSidebarCollapse();
   const [pageTitle] = useState("Báo cáo khách hàng");
   const [filteredData, setFilteredData] = useState(mockCustomers);
   const [dateRange, setDateRange] = useState([]);
@@ -85,7 +86,7 @@ const ReportsCustomerPage = () => {
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
-      <AppSidebar collapsed={collapsed} currentPageKey="reports-customers" />
+      <AppSidebar collapsed={collapsed} currentPageKey="report_customers" />
       <Layout style={{ marginLeft: collapsed ? 80 : 220 }}>
         <AppHeader
           collapsed={collapsed}
@@ -154,11 +155,18 @@ const ReportsCustomerPage = () => {
                   angleField="value"
                   colorField="type"
                   radius={0.8}
-                  label={{
-                    type: "spider",
-                    content: "{name} {percentage}",
+                  label={false}
+                  legend={{
+                    position: "bottom",
                   }}
-                  interactions={[{ type: "element-active" }]}
+                  tooltip={{
+                    formatter: (datum) => {
+                      return {
+                        name: datum.type,
+                        value: datum.value,
+                      };
+                    },
+                  }}
                 />
               </Card>
             </Col>

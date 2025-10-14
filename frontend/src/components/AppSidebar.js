@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Layout, Menu } from "antd";
 import {
   AppstoreOutlined,
@@ -16,7 +16,37 @@ const { Sider } = Layout;
 
 const AppSidebar = ({ collapsed, currentPageKey, setPageTitle }) => {
   const navigate = useNavigate();
-  const [openKeys, setOpenKeys] = useState([]);
+
+  // Khởi tạo openKeys từ localStorage hoặc tự động mở dựa trên currentPageKey
+  const [openKeys, setOpenKeys] = useState(() => {
+    const saved = localStorage.getItem("sidebarOpenKeys");
+    if (saved) {
+      return JSON.parse(saved);
+    }
+    // Tự động mở submenu nếu đang ở trang con
+    if (["categorys", "tables"].includes(currentPageKey)) {
+      return ["category"];
+    }
+    if (["report_sales", "report_products", "report_customers", "report_chatbot"].includes(currentPageKey)) {
+      return ["report"];
+    }
+    return [];
+  });
+
+  // Lưu openKeys vào localStorage mỗi khi thay đổi
+  useEffect(() => {
+    localStorage.setItem("sidebarOpenKeys", JSON.stringify(openKeys));
+  }, [openKeys]);
+
+  // Tự động mở submenu khi chuyển trang
+  useEffect(() => {
+    if (["categorys", "tables"].includes(currentPageKey) && !openKeys.includes("category")) {
+      setOpenKeys((prev) => [...prev, "category"]);
+    }
+    if (["report_sales", "report_products", "report_customers", "report_chatbot"].includes(currentPageKey) && !openKeys.includes("report")) {
+      setOpenKeys((prev) => [...prev, "report"]);
+    }
+  }, [currentPageKey]);
 
   // map key -> path & title
   const menuConfig = {
