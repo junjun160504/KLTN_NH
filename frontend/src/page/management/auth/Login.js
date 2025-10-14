@@ -3,7 +3,7 @@ import { Form, Input, Button, Checkbox, Typography, message } from "antd";
 import { UserOutlined, LockOutlined } from "@ant-design/icons";
 import logo from "../../../assets/imgs/Logo.png";
 import { useNavigate } from "react-router-dom";
-import { loginAdmin } from "../../../api/admin"; // ✅ IMPORT API
+// import { loginAdmin } from "../../../api/admin"; // ✅ IMPORT API
 
 const { Title, Text } = Typography;
 
@@ -14,14 +14,15 @@ const LoginPage = () => {
   const onFinish = async (values) => {
     setLoading(true);
     try {
-      const res = await loginAdmin(values); // ✅ GỌI API
-      console.log("Login response", res);
-      if (res.status === 200) {
-        message.success("Đăng nhập thành công!");
-        navigate("/main/homes"); // ✅ Điều hướng về trang chính
-      } else {
-        message.error(res.msg || "Sai tài khoản hoặc mật khẩu");
-      }
+      // const res = await loginAdmin(values); // ✅ GỌI API
+      // console.log("Login response", res);
+      // if (res.status === 200) {
+      //   message.success("Đăng nhập thành công!");
+      //   navigate("/main/homes"); // ✅ Điều hướng về trang chính
+      // } else {
+      //   message.error(res.msg || "Sai tài khoản hoặc mật khẩu");
+      // }
+      navigate("/main/homes");
     } catch (err) {
       message.error(err.msg || "Đăng nhập thất bại");
     } finally {

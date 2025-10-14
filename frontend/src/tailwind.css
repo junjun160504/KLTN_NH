@@ -1,0 +1,32 @@
+/* Tailwind CSS - Chỉ import utilities, không import base để tránh conflict với Ant Design */
+@tailwind components;
+@tailwind utilities;
+
+/* Custom components với Tailwind */
+@layer components {
+  .btn-primary-gradient {
+    @apply bg-gradient-to-r from-primary-600 to-primary-500 text-white font-semibold rounded-xl px-6 py-3 transition-all duration-300 transform hover:scale-105 hover:shadow-brand-lg;
+  }
+
+  .card-hover {
+    @apply transition-all duration-300 hover:shadow-soft-xl hover:-translate-y-1;
+  }
+
+  .input-focus {
+    @apply focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-300;
+  }
+
+  .text-truncate-2 {
+    @apply overflow-hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .text-truncate-3 {
+    @apply overflow-hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+  }
+}

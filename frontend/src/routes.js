@@ -14,58 +14,69 @@ import HomecsPage from "./page/cus/HomesCus";
 import MenucsPage from "./page/cus/MenusCus";
 import CartcsPage from "./page/cus/CartsCus";
 import BillcsPage from "./page/cus/BillsCus";
+import PaymentcsPage from "./page/cus/PaymentCus";
 import ChatbotcsPage from "./page/cus/ChatbotsCus";
 import ReviewcsPage from "./page/cus/ReviewsCus";
 import FoodReviewcsPage from "./page/cus/FoodReviewsCus";
 import LoyaltycsPage from "./page/cus/LoyaltysCus";
 import FoodDetailcsPage from "./page/cus/FoodDetailsCus";
+
+// Import AdminLayout
+import AdminLayout from "./layouts/AdminLayout";
+
 const routes = [
+  // Login page (không cần notifications)
   {
     path: "/main/auth",
     element: <LoginPage />,
   },
+
+  // Admin routes - Tất cả wrapped trong AdminLayout
+  // Dùng path tuyệt đối thay vì nested routes
   {
     path: "/main/homes",
-    element: <Home />,
+    element: <AdminLayout><Home /></AdminLayout>,
   },
   {
     path: "/main/orders",
-    element: <OrderPage />,
+    element: <AdminLayout><OrderPage /></AdminLayout>,
   },
   {
     path: "/main/categorys",
-    element: <MenuPage />,
+    element: <AdminLayout><MenuPage /></AdminLayout>,
   },
   {
     path: "/main/tables",
-    element: <TablePage />,
+    element: <AdminLayout><TablePage /></AdminLayout>,
   },
   {
     path: "/main/customers",
-    element: <CustomerPage />,
+    element: <AdminLayout><CustomerPage /></AdminLayout>,
   },
   {
     path: "/main/staffs",
-    element: <StaffPage />,
+    element: <AdminLayout><StaffPage /></AdminLayout>,
   },
   {
     path: "/main/reports/sales",
-    element: <ReportsSalesPage />,
+    element: <AdminLayout><ReportsSalesPage /></AdminLayout>,
   },
   {
     path: "/main/reports/products",
-    element: <ReportsProductsPage />,
+    element: <AdminLayout><ReportsProductsPage /></AdminLayout>,
   },
   {
     path: "/main/reports/customers",
-    element: <ReportsCustomersPage />,
+    element: <AdminLayout><ReportsCustomersPage /></AdminLayout>,
   },
   {
     path: "/main/reports/chatbots",
-    element: <ReportsChatbotPage />,
+    element: <AdminLayout><ReportsChatbotPage /></AdminLayout>,
   },
+
+  // Customer routes (không cần AdminLayout)
   {
-    path: "/cus/homes/:tableId",
+    path: "/cus/homes",
     element: <HomecsPage />,
   },
   {
@@ -79,6 +90,10 @@ const routes = [
   {
     path: "/cus/bills",
     element: <BillcsPage />,
+  },
+  {
+    path: "/cus/payment",
+    element: <PaymentcsPage />,
   },
   {
     path: "/cus/chatbot",
@@ -100,7 +115,6 @@ const routes = [
     path: "/cus/fooddetails/:id",
     element: <FoodDetailcsPage />,
   }
-
 ];
 
 export default routes;

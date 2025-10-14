@@ -192,3 +192,38 @@ CREATE TABLE employees (
 );
 
 
+CREATE TABLE notifications (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    target_type ENUM('CUSTOMER','STAFF','ALL') NOT NULL,
+    target_id BIGINT, -- qr_session_id hoặc admin_id
+    title VARCHAR(255) NOT NULL,
+    message TEXT,
+    type ENUM('ORDER_UPDATE','CALL_STAFF','SYSTEM','PROMOTION') DEFAULT 'SYSTEM',
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_target (target_type, target_id),
+    INDEX idx_created_at (created_at)
+);
+
+ALTER TABLE notifications 
+MODIFY COLUMN type ENUM(
+    'ORDER_UPDATE',
+    'CALL_STAFF', 
+    'PAYMENT',
+    'REVIEW',
+    'INVENTORY',
+    'SYSTEM',
+    'SUCCESS',
+    'ERROR',
+    'WARNING',
+    'INFO'
+) DEFAULT 'SYSTEM';
+
+-- Thêm các column bổ sung
+ALTER TABLE notifications
+ADD COLUMN priority ENUM('high', 'medium', 'low') DEFAULT 'medium',
+ADD COLUMN action_url VARCHAR(500),
+ADD COLUMN metadata JSON,
+ADD INDEX idx_is_read (is_read),
+ADD INDEX idx_type (type),
+ADD INDEX idx_priority (priority);

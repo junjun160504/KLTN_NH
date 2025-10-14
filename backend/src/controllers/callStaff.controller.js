@@ -1,30 +1,41 @@
-import { query } from '../config/db.js';
+import * as callStaffService from '../services/callStaff.service.js';
 
-export async function handleCallStaff({ tableNumber, note }) {
+/**
+ * POST /api/call-staff
+ * Tạo thông báo gọi nhân viên (chỉ tạo notification, không lưu vào table riêng)
+ */
+export async function createCallStaffNotification(req, res) {
     try {
-        const sql = `
-      INSERT INTO call_staff_logs (table_number, request_time, note, status)
-      VALUES (?, NOW(), ?, 'PENDING')
-    `;
-        const params = [tableNumber, note || null];
+        const { qr_session_id, message } = req.body;
 
-        const result = await query(sql, params);
+        // Validate required fields
+        if (!qr_session_id) {
+            return res.status(400).json({
+                status: 400,
+                error: 'Thiếu thông tin: qr_session_id'
+            });
+        }
 
-        return {
-            success: true,
-            message: 'Gọi nhân viên thành công!',
+        // Gọi service để tạo notification
+        // Service sẽ tự động emit qua Socket.IO tới tất cả STAFF
+        const result = await callStaffService.createCallStaffNotification(
+            qr_session_id,
+            message
+        );
+
+        res.status(201).json({
+            status: 201,
+            message: result.message,
             data: {
-                id: result.insertId,
-                tableNumber,
-                status: 'PENDING'
+                notification: result.notification,
+                tableInfo: result.tableInfo
             }
-        };
+        });
     } catch (error) {
-        console.error('[handleCallStaff] Lỗi khi lưu gọi nhân viên:', error);
-        return {
-            success: false,
-            message: 'Không thể gọi nhân viên. Vui lòng thử lại!'
-        };
+        console.error('createCallStaffNotification error:', error);
+        res.status(500).json({
+            status: 500,
+            error: error.message || 'Lỗi khi gọi nhân viên'
+        });
     }
 }
-

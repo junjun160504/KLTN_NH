@@ -5,103 +5,221 @@ import {
   Typography,
   Button,
   Input,
-  Tag,
+  Spin,
+  Card,
 } from "antd";
 import {
   ArrowLeftOutlined,
   SendOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
+import axios from "axios";
 
 const { Header, Content } = Layout;
-const { Title } = Typography;
+const { Title, Text } = Typography;
+
+const REACT_APP_API_URL = process.env.REACT_APP_API_URL;
 
 export default function CustomerChatbotPage() {
-  const [messages, setMessages] = useState([
-    { from: "bot", text: "Xin chào! Tôi có thể giúp gì cho bạn hôm nay?" },
-  ]);
-  const [input, setInput] = useState("");
-  const [cartCount] = useState(5); // ✅ demo giỏ hàng
-
   const navigate = useNavigate();
   const messagesEndRef = useRef(null);
 
-  // ✅ Auto scroll khi có tin nhắn mới
+  // Redux cart count
+  const order = useSelector((state) => state.cart.order);
+  const cartCount = order?.foodOrderList?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+
+  // ✅ Load messages from sessionStorage on mount
+  const [messages, setMessages] = useState(() => {
+    try {
+      const savedMessages = sessionStorage.getItem("chatbot_messages");
+      if (savedMessages) {
+        return JSON.parse(savedMessages);
+      }
+    } catch (error) {
+      console.error("Error loading chat history:", error);
+    }
+
+    // Default welcome message
+    return [
+      {
+        from: "bot",
+        type: "text",
+        text: "Xin chào! Tôi có thể giúp gì cho bạn hôm nay? 😊",
+      },
+    ];
+  });
+
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // ✅ Save messages to sessionStorage whenever they change
+  useEffect(() => {
+    try {
+      sessionStorage.setItem("chatbot_messages", JSON.stringify(messages));
+    } catch (error) {
+      console.error("Error saving chat history:", error);
+    }
+  }, [messages]);
+
+  // Auto scroll when new message
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
 
-  // ✅ Gửi tin nhắn
-  const handleSend = () => {
-    if (!input.trim()) return;
+  // Send message to chatbot API
+  const handleSend = async (text = input) => {
+    const messageText = text.trim();
+    if (!messageText) return;
 
-    setMessages((prev) => [...prev, { from: "user", text: input }]);
+    // Add user message
+    const userMessage = { from: "user", type: "text", text: messageText };
+    setMessages((prev) => [...prev, userMessage]);
     setInput("");
+    setLoading(true);
 
-    // Giả lập bot trả lời
-    setTimeout(() => {
+    try {
+      // ✅ Build conversation history (last 10 messages for context)
+      const history = messages.slice(-10).map((msg) => ({
+        from: msg.from,
+        text: msg.type === "text" ? msg.text : msg.intro, // Use intro for suggestion messages
+      }));
+
+      // Call chatbot API with history
+      const response = await axios.post(`${REACT_APP_API_URL}/chatbot`, {
+        message: messageText,
+        history: history, // Send conversation context
+      });
+
+      const botResponse = response.data.data;
+
+      // Add bot response based on type
+      if (botResponse.type === "suggestions" && botResponse.suggestions?.length > 0) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            from: "bot",
+            type: "suggestions",
+            intro: botResponse.intro,
+            suggestions: botResponse.suggestions,
+          },
+        ]);
+      } else if (botResponse.type === "text_with_items" && botResponse.mentioned_items?.length > 0) {
+        // ✅ Handle text with mentioned items
+        setMessages((prev) => [
+          ...prev,
+          {
+            from: "bot",
+            type: "text_with_items",
+            text: botResponse.text,
+            mentioned_items: botResponse.mentioned_items,
+          },
+        ]);
+      } else {
+        // Text response fallback
+        setMessages((prev) => [
+          ...prev,
+          {
+            from: "bot",
+            type: "text",
+            text: botResponse.suggestion || botResponse.text || botResponse.intro || "Xin lỗi, tôi không hiểu câu hỏi của bạn.",
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error("Chatbot error:", error);
       setMessages((prev) => [
         ...prev,
-        { from: "bot", text: "Đang xử lý yêu cầu: " + input },
+        {
+          from: "bot",
+          type: "text",
+          text: "Xin lỗi, có lỗi xảy ra. Vui lòng thử lại! 🙏",
+        },
       ]);
-    }, 1000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ Clear chat history and reset context
+  const handleClearChat = () => {
+    const welcomeMessage = {
+      from: "bot",
+      type: "text",
+      text: "Xin chào! Tôi có thể giúp gì cho bạn hôm nay? 😊",
+    };
+
+    // Clear sessionStorage first
+    sessionStorage.removeItem("chatbot_messages");
+
+    // Reset messages (this will trigger useEffect to save only welcome message)
+    setMessages([welcomeMessage]);
+
+    // Optional: Show confirmation
+    console.log("✅ Chat history cleared. Starting fresh conversation.");
   };
 
   return (
-    <Layout style={{ minHeight: "100vh", background: "#fafafa" }}>
-      {/* -------- HEADER -------- */}
+    <Layout style={{ minHeight: "100vh", background: "#f5f7fa" }}>
+      {/* ========== HEADER ========== */}
       <Header
         style={{
           background: "#fff",
-          padding: "8px 12px",
+          padding: "0 16px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
           position: "fixed",
           top: 0,
           left: 0,
           right: 0,
           zIndex: 1000,
+          height: 64,
         }}
       >
         <Button
           type="text"
-          icon={<ArrowLeftOutlined />}
+          icon={<ArrowLeftOutlined style={{ fontSize: 18 }} />}
           onClick={() => navigate(-1)}
+          style={{ width: 40, height: 40 }}
         />
         <Title
           level={5}
           style={{
             margin: 0,
             color: "#226533",
-            fontWeight: "bold",
-            fontSize: 20,
+            fontWeight: 600,
           }}
         >
-          Chatbot
+          Trợ lý AI
         </Title>
-        <Tag color="green" style={{ borderRadius: 12 }}>
-          Bàn C8
-        </Tag>
+        <Button
+          type="text"
+          icon={<DeleteOutlined style={{ fontSize: 18, color: "#226533" }} />}
+          onClick={handleClearChat}
+          style={{ width: 40, height: 40 }}
+        />
       </Header>
 
-      {/* -------- CONTENT (KHUNG CHAT) -------- */}
+      {/* ========== CONTENT ========== */}
       <Content
         style={{
           padding: "12px",
-          paddingTop: "60px", // chừa chỗ cho header
-          paddingBottom: "220px", // ✅ chừa chỗ cho gợi ý + input + footer nav
+          paddingTop: "76px",
+          paddingBottom: "220px",
         }}
       >
         <div
           style={{
-            height: "calc(100vh - 230px)", // ✅ khung chat fix chiều cao
+            height: "calc(100vh - 290px)",
             overflowY: "auto",
             display: "flex",
             flexDirection: "column",
+            gap: 12,
           }}
         >
           {messages.map((msg, index) => (
@@ -109,30 +227,255 @@ export default function CustomerChatbotPage() {
               key={index}
               style={{
                 display: "flex",
-                justifyContent:
-                  msg.from === "user" ? "flex-end" : "flex-start",
-                marginBottom: 6,
+                justifyContent: msg.from === "user" ? "flex-end" : "flex-start",
               }}
             >
-              <div
-                style={{
-                  background: msg.from === "user" ? "#226533" : "#f0f0f0",
-                  color: msg.from === "user" ? "white" : "black",
-                  padding: "8px 12px",
-                  borderRadius: 16,
-                  maxWidth: "75%",
-                  fontSize: 16,
-                }}
-              >
-                {msg.text}
-              </div>
+              {msg.from === "user" ? (
+                // User message bubble
+                <div
+                  style={{
+                    background: "#226533",
+                    color: "white",
+                    padding: "10px 14px",
+                    borderRadius: 16,
+                    maxWidth: "75%",
+                    fontSize: 15,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {msg.text}
+                </div>
+              ) : msg.type === "suggestions" ? (
+                // Bot suggestions with images
+                <div style={{ maxWidth: "100%", width: "100%" }}>
+                  {/* Intro text */}
+                  <div
+                    style={{
+                      background: "#f0f0f0",
+                      color: "#333",
+                      padding: "10px 14px",
+                      borderRadius: 16,
+                      marginBottom: 12,
+                      fontSize: 15,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {msg.intro}
+                  </div>
+
+                  {/* Suggestion cards */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {msg.suggestions.map((item) => (
+                      <Card
+                        key={item.id}
+                        hoverable
+                        onClick={() => navigate(`/food/${item.id}`)}
+                        style={{
+                          borderRadius: 12,
+                          overflow: "hidden",
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                          transition: "all 0.3s",
+                        }}
+                        bodyStyle={{ padding: 0 }}
+                      >
+                        <div style={{ display: "flex", alignItems: "stretch" }}>
+                          {/* Image */}
+                          <img
+                            src={item.image_url}
+                            alt={item.name}
+                            style={{
+                              width: 90,
+                              height: 90,
+                              objectFit: "cover",
+                              flexShrink: 0,
+                              display: "block",
+                              margin: 8,
+                              borderRadius: 8,
+                            }}
+                          />
+
+                          {/* Info */}
+                          <div style={{
+                            flex: 1,
+                            padding: "8px 12px 8px 12px",
+                            display: "flex",
+                            flexDirection: "column",
+                            justifyContent: "space-between",
+                          }}>
+                            <div>
+                              <Text
+                                strong
+                                style={{
+                                  fontSize: 14,
+                                  display: "block",
+                                  marginBottom: 4,
+                                  color: "#1a1a1a",
+                                  lineHeight: 1.3,
+                                }}
+                              >
+                                {item.name}
+                              </Text>
+
+                              <Text
+                                style={{
+                                  fontSize: 12,
+                                  color: "#666",
+                                  display: "block",
+                                  marginBottom: 4,
+                                  lineHeight: 1.3,
+                                }}
+                              >
+                                {item.reason}
+                              </Text>
+                            </div>
+
+                            <Text
+                              strong
+                              style={{
+                                fontSize: 15,
+                                color: "#226533",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {item.price.toLocaleString()}đ
+                            </Text>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              ) : msg.type === "text_with_items" ? (
+                // ✅ Bot text with mentioned items
+                <div style={{ maxWidth: "100%", width: "100%" }}>
+                  {/* Text response */}
+                  <div
+                    style={{
+                      background: "#f0f0f0",
+                      color: "#333",
+                      padding: "10px 14px",
+                      borderRadius: 16,
+                      marginBottom: 12,
+                      fontSize: 15,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {msg.text}
+                  </div>
+
+                  {/* Mentioned items cards */}
+                  {msg.mentioned_items && msg.mentioned_items.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {msg.mentioned_items.map((item) => (
+                        <Card
+                          key={item.id}
+                          hoverable
+                          onClick={() => navigate(`/food/${item.id}`)}
+                          style={{
+                            borderRadius: 12,
+                            overflow: "hidden",
+                            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                            transition: "all 0.3s",
+                          }}
+                          bodyStyle={{ padding: 0 }}
+                        >
+                          <div style={{ display: "flex", alignItems: "stretch" }}>
+                            {/* Image */}
+                            <img
+                              src={item.image_url}
+                              alt={item.name}
+                              style={{
+                                width: 90,
+                                height: 90,
+                                objectFit: "cover",
+                                flexShrink: 0,
+                                display: "block",
+                                margin: 8,
+                                borderRadius: 8,
+                              }}
+                            />
+
+                            {/* Info */}
+                            <div style={{
+                              flex: 1,
+                              padding: "8px 12px 8px 12px",
+                              display: "flex",
+                              flexDirection: "column",
+                              justifyContent: "center",
+                            }}>
+                              <Text
+                                strong
+                                style={{
+                                  fontSize: 14,
+                                  display: "block",
+                                  marginBottom: 6,
+                                  color: "#1a1a1a",
+                                  lineHeight: 1.3,
+                                }}
+                              >
+                                {item.name}
+                              </Text>
+
+                              <Text
+                                strong
+                                style={{
+                                  fontSize: 15,
+                                  color: "#226533",
+                                  fontWeight: 700,
+                                }}
+                              >
+                                {item.price.toLocaleString()}đ
+                              </Text>
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // Bot text message
+                <div
+                  style={{
+                    background: "#f0f0f0",
+                    color: "#333",
+                    padding: "10px 14px",
+                    borderRadius: 16,
+                    maxWidth: "75%",
+                    fontSize: 15,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {msg.text}
+                </div>
+              )}
             </div>
           ))}
+
+          {/* Loading indicator */}
+          {loading && (
+            <div style={{ display: "flex", justifyContent: "flex-start" }}>
+              <div
+                style={{
+                  background: "#f0f0f0",
+                  padding: "10px 14px",
+                  borderRadius: 16,
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "center",
+                }}
+              >
+                <Spin size="small" />
+                <Text type="secondary" style={{ fontSize: 14 }}>Đang suy nghĩ...</Text>
+              </div>
+            </div>
+          )}
+
           <div ref={messagesEndRef} />
         </div>
       </Content>
 
-      {/* -------- GỢI Ý CÂU HỎI -------- */}
+      {/* ========== QUICK SUGGESTIONS ========== */}
       <div
         style={{
           position: "fixed",
@@ -141,7 +484,7 @@ export default function CustomerChatbotPage() {
           right: 0,
           padding: "8px 12px",
           background: "#fff",
-          borderTop: "1px solid #eee",
+          borderTop: "1px solid #e8e8e8",
           display: "flex",
           overflowX: "auto",
           whiteSpace: "nowrap",
@@ -151,24 +494,18 @@ export default function CustomerChatbotPage() {
       >
         {[
           "Món mới gần đây?",
-          "Món đặc trưng của nhà hàng?",
-          "Set đồ ăn cho 2 người?",
-          "Món nào ít cay?",
+          "Món đặc trưng?",
+          "Đồ ăn cho 2 người?",
+          "Món ít cay?",
         ].map((suggestion, i) => (
           <Button
             key={i}
-            size="medium"
-            onClick={() => {
-              setMessages((prev) => [
-                ...prev,
-                { from: "user", text: suggestion },
-              ]);
-              setTimeout(() => {
-                setMessages((prev) => [
-                  ...prev,
-                  { from: "bot", text: "Đang xử lý yêu cầu: " + suggestion },
-                ]);
-              }, 800);
+            size="small"
+            onClick={() => handleSend(suggestion)}
+            style={{
+              borderRadius: 16,
+              fontSize: 13,
+              whiteSpace: "nowrap",
             }}
           >
             {suggestion}
@@ -176,31 +513,46 @@ export default function CustomerChatbotPage() {
         ))}
       </div>
 
-      {/* -------- Ô nhập tin nhắn (cố định) -------- */}
+      {/* ========== INPUT BOX ========== */}
       <div
         style={{
           position: "fixed",
-          bottom: 70, // ✅ ngay trên FooterNav
+          bottom: 70,
           left: 0,
           right: 0,
           padding: "8px 12px",
           background: "#fff",
-          borderTop: "1px solid #eee",
+          borderTop: "2px solid #f0f0f0",
           display: "flex",
           gap: 8,
           zIndex: 1000,
         }}
       >
         <Input
-          placeholder="Nhập tin nhắn..."
+          placeholder="Hỏi món gì đó..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onPressEnter={handleSend}
+          onPressEnter={() => handleSend()}
+          disabled={loading}
+          style={{
+            borderRadius: 20,
+            fontSize: 14,
+          }}
         />
-        <Button type="primary" icon={<SendOutlined />} onClick={handleSend} />
+        <Button
+          type="primary"
+          icon={<SendOutlined />}
+          onClick={() => handleSend()}
+          disabled={loading || !input.trim()}
+          style={{
+            borderRadius: 20,
+            background: "#226533",
+            borderColor: "#226533",
+          }}
+        />
       </div>
 
-      {/* -------- FOOTER NAV -------- */}
+      {/* ========== FOOTER NAV ========== */}
       <CustomerFooterNav cartCount={cartCount} />
     </Layout>
   );

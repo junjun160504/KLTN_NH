@@ -18,6 +18,15 @@ export async function updateTable(req, res) {
     }
 }
 
+export async function deleteTable(req, res) {
+    try {
+        const result = await tableService.deleteTable(req.params.id);
+        res.json({ status: 200, data: result });
+    } catch (err) {
+        res.status(400).json({ status: 400, message: err.message });
+    }
+}
+
 export async function listTables(req, res) {
     try {
         const result = await tableService.getTables();

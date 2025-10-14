@@ -1,4 +1,4 @@
-import  { useState } from "react";
+import { useState } from "react";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import {
@@ -11,6 +11,7 @@ import {
   Tag,
   Carousel,
   Modal,
+  message,
 } from "antd";
 import {
   GiftOutlined,
@@ -23,12 +24,14 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useParams } from "react-router-dom";
 import React, { useEffect } from "react";
+import axios from "axios";
 const { Header, Content, Footer } = Layout;
 const { Title, Text } = Typography;
 
 export default function HomecsPage() {
   const navigate = useNavigate();
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const { tableId } = useParams();
   console.log("Table ID from URL:", tableId);
@@ -38,6 +41,41 @@ export default function HomecsPage() {
       sessionStorage.setItem("tableId", tableId);
     }
   }, [tableId]);
+
+  // Gọi nhân viên
+  const handleCallStaff = async () => {
+    try {
+      setIsLoading(true);
+
+      // Lấy qr_session_id từ localStorage
+      const qrSession = JSON.parse(localStorage.getItem("qr_session")) || {};
+      const qrSessionId = qrSession.session_id;
+
+      if (!qrSessionId) {
+        message.error("Không tìm thấy thông tin phiên QR. Vui lòng quét mã QR lại.");
+        setIsModalVisible(false);
+        return;
+      }
+
+      // Gọi API - Chỉ tạo notification, không lưu vào table riêng
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/call-staff`, {
+        qr_session_id: qrSessionId,
+        message: null, // có thể thêm input để user nhập message nếu muốn
+      });
+
+      if (response.status === 201) {
+        message.success("Đã gọi nhân viên thành công! Nhân viên sẽ tới ngay.");
+        setIsModalVisible(false);
+      }
+    } catch (error) {
+      console.error("Error calling staff:", error);
+      message.error(
+        error.response?.data?.error || "Có lỗi xảy ra khi gọi nhân viên. Vui lòng thử lại."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
   // Tính chào theo giờ
   const hour = new Date().getHours();
   let greeting = "Chào buổi tối Quý khách";
@@ -49,7 +87,8 @@ export default function HomecsPage() {
     greeting = "Chào buổi chiều Quý khách";
   }
 
-  const tableNumber = 8;
+  const qrSession = JSON.parse(localStorage.getItem("qr_session")) || {};
+  const tableNumber = qrSession.table_id || "N/A";
 
   const banners = [
     "/assets/images/Banner1.jpg",
@@ -189,7 +228,7 @@ export default function HomecsPage() {
                   {item.icon}
                   <Text
                     style={{
-                      fontSize: item.fontSize, 
+                      fontSize: item.fontSize,
                       color: item.color || "#333",
                       marginTop: 6,
                       fontWeight: 500,
@@ -251,17 +290,27 @@ export default function HomecsPage() {
       {/* -------- MODAL -------- */}
       <Modal
         open={isModalVisible}
-        title="Thông báo"
+        title="Gọi nhân viên"
         onCancel={() => setIsModalVisible(false)}
         centered
         footer={[
-          <Button key="close" onClick={() => setIsModalVisible(false)}>
-            Đóng
+          <Button key="cancel" onClick={() => setIsModalVisible(false)}>
+            Hủy
+          </Button>,
+          <Button
+            key="confirm"
+            type="primary"
+            loading={isLoading}
+            onClick={handleCallStaff}
+          >
+            Xác nhận
           </Button>,
         ]}
       >
-        <p>Nhân viên sẽ tới ngay, vui lòng đợi chút.</p>
-        
+        <p>Bạn có chắc chắn muốn gọi nhân viên không?</p>
+        <p style={{ color: "#666", fontSize: 14 }}>
+          Nhân viên sẽ được thông báo và tới bàn của bạn ngay.
+        </p>
       </Modal>
     </Layout>
   );

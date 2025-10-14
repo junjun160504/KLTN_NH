@@ -37,6 +37,9 @@ const Home = () => {
   const [activeButton, setActiveButton] = useState("today");
   const [orderView, setOrderView] = useState("day"); // trạng thái cho biểu đồ đơn hàng
 
+  // Note: useNotificationLoader đã được gọi ở AdminLayout
+  // Không cần gọi lại ở đây nữa
+
   // Danh sách nút lọc ngày
   const dateButtons = [
     { key: "today", label: "Hôm nay" },
@@ -219,7 +222,7 @@ const Home = () => {
                         nameKey="name"
                         outerRadius={100}
                         label={{
-                          type: "spider", 
+                          type: "spider",
                           content: "{name} {percentage}",
                         }}
                       >
