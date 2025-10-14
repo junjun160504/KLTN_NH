@@ -1,6 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import AppHeader from "../../../components/AppHeader";
 import AppSidebar from "../../../components/AppSidebar";
+import useSidebarCollapse from "../../../hooks/useSidebarCollapse";
+import useFilterState from "../../../hooks/useFilterState";
+import * as orderService from "../../../services/orderService";
 import {
   Layout,
   Button,
@@ -15,6 +18,7 @@ import {
   List,
   message,
   Modal,
+  Spin,
 } from "antd";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
@@ -24,73 +28,76 @@ const { Content } = Layout;
 const { Option } = Select;
 
 const OrderPage = () => {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useSidebarCollapse();
   const [pageTitle] = useState("Đơn hàng");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useFilterState("orders_currentPage", 1);
   const [modalExport, setModalExport] = useState(false);
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [filterTime, setFilterTime] = useState("today"); // thêm state lọc thời gian
-  const [searchText, setSearchText] = useState(""); // Thêm state cho tìm kiếm
-
-  // danh sách món sẵn
-  const menuList = [
-    { name: "Cà phê sữa", price: 35000 },
-    { name: "Trà đào", price: 40000 },
-    { name: "Sinh tố xoài", price: 55000 },
-    { name: "Khoai tây chiên", price: 65000 },
-    { name: "Bánh ngọt", price: 50000 },
-    { name: "Bánh mì", price: 30000 },
-  ];
-
-  // danh sách đơn hàng (thêm trường createdAt)
-  const [orders, setOrders] = useState([
-    {
-      key: "1",
-      code: "#PN0015",
-      table: "Bàn 02",
-      phone: "09xx xxx 123",
-      point: 120,
-      total: "275,000đ",
-      status: "Chờ xác nhận",
-      createdAt: dayjs().subtract(1, "day").toISOString(), // ví dụ: hôm qua
-      items: [
-        { name: "Cà phê sữa", qty: 2, price: "35000", note: "ít đá" },
-        { name: "Bánh ngọt", qty: 1, price: "50000", note: "" },
-      ],
-    },
-    {
-      key: "2",
-      code: "#PN0014",
-      table: "Bàn 03",
-      phone: "-",
-      point: 0,
-      total: "180,000đ",
-      status: "Đang phục vụ",
-      createdAt: dayjs().toISOString(), // hôm nay
-      items: [
-        { name: "Trà đào", qty: 2, price: "40000", note: "ít đường" },
-        { name: "Bánh mì", qty: 1, price: "30000", note: "thêm pate" },
-      ],
-    },
-    {
-      key: "3",
-      code: "#PN0013",
-      table: "Bàn 07",
-      phone: "08xx xxx 456",
-      point: 85,
-      total: "320,000đ",
-      status: "Hoàn tất",
-      createdAt: dayjs().subtract(8, "day").toISOString(), // 8 ngày trước
-      items: [
-        { name: "Sinh tố xoài", qty: 1, price: "55000", note: "" },
-        { name: "Khoai tây chiên", qty: 2, price: "65000", note: "" },
-      ],
-    },
-  ]);
+  const [filterStatus, setFilterStatus] = useFilterState("orders_filterStatus", "all");
+  const [filterTime, setFilterTime] = useFilterState("orders_filterTime", "today");
+  const [searchText, setSearchText] = useFilterState("orders_searchText", "");
+  const [loading, setLoading] = useState(false);
+  const [orders, setOrders] = useState([]);
+  const [menuList, setMenuList] = useState([]); // Danh sách món ăn để tạo đơn mới
 
   const pageSize = 5; // số đơn mỗi trang
 
+  // Load đơn hàng từ backend
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const response = await orderService.getAllOrders({
+        limit: 1000, // Lấy nhiều để filter ở frontend
+      });
+
+      console.log("📦 API Response:", response);
+      console.log("📦 Orders data:", response.data);
+
+      // Transform data từ backend sang format frontend
+      const transformedOrders = response.data.map((order) => ({
+        key: order.id.toString(),
+        code: `#${order.id.toString().padStart(6, '0')}`,
+        table: order.table_number || `Bàn ${order.table_id || 'N/A'}`,
+        phone: "-", // Backend chưa có customer_phone
+        point: 0, // Nếu có loyalty points thì thêm vào
+        total: (parseFloat(order.total_price) || 0).toLocaleString('vi-VN') + "đ",
+        status: mapOrderStatus(order.status),
+        createdAt: order.created_at,
+        updatedAt: order.updated_at,
+        items: [], // Sẽ load khi xem chi tiết
+        rawStatus: order.status, // Giữ status gốc để xử lý
+        totalItems: order.total_items || 0, // Số lượng món
+      }));
+
+      console.log("✅ Transformed orders:", transformedOrders);
+      setOrders(transformedOrders);
+      console.log("✅ Orders state updated");
+    } catch (error) {
+      console.error("❌ Error loading orders:", error);
+      message.error("Không thể tải danh sách đơn hàng");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Map status từ backend sang frontend
+  const mapOrderStatus = (status) => {
+    const statusMap = {
+      'NEW': 'Chờ xác nhận',
+      'IN_PROGRESS': 'Đang phục vụ',
+      'DONE': 'Hoàn tất',
+      'PAID': 'Đã thanh toán',
+      'CANCELLED': 'Đã hủy',
+    };
+    return statusMap[status] || status;
+  };
+
+  // Load data khi component mount
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
   // 👉 lọc đơn hàng theo trạng thái, thời gian và tìm kiếm
+  console.log("🔍 Orders before filter:", orders);
   const filteredOrders = orders.filter((o) => {
     // Lọc trạng thái
     const statusMatch = filterStatus === "all" ? true : o.status === filterStatus;
@@ -117,10 +124,12 @@ const OrderPage = () => {
   });
 
   // 👉 lấy dữ liệu cho trang hiện tại
+  console.log("🔍 Filtered orders:", filteredOrders.length);
   const pagedOrders = filteredOrders.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   );
+  console.log("📄 Paged orders:", pagedOrders.length);
 
   // hàm xuất Excel
   const handleExportExcel = () => {
@@ -208,28 +217,56 @@ const OrderPage = () => {
       title: "Mã đơn",
       dataIndex: "code",
       key: "code",
+      align: "center",
       render: (t) => <strong>{t}</strong>,
     },
-    { title: "Bàn", dataIndex: "table", key: "table" },
-    { title: "Số điện thoại", dataIndex: "phone", key: "phone" },
+    {
+      title: "Bàn",
+      dataIndex: "table",
+      key: "table",
+      align: "center"
+    },
+    {
+      title: "Số điện thoại",
+      dataIndex: "phone",
+      key: "phone",
+      align: "center"
+    },
     {
       title: "Điểm tích lũy",
       dataIndex: "point",
       key: "point",
+      align: "center",
       render: (p) => <span>{p} điểm</span>,
     },
     {
       title: "Tổng tiền",
       dataIndex: "total",
       key: "total",
+      align: "center",
       render: (t) => (
         <span style={{ color: "red", fontWeight: "bold" }}>{t}</span>
       ),
     },
     {
+      title: "Thời gian tạo",
+      dataIndex: "createdAt",
+      key: "createdAt",
+      align: "center",
+      render: (date) => dayjs(date).format("DD/MM/YYYY HH:mm"),
+    },
+    {
+      title: "Thời gian cập nhật",
+      dataIndex: "updatedAt",
+      key: "updatedAt",
+      align: "center",
+      render: (date) => dayjs(date).format("DD/MM/YYYY HH:mm"),
+    },
+    {
       title: "Trạng thái",
       dataIndex: "status",
       key: "status",
+      align: "center",
       render: (s) => {
         let color = "default";
         if (s === "Chờ xác nhận") color = "orange";
@@ -243,6 +280,7 @@ const OrderPage = () => {
     {
       title: "Thao tác",
       key: "action",
+      align: "center",
       render: (_, record) => (
         <Space>
           <Button size="small" onClick={() => setSelectedOrder(record)}>
@@ -343,116 +381,149 @@ const OrderPage = () => {
   };
 
   return (
-    <Layout style={{ minHeight: "100vh" }}>
-      <AppSidebar collapsed={collapsed} currentPageKey="orders" />
-      <Layout style={{ marginLeft: collapsed ? 80 : 220 }}>
-        <AppHeader
-          collapsed={collapsed}
-          setCollapsed={setCollapsed}
-          pageTitle={pageTitle}
-        />
-        <Content
-          style={{
-            marginTop: 64,
-            padding: 20,
-            background: "#f9f9f9",
-            minHeight: "calc(100vh - 64px)",
-            overflow: "auto",
-          }}
-        >
-          {/* Filter */}
-          <Space style={{ marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
-            <Input.Search
-              placeholder="Nhập mã đơn hoặc số điện thoại..."
-              style={{ width: 250 }}
-              value={searchText}
-              onChange={e => setSearchText(e.target.value)}
-              allowClear
-            />
-            <Select
-              value={filterStatus}
-              onChange={(val) => setFilterStatus(val)}
-              style={{ width: 150 }}
-            >
-              <Option value="all">Tất cả trạng thái</Option>
-              <Option value="Chờ xác nhận">Chờ xác nhận</Option>
-              <Option value="Đang phục vụ">Đang phục vụ</Option>
-              <Option value="Hoàn tất">Hoàn tất</Option>
-              <Option value="Hủy món">Hủy món</Option>
-              <Option value="Hoàn đơn">Hoàn đơn</Option>
-            </Select>
-            <Select
-              value={filterTime}
-              onChange={setFilterTime}
-              style={{ width: 120 }}
-            >
-              <Option value="today">Hôm nay</Option>
-              <Option value="7days">7 ngày qua</Option>
-              <Option value="30days">30 ngày qua</Option>
-            </Select>
-            <Button
-              type="primary"
-              style={{ background: "#226533" }}
-              onClick={() => setNewOrderDrawer(true)}
-            >
-              + Tạo đơn mới
-            </Button>
-            <Button onClick={() => setModalExport(true)}>Xuất file excel</Button>
-          </Space>
-
-          {/* Table */}
-          <Table
-            dataSource={pagedOrders} // sửa lại ở đây
-            columns={columns}
-            pagination={false}
-            bordered
-            style={{ marginBottom: 16, background: "#fff" }}
+    <>
+      <Layout style={{ minHeight: "100vh" }}>
+        <AppSidebar collapsed={collapsed} currentPageKey="orders" />
+        <Layout style={{ marginLeft: collapsed ? 80 : 220 }}>
+          <AppHeader
+            collapsed={collapsed}
+            setCollapsed={setCollapsed}
+            pageTitle={pageTitle}
           />
-
-          {/* Pagination */}
-          <div
+          <Content
             style={{
+              marginTop: 64,
+              background: "#f9f9f9",
+              minHeight: "calc(100vh - 64px)",
+              height: "calc(100vh - 64px)",
+              overflow: "hidden",
               display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
+              flexDirection: "column",
             }}
           >
-            <span>
-              Hiển thị 1 đến {pagedOrders.length} trong tổng số {orders.length} đơn hàng
-            </span>
-            <Pagination
-              current={currentPage}
-              pageSize={pageSize}
-              total={filteredOrders.length}
-              onChange={(page) => setCurrentPage(page)}
-            />
-          </div>
-        </Content>
+            <Spin spinning={loading} tip="Đang tải dữ liệu...">
+              {/* Filter - Fixed at top */}
+              <div style={{
+                backgroundColor: '#fff',
+                padding: '16px 20px',
+                borderBottom: '1px solid #e8e8e8',
+                flexShrink: 0,
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: 12
+                }}>
+                  {/* Left side: Search & Filters */}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <Input.Search
+                      placeholder="Nhập mã đơn hoặc số điện thoại..."
+                      style={{ width: 250 }}
+                      value={searchText}
+                      onChange={e => setSearchText(e.target.value)}
+                      allowClear
+                    />
+                    <Select
+                      value={filterStatus}
+                      onChange={(val) => setFilterStatus(val)}
+                      style={{ width: 150 }}
+                    >
+                      <Option value="all">Tất cả trạng thái</Option>
+                      <Option value="Chờ xác nhận">Chờ xác nhận</Option>
+                      <Option value="Đang phục vụ">Đang phục vụ</Option>
+                      <Option value="Hoàn tất">Hoàn tất</Option>
+                      <Option value="Hủy món">Hủy món</Option>
+                      <Option value="Hoàn đơn">Hoàn đơn</Option>
+                    </Select>
+                    <Select
+                      value={filterTime}
+                      onChange={setFilterTime}
+                      style={{ width: 130 }}
+                    >
+                      <Option value="today">Hôm nay</Option>
+                      <Option value="7days">7 ngày qua</Option>
+                      <Option value="30days">30 ngày qua</Option>
+                    </Select>
+                  </div>
 
-        {/* Modal Xuất Excel */}
-        <Modal
-          title="Xuất file Excel"
-          open={modalExport}
-          onCancel={() => setModalExport(false)}
-          footer={[
-            <Button key="back" onClick={() => setModalExport(false)}>
-              Đóng
-            </Button>,
-            <Button
-              key="submit"
-              type="primary"
-              style={{ background: "#226533" }}
-              onClick={() => {
-                setModalExport(false);
-                handleExportExcel(); // ✅ gọi hàm export
-              }}
-            >
-              Xác nhận xuất
-            </Button>,
-          ]}
-        >
-          <p>Bạn có chắc chắn muốn xuất danh sách đơn hàng ra file Excel không?</p>
-        </Modal>
+                  {/* Right side: Actions */}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <Button
+                      type="primary"
+                      style={{ background: "#226533" }}
+                      onClick={() => setNewOrderDrawer(true)}
+                    >
+                      + Tạo đơn mới
+                    </Button>
+                    <Button onClick={() => setModalExport(true)}>Xuất file excel</Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Table & Pagination - Scrollable Area */}
+              <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
+                <Table
+                  dataSource={pagedOrders}
+                  columns={columns}
+                  pagination={false}
+                  bordered
+                  locale={{
+                    triggerDesc: 'Nhấn để sắp xếp giảm dần',
+                    triggerAsc: 'Nhấn để sắp xếp tăng dần',
+                    cancelSort: 'Nhấn để hủy sắp xếp',
+                  }}
+                  style={{ marginBottom: 16, background: "#fff" }}
+                />
+
+                {/* Pagination */}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span>
+                    Hiển thị 1 đến {pagedOrders.length} trong tổng số {orders.length} đơn hàng
+                  </span>
+                  <Pagination
+                    current={currentPage}
+                    pageSize={pageSize}
+                    total={filteredOrders.length}
+                    onChange={(page) => setCurrentPage(page)}
+                  />
+                </div>
+              </div>
+
+              {/* Modal Xuất Excel */}
+              <Modal
+                title="Xuất file Excel"
+                open={modalExport}
+                onCancel={() => setModalExport(false)}
+                footer={[
+                  <Button key="back" onClick={() => setModalExport(false)}>
+                    Đóng
+                  </Button>,
+                  <Button
+                    key="submit"
+                    type="primary"
+                    style={{ background: "#226533" }}
+                    onClick={() => {
+                      setModalExport(false);
+                      handleExportExcel(); // ✅ gọi hàm export
+                    }}
+                  >
+                    Xác nhận xuất
+                  </Button>,
+                ]}
+              >
+                <p>Bạn có chắc chắn muốn xuất danh sách đơn hàng ra file Excel không?</p>
+              </Modal>
+            </Spin>
+          </Content>
+        </Layout>
       </Layout>
 
       {/* Drawer chi tiết đơn */}
@@ -716,7 +787,7 @@ const OrderPage = () => {
       >
         <p>Bạn có chắc muốn hoàn đơn {modalHoanDon.order?.code} không?</p>
       </Modal>
-    </Layout>
+    </>
   );
 };
 

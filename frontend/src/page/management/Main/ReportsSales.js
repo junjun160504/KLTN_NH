@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import AppHeader from "../../../components/AppHeader";
 import AppSidebar from "../../../components/AppSidebar";
+import useSidebarCollapse from "../../../hooks/useSidebarCollapse";
 import {
   Layout,
   Card,
@@ -33,7 +34,7 @@ const mockProducts = [
 ];
 
 const ReportsProductPage = () => {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useSidebarCollapse();
   const [pageTitle] = useState("Báo cáo sản phẩm");
   const [filteredSales, setFilteredSales] = useState(mockProducts);
   const [dateRange, setDateRange] = useState([]);
@@ -92,7 +93,7 @@ const ReportsProductPage = () => {
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
-      <AppSidebar collapsed={collapsed} currentPageKey="reports-products" />
+      <AppSidebar collapsed={collapsed} currentPageKey="report_sales" />
       <Layout style={{ marginLeft: collapsed ? 80 : 220 }}>
         <AppHeader
           collapsed={collapsed}

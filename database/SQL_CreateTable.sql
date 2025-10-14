@@ -1,11 +1,35 @@
--- Bảng khách hàng
+create database kltn_nhahang;
+-- 1️⃣ Nhân viên
+CREATE TABLE employees (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    phone VARCHAR(20) UNIQUE,
+    email VARCHAR(100) UNIQUE,
+    gender ENUM('MALE','FEMALE','OTHER') DEFAULT 'OTHER',
+    address TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2️⃣ Tài khoản nhân viên hệ thống
+CREATE TABLE admins (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    employee_id BIGINT NOT NULL,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    role ENUM('STAFF','MANAGER','OWNER') DEFAULT 'STAFF',
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE
+);
+
+-- 3️⃣ Bảng khách hàng
 CREATE TABLE customers (
     idcustomers BIGINT PRIMARY KEY AUTO_INCREMENT,
     phone VARCHAR(20) UNIQUE NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Bảng bàn ăn
+-- 4️⃣ Bảng bàn ăn
 CREATE TABLE tables (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     table_number VARCHAR(10) UNIQUE NOT NULL,
@@ -13,7 +37,7 @@ CREATE TABLE tables (
     is_active BOOLEAN DEFAULT TRUE
 );
 
--- Bảng phiên QR (mỗi lần quét QR bắt đầu một phiên ăn uống)
+-- 5️⃣ Bảng phiên QR
 CREATE TABLE qr_sessions (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     table_id BIGINT NOT NULL,
@@ -24,7 +48,7 @@ CREATE TABLE qr_sessions (
     FOREIGN KEY (customer_id) REFERENCES customers(idcustomers) ON DELETE SET NULL
 );
 
--- Bảng danh mục món ăn
+-- 6️⃣ Bảng danh mục món ăn
 CREATE TABLE menu_categories (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(100) NOT NULL,
@@ -32,7 +56,7 @@ CREATE TABLE menu_categories (
     is_available BOOLEAN DEFAULT TRUE
 );
 
--- Bảng món ăn
+-- 7️⃣ Bảng món ăn
 CREATE TABLE menu_items (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(255) NOT NULL,
@@ -42,7 +66,7 @@ CREATE TABLE menu_items (
     is_available BOOLEAN DEFAULT TRUE
 );
 
--- Bảng trung gian món ăn, danh mục
+-- 8️⃣ Bảng trung gian món ăn - danh mục
 CREATE TABLE menu_item_categories (
 	id BIGINT PRIMARY KEY AUTO_INCREMENT,
     item_id BIGINT,
@@ -51,6 +75,7 @@ CREATE TABLE menu_item_categories (
     FOREIGN KEY (category_id) REFERENCES menu_categories(id) ON DELETE CASCADE
 );
 
+-- 9️⃣ Bảng lịch sử giá món ăn
 CREATE TABLE menu_price_history (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     item_id BIGINT,
@@ -62,7 +87,7 @@ CREATE TABLE menu_price_history (
     FOREIGN KEY (changed_by) REFERENCES admins(id) ON DELETE SET NULL
 );
 
--- Tạo bảng carts
+-- 🔟 Bảng giỏ hàng
 CREATE TABLE carts (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     qr_session_id BIGINT, 
@@ -71,7 +96,7 @@ CREATE TABLE carts (
     FOREIGN KEY (qr_session_id) REFERENCES qr_sessions(id) ON DELETE CASCADE
 );
 
--- Tạo bảng cart_items
+-- 11️⃣ Chi tiết giỏ hàng
 CREATE TABLE cart_items (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     cart_id BIGINT NOT NULL,
@@ -85,7 +110,7 @@ CREATE TABLE cart_items (
     FOREIGN KEY (menu_item_id) REFERENCES menu_items(id) ON DELETE CASCADE
 );
 
--- Bảng đơn đặt món
+-- 12️⃣ Bảng đơn đặt món
 CREATE TABLE orders (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     qr_session_id BIGINT NOT NULL,
@@ -98,11 +123,11 @@ CREATE TABLE orders (
     FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE SET NULL
 );
 
--- Chi tiết món trong đơn hàng
+-- 13️⃣ Chi tiết món trong đơn hàng
 CREATE TABLE order_items (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     order_id BIGINT NOT NULL,
-    cart_item_id BIGINT,  -- 👈 tham chiếu món gốc trong giỏ
+    cart_item_id BIGINT,
     menu_item_id BIGINT NOT NULL,
     quantity INT DEFAULT 1,
     note TEXT,
@@ -112,8 +137,7 @@ CREATE TABLE order_items (
     FOREIGN KEY (cart_item_id) REFERENCES cart_items(id) ON DELETE SET NULL
 );
 
-
--- Bảng thanh toán
+-- 14️⃣ Bảng thanh toán
 CREATE TABLE payments (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     qr_sessions_id BIGINT,
@@ -126,8 +150,8 @@ CREATE TABLE payments (
     FOREIGN KEY (qr_sessions_id) REFERENCES qr_sessions(id) ON DELETE CASCADE
 );
 
--- Bảng tích điểm khách hàng
-CREATE TABLE IF NOT EXISTS reward_points (
+-- 15️⃣ Tích điểm khách hàng
+CREATE TABLE reward_points (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     customer_id BIGINT,
     points INT DEFAULT 0,
@@ -135,7 +159,7 @@ CREATE TABLE IF NOT EXISTS reward_points (
     FOREIGN KEY (customer_id) REFERENCES customers(idcustomers) ON DELETE CASCADE
 );
 
--- Đánh giá tổng thể bữa ăn
+-- 16️⃣ Đánh giá tổng thể bữa ăn
 CREATE TABLE reviews (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     qr_session_id BIGINT,
@@ -145,7 +169,7 @@ CREATE TABLE reviews (
     FOREIGN KEY (qr_session_id) REFERENCES qr_sessions(id) ON DELETE CASCADE
 );
 
--- Đánh giá từng món ăn
+-- 17️⃣ Đánh giá từng món ăn
 CREATE TABLE menu_reviews (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     item_id BIGINT,
@@ -157,7 +181,7 @@ CREATE TABLE menu_reviews (
     FOREIGN KEY (qr_session_id) REFERENCES qr_sessions(id) ON DELETE CASCADE
 );
 
--- Lưu lịch sử chat với chatbot
+-- 18️⃣ Lịch sử chat
 CREATE TABLE chats (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     qr_session_id BIGINT,
@@ -168,34 +192,11 @@ CREATE TABLE chats (
     FOREIGN KEY (qr_session_id) REFERENCES qr_sessions(id) ON DELETE CASCADE
 );
 
--- Tài khoản nhân viên hệ thống
-CREATE TABLE admins (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    employee_id BIGINT NOT NULL,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL,
-    role ENUM('STAFF','MANAGER','OWNER') DEFAULT 'STAFF',
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE
-);
-
--- Nhân viên
-CREATE TABLE employees (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(100) NOT NULL,
-    phone VARCHAR(20) UNIQUE,
-    email VARCHAR(100) UNIQUE,
-    gender ENUM('MALE','FEMALE','OTHER') DEFAULT 'OTHER',
-    address TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-
+-- 19️⃣ Thông báo
 CREATE TABLE notifications (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     target_type ENUM('CUSTOMER','STAFF','ALL') NOT NULL,
-    target_id BIGINT, -- qr_session_id hoặc admin_id
+    target_id BIGINT,
     title VARCHAR(255) NOT NULL,
     message TEXT,
     type ENUM('ORDER_UPDATE','CALL_STAFF','SYSTEM','PROMOTION') DEFAULT 'SYSTEM',
@@ -219,7 +220,6 @@ MODIFY COLUMN type ENUM(
     'INFO'
 ) DEFAULT 'SYSTEM';
 
--- Thêm các column bổ sung
 ALTER TABLE notifications
 ADD COLUMN priority ENUM('high', 'medium', 'low') DEFAULT 'medium',
 ADD COLUMN action_url VARCHAR(500),
