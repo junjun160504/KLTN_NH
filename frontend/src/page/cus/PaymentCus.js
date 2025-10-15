@@ -4,6 +4,7 @@ import {
     Typography,
     Button,
     message,
+    Modal,
 } from "antd";
 import {
     ArrowLeftOutlined,
@@ -11,6 +12,7 @@ import {
     BankOutlined,
     QrcodeOutlined,
     CreditCardOutlined,
+    DownloadOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
@@ -19,6 +21,22 @@ const { Header, Content } = Layout;
 const { Title, Text } = Typography;
 
 const REACT_APP_API_URL = process.env.REACT_APP_API_URL;
+
+// CSS animations
+const pulseAnimation = `
+  @keyframes pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.05); opacity: 0.8; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+`;
+
+// Inject CSS animations
+if (typeof document !== 'undefined') {
+    const style = document.createElement('style');
+    style.textContent = pulseAnimation;
+    document.head.appendChild(style);
+}
 
 // Format giá tiền
 const formatPrice = (price) => {
@@ -36,6 +54,11 @@ export default function PaymentPage() {
     const [paymentMethod, setPaymentMethod] = useState('CASH'); // 'CASH', 'BANKING', 'QR', 'CARD'
     const [loading, setLoading] = useState(false);
     const [usePoints, setUsePoints] = useState(false); // Dùng điểm hay không
+
+    // QR Code Modal State
+    const [qrModalVisible, setQrModalVisible] = useState(false);
+    const [qrData, setQrData] = useState(null);
+    const [qrLoading, setQrLoading] = useState(false);
 
     // Mock data - Điểm tích lũy của khách hàng (sau này lấy từ API)
     const customerPoints = 200; // 200 điểm = 200đ
@@ -161,17 +184,47 @@ export default function PaymentPage() {
     // Xử lý các phương thức thanh toán khác (BANKING, QR, CARD)
     const handleOtherPaymentMethods = async () => {
         try {
-            // TODO: Implement logic cho các phương thức khác
-            // - BANKING: Hiển thị thông tin chuyển khoản
-            // - QR: Hiển thị mã QR
-            // - CARD: Gọi API quẹt thẻ
+            // Nếu là BANKING hoặc QR → Hiển thị mã QR
+            if (paymentMethod === 'BANKING' || paymentMethod === 'QR') {
+                setQrLoading(true);
+                setQrModalVisible(true);
+
+                try {
+                    // Gọi API thanh toán cho order đầu tiên để lấy QR code
+                    const firstOrder = unpaidOrders[0];
+                    const response = await axios.post(`${REACT_APP_API_URL}/payment`, {
+                        order_id: firstOrder.id,
+                        method: paymentMethod,
+                        amount: finalAmount,
+                        print_bill: false
+                    });
+
+                    // Kiểm tra và lưu thông tin QR
+                    if (response.data.data && response.data.data["qr_data"]) {
+                        setQrData(response.data.data.qr_data);
+                        console.log("QR data set successfully:", response.data.data.qr_data);
+                    } else {
+                        console.error("QR data not found in response");
+                        message.error("Không nhận được thông tin QR từ server");
+                    }
+                } catch (error) {
+                    console.error("API call error:", error);
+                    message.error("Lỗi khi tạo mã QR: " + (error.response?.data?.message || error.message));
+                } finally {
+                    setQrLoading(false);
+                }
+
+                return; // Không tự động quay về, đợi user đóng modal
+            }
+
+            // CARD hoặc phương thức khác
+            // TODO: Implement logic cho CARD
 
             // Gọi API thanh toán cho từng order
             const paymentPromises = unpaidOrders.map(order =>
                 axios.post(`${REACT_APP_API_URL}/payment`, {
                     order_id: order.id,
                     method: paymentMethod,
-                    amount: finalAmount, // Số tiền sau khi trừ điểm
                     print_bill: false
                 })
             );
@@ -190,8 +243,50 @@ export default function PaymentPage() {
 
         } catch (error) {
             console.error("Payment error:", error);
+            setQrLoading(false);
             throw error;
         }
+    };
+
+    // Tải QR code về máy
+    const handleDownloadQR = async () => {
+        try {
+            if (!qrData?.qr_code_url) {
+                message.error("Không có mã QR để tải!");
+                return;
+            }
+
+            // Tải ảnh về từ URL
+            const response = await fetch(qrData.qr_code_url);
+            const blob = await response.blob();
+
+            // Tạo link download
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `QR_Payment_${qrData.bank_info?.amount || 'unknown'}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+            message.success("Đã tải mã QR về máy!");
+        } catch (error) {
+            console.error("Download QR error:", error);
+            message.error("Không thể tải mã QR!");
+        }
+    };
+
+    // Đóng modal QR
+    const handleCloseQRModal = () => {
+        setQrModalVisible(false);
+        // Quay về trang bills
+        navigate('/cus/bills', {
+            state: {
+                paymentRequested: true,
+                paymentMethod: paymentMethod
+            }
+        });
     };
 
     return (
@@ -450,6 +545,288 @@ export default function PaymentPage() {
                     Hoàn thành
                 </Button>
             </div>
+
+            {/* QR Code Modal - Modern Design */}
+            <Modal
+                open={qrModalVisible}
+                onCancel={handleCloseQRModal}
+                footer={null}
+                centered
+                width="95%"
+                style={{
+                    maxWidth: 720,
+                    top: 20,
+                }}
+                closable={false}
+                styles={{
+                    body: {
+                        padding: 0,
+                        borderRadius: 16,
+                        overflow: 'hidden'
+                    },
+                    content: {
+                        borderRadius: 16,
+                        overflow: 'hidden',
+                        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15)',
+                    }
+                }}
+                maskStyle={{
+                    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                    backdropFilter: 'blur(4px)',
+                }}
+                destroyOnClose
+            >
+
+                {qrLoading ? (
+                    // Loading State
+                    <div style={{
+                        padding: '48px 24px',
+                        textAlign: 'center',
+                        background: 'linear-gradient(135deg, #f8fffe 0%, #f0f9ff 100%)',
+                    }}>
+                        <div style={{
+                            width: 80,
+                            height: 80,
+                            margin: '0 auto 24px',
+                            background: 'linear-gradient(135deg, #226533 0%, #2d8e47 100%)',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            animation: 'pulse 2s infinite',
+                        }}>
+                            <QrcodeOutlined style={{ fontSize: 36, color: '#fff' }} />
+                        </div>
+                        <Title level={4} style={{ margin: '0 0 8px', color: '#226533', fontWeight: 600 }}>
+                            Đang tạo mã QR
+                        </Title>
+                        <Text style={{ color: '#666', fontSize: 14 }}>
+                            Vui lòng đợi trong giây lát...
+                        </Text>
+                    </div>
+                ) : qrData ? (
+                    // QR Code Content
+                    <div style={{
+                        background: 'linear-gradient(135deg, #f8fffe 0%, #f0f9ff 100%)',
+                        position: 'relative',
+                    }}>
+                        {/* Header */}
+                        <div style={{
+                            padding: '16px 16px 12px',
+                            textAlign: 'center',
+                            background: 'linear-gradient(135deg, #226533 0%, #2d8e47 100%)',
+                            color: '#fff',
+                            position: 'relative',
+                        }}>
+                            <div style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                background: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.1"%3E%3Ccircle cx="30" cy="30" r="2"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
+                                opacity: 0.3,
+                            }} />
+                            <QrcodeOutlined style={{ fontSize: 24, marginBottom: 4, position: 'relative', zIndex: 1 }} />
+                            <Title level={5} style={{ margin: 0, color: '#fff', fontWeight: 600, fontSize: 16, position: 'relative', zIndex: 1 }}>
+                                Quét mã để thanh toán
+                            </Title>
+                            <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13, position: 'relative', zIndex: 1 }}>
+                                Số tiền: {formatPrice(qrData.bank_info?.amount || 0)}đ
+                            </Text>
+                        </div>
+
+                        {/* QR Code Container */}
+                        <div style={{ padding: '24px 20px 20px' }}>
+                            <div
+                                style={{
+                                    background: '#fff',
+                                    padding: 16,
+                                    borderRadius: 20,
+                                    border: '1px solid #e8f4e8',
+                                    marginBottom: 16,
+                                    textAlign: 'center',
+                                    boxShadow: '0 8px 32px rgba(34, 101, 51, 0.08)',
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}
+                            >
+                                {/* Corner decorations */}
+                                <div style={{
+                                    position: 'absolute',
+                                    top: 12,
+                                    left: 12,
+                                    width: 16,
+                                    height: 16,
+                                    border: '3px solid #226533',
+                                    borderRight: 'none',
+                                    borderBottom: 'none',
+                                    borderRadius: '4px 0 0 0',
+                                }} />
+                                <div style={{
+                                    position: 'absolute',
+                                    top: 12,
+                                    right: 12,
+                                    width: 16,
+                                    height: 16,
+                                    border: '3px solid #226533',
+                                    borderLeft: 'none',
+                                    borderBottom: 'none',
+                                    borderRadius: '0 4px 0 0',
+                                }} />
+                                <div style={{
+                                    position: 'absolute',
+                                    bottom: 12,
+                                    left: 12,
+                                    width: 16,
+                                    height: 16,
+                                    border: '3px solid #226533',
+                                    borderRight: 'none',
+                                    borderTop: 'none',
+                                    borderRadius: '0 0 0 4px',
+                                }} />
+                                <div style={{
+                                    position: 'absolute',
+                                    bottom: 12,
+                                    right: 12,
+                                    width: 16,
+                                    height: 16,
+                                    border: '3px solid #226533',
+                                    borderLeft: 'none',
+                                    borderTop: 'none',
+                                    borderRadius: '0 0 4px 0',
+                                }} />
+
+                                <img
+                                    src={qrData.qr_code_url}
+                                    alt="QR Code"
+                                    style={{
+                                        width: 320,
+                                        height: 320,
+                                        display: 'block',
+                                        borderRadius: 8,
+                                    }}
+                                />
+                                <Text style={{
+                                    marginTop: 12,
+                                    color: '#666',
+                                    fontSize: 13,
+                                    display: 'block'
+                                }}>
+                                    Quét bằng app ngân hàng
+                                </Text>
+                            </div>
+
+                            {/* Quick Action Buttons */}
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: '1fr 1fr',
+                                gap: 12,
+                            }}>
+                                <Button
+                                    icon={<DownloadOutlined />}
+                                    size="large"
+                                    onClick={handleDownloadQR}
+                                    style={{
+                                        height: 48,
+                                        borderRadius: 12,
+                                        fontWeight: 600,
+                                        fontSize: 14,
+                                        border: '2px solid #e8f4e8',
+                                        background: '#fff',
+                                        color: '#226533',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: 8,
+                                        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                                        transition: 'all 0.3s ease',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.target.style.transform = 'translateY(-2px)';
+                                        e.target.style.boxShadow = '0 4px 16px rgba(34, 101, 51, 0.15)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.target.style.transform = 'translateY(0)';
+                                        e.target.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
+                                    }}
+                                >
+                                    Tải về
+                                </Button>
+                                <Button
+                                    type="primary"
+                                    size="large"
+                                    onClick={handleCloseQRModal}
+                                    style={{
+                                        height: 48,
+                                        borderRadius: 12,
+                                        fontWeight: 600,
+                                        fontSize: 14,
+                                        background: 'linear-gradient(135deg, #226533 0%, #2d8e47 100%)',
+                                        border: 'none',
+                                        boxShadow: '0 4px 16px rgba(34, 101, 51, 0.3)',
+                                        transition: 'all 0.3s ease',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.target.style.transform = 'translateY(-2px)';
+                                        e.target.style.boxShadow = '0 6px 20px rgba(34, 101, 51, 0.4)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.target.style.transform = 'translateY(0)';
+                                        e.target.style.boxShadow = '0 4px 16px rgba(34, 101, 51, 0.3)';
+                                    }}
+                                >
+                                    Hoàn thành
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                ) : !qrLoading ? (
+                    // Error State
+                    <div style={{
+                        padding: '48px 24px',
+                        textAlign: 'center',
+                        background: 'linear-gradient(135deg, #fff5f5 0%, #fef2f2 100%)',
+                    }}>
+                        <div style={{
+                            width: 80,
+                            height: 80,
+                            margin: '0 auto 24px',
+                            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        }}>
+                            <Text style={{ fontSize: 36, color: '#fff' }}>❌</Text>
+                        </div>
+                        <Title level={4} style={{ margin: '0 0 8px', color: '#dc2626', fontWeight: 600 }}>
+                            Không thể tạo mã QR
+                        </Title>
+                        <Text style={{ color: '#666', fontSize: 14, marginBottom: 24 }}>
+                            Đã xảy ra lỗi khi tạo mã QR thanh toán
+                        </Text>
+                        <Button
+                            type="primary"
+                            onClick={handleCloseQRModal}
+                            style={{
+                                background: '#dc2626',
+                                borderColor: '#dc2626',
+                                borderRadius: 8,
+                                height: 40,
+                                paddingLeft: 24,
+                                paddingRight: 24,
+                            }}
+                        >
+                            Đóng
+                        </Button>
+                    </div>
+                ) : null}
+            </Modal>
         </Layout>
     );
 }

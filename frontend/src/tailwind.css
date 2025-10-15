@@ -1,6 +1,28 @@
-/* Tailwind CSS - Chỉ import utilities, không import base để tránh conflict với Ant Design */
+/* Tailwind CSS - Import base để reset browser defaults */
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Đảm bảo html và body không có scroll bar không mong muốn */
+@layer base {
+  html {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+  }
+
+  #root {
+    height: 100%;
+    width: 100%;
+  }
+}
 
 /* Custom components với Tailwind */
 @layer components {

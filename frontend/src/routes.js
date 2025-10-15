@@ -21,57 +21,97 @@ import FoodReviewcsPage from "./page/cus/FoodReviewsCus";
 import LoyaltycsPage from "./page/cus/LoyaltysCus";
 import FoodDetailcsPage from "./page/cus/FoodDetailsCus";
 
-// Import AdminLayout
+// Import AdminLayout and ProtectedAdminRoute
 import AdminLayout from "./layouts/AdminLayout";
+import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 
 const routes = [
-  // Login page (không cần notifications)
+  // Login page (public - không cần protection)
   {
-    path: "/main/auth",
+    path: "/main/login",
     element: <LoginPage />,
   },
 
-  // Admin routes - Tất cả wrapped trong AdminLayout
-  // Dùng path tuyệt đối thay vì nested routes
+  // Admin routes - Wrapped với ProtectedAdminRoute và AdminLayout
   {
     path: "/main/homes",
-    element: <AdminLayout><Home /></AdminLayout>,
+    element: (
+      <ProtectedAdminRoute>
+        <AdminLayout><Home /></AdminLayout>
+      </ProtectedAdminRoute>
+    ),
   },
   {
     path: "/main/orders",
-    element: <AdminLayout><OrderPage /></AdminLayout>,
+    element: (
+      <ProtectedAdminRoute>
+        <AdminLayout><OrderPage /></AdminLayout>
+      </ProtectedAdminRoute>
+    ),
   },
   {
     path: "/main/categorys",
-    element: <AdminLayout><MenuPage /></AdminLayout>,
+    element: (
+      <ProtectedAdminRoute>
+        <AdminLayout><MenuPage /></AdminLayout>
+      </ProtectedAdminRoute>
+    ),
   },
   {
     path: "/main/tables",
-    element: <AdminLayout><TablePage /></AdminLayout>,
+    element: (
+      <ProtectedAdminRoute>
+        <AdminLayout><TablePage /></AdminLayout>
+      </ProtectedAdminRoute>
+    ),
   },
   {
     path: "/main/customers",
-    element: <AdminLayout><CustomerPage /></AdminLayout>,
+    element: (
+      <ProtectedAdminRoute>
+        <AdminLayout><CustomerPage /></AdminLayout>
+      </ProtectedAdminRoute>
+    ),
   },
   {
     path: "/main/staffs",
-    element: <AdminLayout><StaffPage /></AdminLayout>,
+    element: (
+      <ProtectedAdminRoute>
+        <AdminLayout><StaffPage /></AdminLayout>
+      </ProtectedAdminRoute>
+    ),
   },
   {
     path: "/main/reports/sales",
-    element: <AdminLayout><ReportsSalesPage /></AdminLayout>,
+    element: (
+      <ProtectedAdminRoute>
+        <AdminLayout><ReportsSalesPage /></AdminLayout>
+      </ProtectedAdminRoute>
+    ),
   },
   {
     path: "/main/reports/products",
-    element: <AdminLayout><ReportsProductsPage /></AdminLayout>,
+    element: (
+      <ProtectedAdminRoute>
+        <AdminLayout><ReportsProductsPage /></AdminLayout>
+      </ProtectedAdminRoute>
+    ),
   },
   {
     path: "/main/reports/customers",
-    element: <AdminLayout><ReportsCustomersPage /></AdminLayout>,
+    element: (
+      <ProtectedAdminRoute>
+        <AdminLayout><ReportsCustomersPage /></AdminLayout>
+      </ProtectedAdminRoute>
+    ),
   },
   {
     path: "/main/reports/chatbots",
-    element: <AdminLayout><ReportsChatbotPage /></AdminLayout>,
+    element: (
+      <ProtectedAdminRoute>
+        <AdminLayout><ReportsChatbotPage /></AdminLayout>
+      </ProtectedAdminRoute>
+    ),
   },
 
   // Customer routes (không cần AdminLayout)

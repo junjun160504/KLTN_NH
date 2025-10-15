@@ -116,14 +116,15 @@ CREATE TABLE order_items (
 -- Bảng thanh toán
 CREATE TABLE payments (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    qr_sessions_id BIGINT,
+    order_id BIGINT,
     admin_id BIGINT,
     method ENUM('BANKING','CASH') NOT NULL,
     amount DECIMAL(12,2),
+    payment_status ENUM('PENDING', 'PAID', 'FAILED', 'REFUNDED'),
     paid_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     printed_bill BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE,
-    FOREIGN KEY (qr_sessions_id) REFERENCES qr_sessions(id) ON DELETE CASCADE
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
 );
 
 -- Bảng tích điểm khách hàng
