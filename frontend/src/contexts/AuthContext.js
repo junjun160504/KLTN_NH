@@ -9,13 +9,22 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         // Check if user is already logged in
-        const initAuth = () => {
+        const initAuth = async () => {
             try {
                 const token = authService.getToken();
                 const savedUser = authService.getUser();
 
                 if (token && savedUser) {
-                    setUser(savedUser);
+                    // Validate token (optional)
+                    const isValid = await authService.validateToken();
+
+                    if (isValid) {
+                        setUser(savedUser);
+                        console.log('✅ Auth restored from storage:', savedUser.username);
+                    } else {
+                        console.warn('⚠️ Invalid token, logging out');
+                        authService.logout();
+                    }
                 }
             } catch (error) {
                 console.error('Auth initialization error:', error);
@@ -30,15 +39,19 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (credentials) => {
         try {
+            console.log('🔐 Attempting login:', credentials.username);
             const data = await authService.login(credentials);
             setUser(data.user);
+            console.log('✅ Login successful, user set:', data.user.username);
             return data;
         } catch (error) {
+            console.error('❌ Login failed in context:', error);
             throw error;
         }
     };
 
     const logout = () => {
+        console.log('🚪 Logout called in context');
         authService.logout();
         setUser(null);
     };
@@ -50,7 +63,11 @@ export const AuthProvider = ({ children }) => {
         loading,
         isAuthenticated: !!user,
         isAdmin: user?.role === 'ADMIN',
-        isStaff: user?.role === 'STAFF'
+        isStaff: user?.role === 'STAFF',
+        isManager: user?.role === 'MANAGER',
+        isOwner: user?.role === 'OWNER',
+        getLoginTime: authService.getLoginTime,
+        isRemembered: authService.isRemembered
     };
 
     return (

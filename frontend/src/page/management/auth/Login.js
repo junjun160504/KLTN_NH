@@ -3,24 +3,28 @@ import { Form, Input, Button, Checkbox, message, Typography } from "antd";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
 
-const { Title, Text, Link } = Typography;
+const { Title, Text } = Typography;
 
 const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login, isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [form] = Form.useForm();
 
   // Redirect if already logged in
   useEffect(() => {
     if (isAuthenticated) {
       const from = location.state?.from?.pathname || "/main/homes";
+      console.log('Already authenticated, redirecting to:', from);
       navigate(from, { replace: true });
     }
   }, [isAuthenticated, navigate, location]);
 
   const onFinish = async (values) => {
     setLoading(true);
+    console.log('🔐 Login form submitted:', { username: values.username, remember: values.remember });
+
     try {
       await login({
         username: values.username,
@@ -28,14 +32,39 @@ const LoginPage = () => {
         remember: values.remember || false,
       });
 
-      message.success("Đăng nhập thành công!");
+      message.success({
+        content: `Chào mừng ${values.username}!`,
+        duration: 2,
+      });
 
       // Redirect to previous page or home
       const from = location.state?.from?.pathname || "/main/homes";
-      navigate(from, { replace: true });
+      console.log('Login successful, redirecting to:', from);
+
+      setTimeout(() => {
+        navigate(from, { replace: true });
+      }, 500);
+
     } catch (err) {
       console.error("Login error:", err);
-      message.error(err.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.");
+
+      // Show specific error messages
+      let errorMessage = "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.";
+
+      if (err.message) {
+        if (err.message.includes('not found')) {
+          errorMessage = "Tên đăng nhập không tồn tại";
+        } else if (err.message.includes('password')) {
+          errorMessage = "Mật khẩu không chính xác";
+        } else {
+          errorMessage = err.message;
+        }
+      }
+
+      message.error({
+        content: errorMessage,
+        duration: 3,
+      });
     } finally {
       setLoading(false);
     }
@@ -61,47 +90,56 @@ const LoginPage = () => {
         {/* Login Form */}
         <Form
           name="login"
+          form={form}
           initialValues={{ remember: false }}
           onFinish={onFinish}
           layout="vertical"
           requiredMark={false}
+          autoComplete="on"
         >
           <Form.Item
             label={<span className="text-gray-700 font-medium text-sm sm:text-base">Tên đăng nhập</span>}
             name="username"
-            rules={[{ required: true, message: "Vui lòng nhập tên đăng nhập" }]}
+            rules={[
+              { required: true, message: "Vui lòng nhập tên đăng nhập" },
+              { min: 3, message: "Tên đăng nhập phải có ít nhất 3 ký tự" }
+            ]}
           >
             <Input
               placeholder="Nhập tên đăng nhập của bạn"
               size="large"
               className="rounded-lg border-gray-300 text-sm sm:text-base"
+              autoComplete="username"
+              disabled={loading}
             />
           </Form.Item>
 
           <Form.Item
             label={<span className="text-gray-700 font-medium text-sm sm:text-base">Mật khẩu</span>}
             name="password"
-            rules={[{ required: true, message: "Vui lòng nhập mật khẩu" }]}
+            rules={[
+              { required: true, message: "Vui lòng nhập mật khẩu" },
+              { min: 3, message: "Mật khẩu phải có ít nhất 3 ký tự" }
+            ]}
           >
             <Input.Password
               placeholder="Nhập mật khẩu của bạn"
               size="large"
               className="rounded-lg border-gray-300 text-sm sm:text-base"
+              autoComplete="current-password"
+              disabled={loading}
             />
           </Form.Item>
 
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-6">
             <Form.Item name="remember" valuePropName="checked" noStyle>
-              <Checkbox className="text-gray-600 text-sm sm:text-base">
+              <Checkbox
+                className="text-gray-600 text-sm sm:text-base"
+                disabled={loading}
+              >
                 Ghi nhớ đăng nhập
               </Checkbox>
             </Form.Item>
-            {/* <Link
-              href="/forgot-password"
-              className="text-indigo-600 hover:text-indigo-700 font-medium text-sm sm:text-base"
-            >
-              Quên mật khẩu?
-            </Link> */}
           </div>
 
           <Form.Item className="mb-4 sm:mb-6">
@@ -113,7 +151,7 @@ const LoginPage = () => {
               size="large"
               className="rounded-lg font-semibold border-0 h-11 sm:h-12 text-sm sm:text-base"
             >
-              Đăng nhập
+              {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
             </Button>
           </Form.Item>
         </Form>

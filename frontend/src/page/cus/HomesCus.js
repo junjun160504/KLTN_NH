@@ -15,11 +15,10 @@ import {
 } from "antd";
 import {
   GiftOutlined,
-  DollarOutlined,
   UserOutlined,
-  StarOutlined,
-  MenuOutlined,
   WechatOutlined,
+  ShoppingOutlined,
+  EnvironmentFilled,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useParams } from "react-router-dom";
@@ -79,11 +78,11 @@ export default function HomecsPage() {
   // Tính chào theo giờ
   const hour = new Date().getHours();
   let greeting = "Chào buổi tối Quý khách";
-  if (hour < 12) {
+  if (hour < 10) {
     greeting = "Chào buổi sáng Quý khách";
-  } else if (hour < 18) {
+  } else if (hour < 13) {
     greeting = "Chào buổi trưa Quý khách";
-  } else {
+  } else if (hour < 18) {
     greeting = "Chào buổi chiều Quý khách";
   }
 
@@ -97,14 +96,14 @@ export default function HomecsPage() {
   ];
 
   return (
-    <Layout style={{ minHeight: "100vh", background: "#fafafa" }}>
+    <Layout style={{ minHeight: "100vh", background: "#f5f5f5" }}>
       {/* -------- HEADER -------- */}
       <Header
         style={{
           background: "#fff",
           textAlign: "center",
-          padding: "12px 8px",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+          padding: "16px",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
           height: "auto",
           lineHeight: "normal",
         }}
@@ -112,31 +111,37 @@ export default function HomecsPage() {
         <img
           src="/assets/images/Logo.png"
           alt="logo"
-          style={{ height: 100, marginBottom: 6 }}
+          style={{ height: 90, marginBottom: 8 }}
         />
 
         <Title
-          level={4}
-          style={{ margin: 0, fontWeight: "bold", color: "#226533", fontSize: 30 }}
+          level={3}
+          style={{
+            margin: "0 0 8px 0",
+            fontWeight: "bold",
+            color: "#226533",
+            fontSize: 26,
+          }}
         >
           Nhà hàng Phương Nam
         </Title>
 
-        <Text style={{ fontSize: 18, color: "#666" }}>
-          Số 13 Mai Hắc Đế, phường Nguyễn Du, quận Hai Bà Trưng
-        </Text>
+        <div style={{ marginBottom: 12 }}>
+          <EnvironmentFilled style={{ color: "#ff4d4f", marginRight: 4 }} />
+          <Text style={{ fontSize: 14, color: "#666" }}>
+            Số 13 Mai Hắc Đế, phường Nguyễn Du, quận Hai Bà Trưng
+          </Text>
+        </div>
 
-        <br />
-
-        <Text strong style={{ fontSize: 20 }}>
+        <Text strong style={{ fontSize: 16, color: "#333" }}>
           {greeting} • Bàn{" "}
           <Tag
             color="green"
             style={{
               fontWeight: "bold",
-              fontSize: 16,
-              borderRadius: "12px",
-              padding: "2px 10px",
+              fontSize: 15,
+              borderRadius: "8px",
+              padding: "4px 12px",
             }}
           >
             {tableNumber}
@@ -145,26 +150,34 @@ export default function HomecsPage() {
       </Header>
 
       {/* -------- CONTENT -------- */}
-      <Content style={{ padding: "16px" }}>
-        {/* Banner */}
+      <Content style={{ padding: "20px 16px", paddingBottom: "90px" }}>
+        {/* Banner - Carousel tự động chuyển ảnh */}
         <Card
           bodyStyle={{ padding: 0 }}
           style={{
             borderRadius: 16,
             overflow: "hidden",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+            marginBottom: 24,
+            border: "none",
           }}
         >
-          <Carousel autoplay autoplaySpeed={3000}>
+          <Carousel
+            autoplay
+            autoplaySpeed={3500}
+            effect="fade"
+            dots={true}
+            dotPosition="bottom"
+          >
             {banners.map((img, index) => (
               <div key={index}>
-                <img
-                  src={img}
-                  alt={`banner-${index}`}
+                <div
                   style={{
                     width: "100%",
                     height: 200,
-                    objectFit: "cover",
+                    backgroundImage: `url(${img})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
                   }}
                 />
               </div>
@@ -172,117 +185,170 @@ export default function HomecsPage() {
           </Carousel>
         </Card>
 
-        {/* Actions */}
-        <Row gutter={[12, 12]} style={{ marginTop: 20 }}>
-          {[
-            {
-              icon: <GiftOutlined style={{ fontSize: 28, color: "#1677ff" }} />,
-              text: "Tích điểm",
-              bg: "#e6f4ff",
-              fontSize: 18,
-              color: "#1677ff",
-              onClick: () => navigate("/cus/loyaltys"),
-            },
-            {
-              icon: <DollarOutlined style={{ fontSize: 28, color: "#52c41a" }} />,
-              text: "Thanh toán",
-              bg: "#f6ffed",
-              fontSize: 18,
-              color: "#52c41a",
-              onClick: () => navigate("/cus/bills"),
-            },
-            {
-              icon: <UserOutlined style={{ fontSize: 28, color: "#722ed1" }} />,
-              text: "Gọi nhân viên",
-              bg: "#f9f0ff",
-              fontSize: 18,
-              color: "#722ed1",
-              onClick: () => setIsModalVisible(true),
-            },
-            {
-              icon: <StarOutlined style={{ fontSize: 28, color: "#fa8c16" }} />,
-              text: "Đánh giá",
-              bg: "#fff7e6",
-              fontSize: 18,
-              color: "#fa8c16",
-              onClick: () => navigate("/cus/reviews"),
-            },
-          ].map((item, i) => (
-            <Col xs={12} key={i}>
-              <Card
-                hoverable
+        {/* Actions - 2 card với border radius đẹp */}
+        <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
+          <Col xs={12}>
+            <Card
+              hoverable
+              style={{
+                textAlign: "center",
+                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                borderRadius: 16,
+                border: "none",
+                boxShadow: "0 4px 12px rgba(102, 126, 234, 0.4)",
+                transition: "all 0.3s ease",
+                height: "100%",
+              }}
+              bodyStyle={{
+                padding: "24px 16px",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: 140,
+              }}
+              onClick={() => navigate("/cus/loyaltys")}
+            >
+              <div
                 style={{
-                  textAlign: "center",
-                  background: item.bg,
-                  borderRadius: 12,
-                  minHeight: 120,
+                  background: "rgba(255, 255, 255, 0.25)",
+                  borderRadius: "50%",
+                  width: 64,
+                  height: 64,
                   display: "flex",
-                  flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "center",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+                  marginBottom: 12,
                 }}
-                onClick={item.onClick}
               >
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                  {item.icon}
-                  <Text
-                    style={{
-                      fontSize: item.fontSize,
-                      color: item.color || "#333",
-                      marginTop: 6,
-                      fontWeight: 500,
-                      textAlign: "center",
-                      whiteSpace: "normal",   // cho phép xuống dòng
-                      wordWrap: "break-word", // tự động xuống dòng khi dài
-                      maxWidth: 95,           // giới hạn độ rộng để text xuống dòng
-                    }}
-                  >
-                    {item.text}
-                  </Text>
-                </div>
-              </Card>
-            </Col>
-          ))}
+                <GiftOutlined style={{ fontSize: 30, color: "#fff" }} />
+              </div>
+              <Text
+                style={{
+                  fontSize: 16,
+                  color: "#fff",
+                  fontWeight: 600,
+                  textAlign: "center",
+                }}
+              >
+                Tích điểm thưởng
+              </Text>
+            </Card>
+          </Col>
+
+          <Col xs={12}>
+            <Card
+              hoverable
+              style={{
+                textAlign: "center",
+                background: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+                borderRadius: 16,
+                border: "none",
+                boxShadow: "0 4px 12px rgba(240, 147, 251, 0.4)",
+                transition: "all 0.3s ease",
+                height: "100%",
+              }}
+              bodyStyle={{
+                padding: "24px 16px",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: 140,
+              }}
+              onClick={() => setIsModalVisible(true)}
+            >
+              <div
+                style={{
+                  background: "rgba(255, 255, 255, 0.25)",
+                  borderRadius: "50%",
+                  width: 64,
+                  height: 64,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: 12,
+                }}
+              >
+                <UserOutlined style={{ fontSize: 30, color: "#fff" }} />
+              </div>
+              <Text
+                style={{
+                  fontSize: 16,
+                  color: "#fff",
+                  fontWeight: 600,
+                  textAlign: "center",
+                }}
+              >
+                Gọi nhân viên
+              </Text>
+            </Card>
+          </Col>
         </Row>
 
-        {/* Nút chat bot */}
-        <Button
-          type="primary"
-          shape="circle"
-          icon={<WechatOutlined style={{ fontSize: 24 }} />}
-          size="large"
+        {/* Nút chat bot - FIX icon méo */}
+        <div
           onClick={() => navigate("/cus/chatbot")}
           style={{
             position: "fixed",
             right: 20,
-            bottom: 80,   // đặt cao hơn Footer chút
+            bottom: 100,
             zIndex: 1000,
             width: 60,
             height: 60,
-            backgroundColor: "#226533",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+            borderRadius: "50%",
+            background: "linear-gradient(135deg, #226533 0%, #2d8a45 100%)",
+            boxShadow: "0 4px 16px rgba(34, 101, 51, 0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            border: "3px solid #fff",
+            transition: "all 0.3s ease",
           }}
-        />
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "scale(1.1)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "scale(1)";
+          }}
+        >
+          <WechatOutlined style={{ fontSize: 28, color: "#fff" }} />
+        </div>
       </Content>
 
       {/* -------- FOOTER -------- */}
-      <Footer style={{ background: "#fff", padding: "12px 16px" }}>
+      <Footer
+        style={{
+          background: "#fff",
+          padding: "16px",
+          boxShadow: "0 -2px 8px rgba(0,0,0,0.06)",
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          zIndex: 999,
+        }}
+      >
         <Button
           type="primary"
           size="large"
-          shape="round"
-          icon={<MenuOutlined style={{ fontSize: 24 }} />}
           block
           onClick={() => navigate("/cus/menus")}
           style={{
-            height: 50,
-            fontSize: 16,
+            height: 52,
+            fontSize: 17,
             fontWeight: "bold",
-            borderRadius: 25,
-            boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
+            borderRadius: 26,
+            background: "linear-gradient(135deg, #226533 0%, #2d8a45 100%)",
+            border: "none",
+            boxShadow: "0 4px 12px rgba(34, 101, 51, 0.3)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
+          <ShoppingOutlined style={{ fontSize: 20, marginRight: 8 }} />
           Xem Menu - Gọi món
         </Button>
       </Footer>
@@ -290,27 +356,68 @@ export default function HomecsPage() {
       {/* -------- MODAL -------- */}
       <Modal
         open={isModalVisible}
-        title="Gọi nhân viên"
+        title={
+          <div
+            style={{
+              textAlign: "center",
+              fontSize: 20,
+              fontWeight: "bold",
+              color: "#226533",
+            }}
+          >
+            🔔 Gọi nhân viên
+          </div>
+        }
         onCancel={() => setIsModalVisible(false)}
         centered
+        width={360}
         footer={[
-          <Button key="cancel" onClick={() => setIsModalVisible(false)}>
+          <Button
+            key="cancel"
+            size="large"
+            onClick={() => setIsModalVisible(false)}
+            style={{
+              borderRadius: 8,
+              height: 44,
+            }}
+          >
             Hủy
           </Button>,
           <Button
             key="confirm"
             type="primary"
+            size="large"
             loading={isLoading}
             onClick={handleCallStaff}
+            style={{
+              background: "linear-gradient(135deg, #226533 0%, #2d8a45 100%)",
+              borderRadius: 8,
+              border: "none",
+              fontWeight: "bold",
+              height: 44,
+            }}
           >
-            Xác nhận
+            Xác nhận gọi
           </Button>,
         ]}
       >
-        <p>Bạn có chắc chắn muốn gọi nhân viên không?</p>
-        <p style={{ color: "#666", fontSize: 14 }}>
-          Nhân viên sẽ được thông báo và tới bàn của bạn ngay.
-        </p>
+        <div style={{ textAlign: "center", padding: "12px 0" }}>
+          <p style={{ fontSize: 16, marginBottom: 16, color: "#333" }}>
+            Bạn có chắc chắn muốn gọi nhân viên không?
+          </p>
+          <div
+            style={{
+              color: "#52c41a",
+              fontSize: 14,
+              background: "#f6ffed",
+              padding: "12px 16px",
+              borderRadius: 8,
+              border: "1px solid #b7eb8f",
+            }}
+          >
+            ✨ Nhân viên sẽ được thông báo và tới bàn của bạn ngay lập tức
+          </div>
+        </div>
       </Modal>
     </Layout>
   );

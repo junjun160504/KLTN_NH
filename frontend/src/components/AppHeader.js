@@ -1,53 +1,29 @@
-import React, { useState, useEffect } from "react";
-import { Layout, Button, Dropdown, Space, Badge } from "antd";
+import React, { useState } from "react";
+import { Layout, Button, Badge, Dropdown } from "antd";
 import {
   MenuUnfoldOutlined,
   MenuFoldOutlined,
   BellOutlined,
-  UserOutlined,
-  DownOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useNotifications } from "../contexts/NotificationContext";
+import { useAuth } from "../hooks/useAuth";
 import NotificationDropdown from "./NotificationDropdown";
+import UserProfile from "./UserProfile";
 
 const { Header } = Layout;
 
 const AppHeader = ({ collapsed, setCollapsed, pageTitle }) => {
-  const [isMobile, setIsMobile] = useState(false);
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const navigate = useNavigate();
   const { unreadCount } = useNotifications();
+  const { user, logout } = useAuth();
 
-  // Menu user
-  const handleMenuClick = ({ key }) => {
-    if (key === "1") {
-      console.log("Mở hồ sơ cá nhân...");
-    }
-    if (key === "2") {
-      localStorage.removeItem("token");
-      sessionStorage.clear();
-      navigate("/main/auth");
-    }
+  // Handle user logout
+  const handleLogout = () => {
+    logout();
+    navigate("/main/auth");
   };
-
-  const userMenu = {
-    items: [
-      { key: "1", label: "Hồ sơ cá nhân" },
-      { key: "2", label: "Đăng xuất" },
-    ],
-    onClick: handleMenuClick,
-  };
-
-  // Lắng nghe thay đổi kích thước màn hình
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
   return (
     <Header
@@ -107,15 +83,8 @@ const AppHeader = ({ collapsed, setCollapsed, pageTitle }) => {
           </Badge>
         </Dropdown>
 
-        <Dropdown menu={userMenu}>
-          <Button type="text" style={{ fontSize: 16, color: "#333" }}>
-            <Space>
-              <UserOutlined />
-              {!isMobile && "ThuyDung (Quản lý)"}
-              {!isMobile && <DownOutlined />}
-            </Space>
-          </Button>
-        </Dropdown>
+        {/* User Profile Dropdown */}
+        {user && <UserProfile user={user} onLogout={handleLogout} />}
       </div>
     </Header>
   );
