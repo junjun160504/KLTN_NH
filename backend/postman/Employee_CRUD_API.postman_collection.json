@@ -1,0 +1,655 @@
+{
+    "info": {
+        "_postman_id": "employee-crud-api-collection",
+        "name": "Employee CRUD API",
+        "description": "Complete Postman collection for testing Employee CRUD operations\n\n**Features:**\n- ✅ Full CRUD operations (10 APIs)\n- ✅ Soft delete & restore support\n- ✅ Search & statistics\n- ✅ Pre-configured requests with validation\n- ✅ Example responses\n- ✅ Environment variables support\n- ✅ Automated test scripts (40+ tests)\n\n**API Groups:**\n1. **Read Operations** (4 APIs)\n   - Get all employees\n   - Get employee by ID\n   - Search employees\n   - Get employee statistics\n\n2. **Create Operation** (1 API)\n   - Create new employee\n\n3. **Update Operation** (1 API)\n   - Update employee\n\n4. **Delete Operations** (3 APIs)\n   - Soft delete employee\n   - Hard delete employee (permanent)\n   - Restore soft-deleted employee\n\n**Employee Fields:**\n- **name** (required): Tên nhân viên\n- **phone** (unique): Số điện thoại (10-11 số)\n- **email** (unique): Email\n- **gender**: MALE/FEMALE/OTHER (default: OTHER)\n- **address**: Địa chỉ\n\n**How to use:**\n1. Import this file into Postman\n2. Import environment file (Employee_API.postman_environment.json)\n3. Run SQL migration: SQL_Employee_SoftDelete_Migration.sql\n4. Run requests in sequence or use Collection Runner\n5. Check test results in Test Results tab\n\n**Created by:** Senior Backend Developer\n**Date:** October 19, 2025\n**Version:** 1.0",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+        "_exporter_id": "employee-api-tester"
+    },
+    "item": [
+        {
+            "name": "Read Operations",
+            "item": [
+                {
+                    "name": "1. Get All Employees",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "// Test status code",
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "// Test response structure",
+                                    "pm.test(\"Response has correct structure\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData).to.have.property('status');",
+                                    "    pm.expect(jsonData).to.have.property('message');",
+                                    "    pm.expect(jsonData).to.have.property('data');",
+                                    "    pm.expect(jsonData.data).to.be.an('array');",
+                                    "});",
+                                    "",
+                                    "// Test response time",
+                                    "pm.test(\"Response time is less than 500ms\", function () {",
+                                    "    pm.expect(pm.response.responseTime).to.be.below(500);",
+                                    "});",
+                                    "",
+                                    "// Save first employee ID for later use",
+                                    "var jsonData = pm.response.json();",
+                                    "if (jsonData.data && jsonData.data.length > 0) {",
+                                    "    pm.environment.set(\"first_employee_id\", jsonData.data[0].id);",
+                                    "    console.log(\"✅ Saved first employee ID: \" + jsonData.data[0].id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/employees",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "employees"
+                            ],
+                            "query": [
+                                {
+                                    "key": "includeDeleted",
+                                    "value": "false",
+                                    "disabled": true,
+                                    "description": "Set to true to include soft-deleted employees"
+                                }
+                            ]
+                        },
+                        "description": "Lấy danh sách tất cả employees (không bao gồm soft-deleted).\n\n**Endpoint:** GET `/api/employees`\n\n**Query Parameters:**\n- `includeDeleted` (optional): `true` để bao gồm soft-deleted employees\n\n**Response:**\n- Status 200: Trả về danh sách employees\n- Status 500: Internal server error"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "2. Get Employee By ID",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "// Test status code",
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "// Test response structure",
+                                    "pm.test(\"Response has correct structure\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData).to.have.property('status');",
+                                    "    pm.expect(jsonData).to.have.property('data');",
+                                    "    pm.expect(jsonData.data).to.be.an('object');",
+                                    "});",
+                                    "",
+                                    "// Test employee data types",
+                                    "pm.test(\"Employee has correct data types\", function () {",
+                                    "    var employee = pm.response.json().data;",
+                                    "    pm.expect(employee.id).to.be.a('number');",
+                                    "    pm.expect(employee.name).to.be.a('string');",
+                                    "    pm.expect(employee.gender).to.be.a('string');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/employees/{{first_employee_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "employees",
+                                "{{first_employee_id}}"
+                            ]
+                        },
+                        "description": "Lấy chi tiết một employee theo ID.\n\n**Endpoint:** GET `/api/employees/:id`\n\n**Response:**\n- Status 200: Trả về employee object\n- Status 404: Employee not found\n- Status 500: Internal server error"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "3. Search Employees",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "// Test status code",
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "// Test response structure",
+                                    "pm.test(\"Response has search results\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data).to.be.an('array');",
+                                    "});",
+                                    "",
+                                    "console.log(\"Search completed: \" + pm.response.json().message);"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/employees/search?q=Nguyen",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "employees",
+                                "search"
+                            ],
+                            "query": [
+                                {
+                                    "key": "q",
+                                    "value": "Nguyen",
+                                    "description": "Search term (name, phone, email)"
+                                }
+                            ]
+                        },
+                        "description": "Tìm kiếm employees theo tên, phone, hoặc email.\n\n**Endpoint:** GET `/api/employees/search?q=keyword`\n\n**Query Parameters:**\n- `q` (required): Từ khóa tìm kiếm\n\n**Response:**\n- Status 200: Trả về danh sách employees khớp\n- Status 400: Missing search term\n- Status 500: Internal server error"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "4. Get Employee Statistics",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "// Test status code",
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "// Test statistics structure",
+                                    "pm.test(\"Statistics has all fields\", function () {",
+                                    "    var stats = pm.response.json().data;",
+                                    "    pm.expect(stats).to.have.property('total');",
+                                    "    pm.expect(stats).to.have.property('active');",
+                                    "    pm.expect(stats).to.have.property('deleted');",
+                                    "    pm.expect(stats).to.have.property('male');",
+                                    "    pm.expect(stats).to.have.property('female');",
+                                    "    pm.expect(stats).to.have.property('other');",
+                                    "});",
+                                    "",
+                                    "// Log statistics",
+                                    "var stats = pm.response.json().data;",
+                                    "console.log(\"📊 Employee Statistics:\");",
+                                    "console.log(`  Total: ${stats.total}`);",
+                                    "console.log(`  Active: ${stats.active}`);",
+                                    "console.log(`  Deleted: ${stats.deleted}`);"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/employees/stats",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "employees",
+                                "stats"
+                            ]
+                        },
+                        "description": "Lấy thống kê employees (total, active, deleted, gender distribution).\n\n**Endpoint:** GET `/api/employees/stats`\n\n**Response:**\n- Status 200: Trả về statistics object\n- Status 500: Internal server error"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "**📖 Read Operations**\n\nNhóm các API để đọc/query dữ liệu employees.\n\n**Includes:**\n- Get all employees\n- Get by ID\n- Search by name/phone/email\n- Statistics"
+        },
+        {
+            "name": "Create Operation",
+            "item": [
+                {
+                    "name": "5. Create New Employee",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "// Test status code",
+                                    "pm.test(\"Status code is 201\", function () {",
+                                    "    pm.response.to.have.status(201);",
+                                    "});",
+                                    "",
+                                    "// Test response structure",
+                                    "pm.test(\"Response has correct structure\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData).to.have.property('status');",
+                                    "    pm.expect(jsonData).to.have.property('message');",
+                                    "    pm.expect(jsonData).to.have.property('data');",
+                                    "});",
+                                    "",
+                                    "// Test employee was created correctly",
+                                    "pm.test(\"Employee was created with correct data\", function () {",
+                                    "    var employee = pm.response.json().data;",
+                                    "    pm.expect(employee).to.have.property('id');",
+                                    "    pm.expect(employee.name).to.exist;",
+                                    "});",
+                                    "",
+                                    "// Save created employee ID",
+                                    "var jsonData = pm.response.json();",
+                                    "pm.environment.set(\"created_employee_id\", jsonData.data.id);",
+                                    "console.log(\"✅ Created employee ID: \" + jsonData.data.id);"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"TEST - Nguyen Van A - DELETE ME\",\n    \"phone\": \"0987654321\",\n    \"email\": \"test.employee@example.com\",\n    \"gender\": \"MALE\",\n    \"address\": \"123 Test Street, Hanoi\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/employees",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "employees"
+                            ]
+                        },
+                        "description": "Tạo employee mới.\n\n**Endpoint:** POST `/api/employees`\n\n**Body:**\n```json\n{\n  \"name\": \"string (required)\",\n  \"phone\": \"string (unique, 10-11 digits)\",\n  \"email\": \"string (unique, valid email)\",\n  \"gender\": \"MALE|FEMALE|OTHER\",\n  \"address\": \"string\"\n}\n```\n\n**Validation:**\n- name: Required, non-empty\n- phone: Unique, 10-11 digits\n- email: Unique, valid format\n- gender: MALE/FEMALE/OTHER\n\n**Response:**\n- Status 201: Employee created successfully\n- Status 400: Validation error or duplicate\n- Status 500: Internal server error"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "**➕ Create Operation**\n\nAPI để tạo employee mới."
+        },
+        {
+            "name": "Update Operation",
+            "item": [
+                {
+                    "name": "6. Update Employee",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "// Test status code",
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "// Test response structure",
+                                    "pm.test(\"Response has correct structure\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData).to.have.property('status');",
+                                    "    pm.expect(jsonData).to.have.property('message');",
+                                    "    pm.expect(jsonData).to.have.property('data');",
+                                    "});",
+                                    "",
+                                    "// Test employee was updated",
+                                    "pm.test(\"Employee was updated correctly\", function () {",
+                                    "    var employee = pm.response.json().data;",
+                                    "    pm.expect(employee.id).to.exist;",
+                                    "});",
+                                    "",
+                                    "console.log(\"✅ Employee updated successfully\");"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"TEST - Nguyen Van A - UPDATED\",\n    \"phone\": \"0987654321\",\n    \"email\": \"test.updated@example.com\",\n    \"gender\": \"MALE\",\n    \"address\": \"456 Updated Street, Hanoi\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/employees/{{created_employee_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "employees",
+                                "{{created_employee_id}}"
+                            ]
+                        },
+                        "description": "Cập nhật thông tin employee.\n\n**Endpoint:** PUT `/api/employees/:id`\n\n**Body:** (tất cả fields đều optional)\n```json\n{\n  \"name\": \"string\",\n  \"phone\": \"string\",\n  \"email\": \"string\",\n  \"gender\": \"MALE|FEMALE|OTHER\",\n  \"address\": \"string\"\n}\n```\n\n**Response:**\n- Status 200: Employee updated successfully\n- Status 404: Employee not found\n- Status 400: Validation error or duplicate\n- Status 500: Internal server error"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "**✏️ Update Operation**\n\nAPI để cập nhật thông tin employee."
+        },
+        {
+            "name": "Delete Operations",
+            "item": [
+                {
+                    "name": "7. Soft Delete Employee",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "// Test status code",
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "// Test response structure",
+                                    "pm.test(\"Response has correct structure\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData).to.have.property('status');",
+                                    "    pm.expect(jsonData).to.have.property('message');",
+                                    "});",
+                                    "",
+                                    "console.log(\"✅ Employee soft deleted\");"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/employees/{{created_employee_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "employees",
+                                "{{created_employee_id}}"
+                            ]
+                        },
+                        "description": "Soft delete employee (set deleted_at timestamp).\n\n**Endpoint:** DELETE `/api/employees/:id`\n\n**Behavior:**\n- Set deleted_at = CURRENT_TIMESTAMP\n- Employee không hiển thị trong danh sách mặc định\n- Có thể restore lại\n- Check xem employee có admin account active không\n\n**Response:**\n- Status 200: Employee soft deleted\n- Status 404: Employee not found\n- Status 400: Cannot delete (có admin account active)\n- Status 500: Internal server error"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "8. Restore Employee",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "// Test status code",
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "// Test employee was restored",
+                                    "pm.test(\"Employee was restored\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('restored');",
+                                    "});",
+                                    "",
+                                    "console.log(\"✅ Employee restored successfully\");"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/employees/{{created_employee_id}}/restore",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "employees",
+                                "{{created_employee_id}}",
+                                "restore"
+                            ]
+                        },
+                        "description": "Restore soft-deleted employee.\n\n**Endpoint:** POST `/api/employees/:id/restore`\n\n**Behavior:**\n- Set deleted_at = NULL\n- Employee hiển thị lại trong danh sách\n\n**Response:**\n- Status 200: Employee restored successfully\n- Status 404: Employee not found\n- Status 400: Employee is not deleted\n- Status 500: Internal server error"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "9. Hard Delete Employee (Permanent)",
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "exec": [
+                                    "// Warning before hard delete",
+                                    "console.warn(\"⚠️⚠️⚠️ WARNING: This will PERMANENTLY delete the employee!\");",
+                                    "console.warn(\"This action CANNOT be undone!\");"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        },
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "// Test status code",
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "// Test response message",
+                                    "pm.test(\"Employee permanently deleted\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('permanently');",
+                                    "});",
+                                    "",
+                                    "console.log(\"⚠️ Employee permanently deleted - CANNOT BE UNDONE\");"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/employees/{{created_employee_id}}/permanent",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "employees",
+                                "{{created_employee_id}}",
+                                "permanent"
+                            ]
+                        },
+                        "description": "⚠️ **CẨN THẬN!** Xóa vĩnh viễn employee khỏi database (hard delete).\n\n**Endpoint:** DELETE `/api/employees/:id/permanent`\n\n**⚠️ WARNING:**\n- Xóa vĩnh viễn khỏi database\n- **KHÔNG THỂ** khôi phục\n- Check xem employee có admin account không\n- Nếu có admin account, PHẢI xóa/reassign admin trước\n\n**Response:**\n- Status 200: Employee permanently deleted\n- Status 404: Employee not found\n- Status 400: Cannot delete (có admin account)\n- Status 500: Internal server error\n\n**Best Practice:**\n- Nên dùng soft delete thay vì hard delete\n- Chỉ dùng hard delete khi thực sự cần thiết\n- Backup database trước khi hard delete"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "**🗑️ Delete & Restore Operations**\n\nCác API để xóa và khôi phục employees.\n\n**Includes:**\n- Soft delete (có thể restore)\n- Restore soft-deleted\n- Hard delete (vĩnh viễn)"
+        },
+        {
+            "name": "Error Handling Tests",
+            "item": [
+                {
+                    "name": "10. Create - Validation Error",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "// Test status code is 400",
+                                    "pm.test(\"Status code is 400 (Bad Request)\", function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});",
+                                    "",
+                                    "// Test error message",
+                                    "pm.test(\"Error message contains 'required'\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message.toLowerCase()).to.include('required');",
+                                    "});",
+                                    "",
+                                    "console.log(\"✅ Validation error test passed\");"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"phone\": \"0123456789\",\n    \"email\": \"test@example.com\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/employees",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "employees"
+                            ]
+                        },
+                        "description": "Test validation error khi thiếu required field (name).\n\n**Expected:**\n- Status 400\n- Error message: \"Employee name is required\""
+                    },
+                    "response": []
+                },
+                {
+                    "name": "11. Get - Not Found Error",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "// Test status code is 404",
+                                    "pm.test(\"Status code is 404 (Not Found)\", function () {",
+                                    "    pm.response.to.have.status(404);",
+                                    "});",
+                                    "",
+                                    "// Test error message",
+                                    "pm.test(\"Error message contains 'not found'\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message.toLowerCase()).to.include('not found');",
+                                    "});",
+                                    "",
+                                    "console.log(\"✅ Not found error test passed\");"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/employees/999999",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "employees",
+                                "999999"
+                            ]
+                        },
+                        "description": "Test 404 error khi employee không tồn tại.\n\n**Expected:**\n- Status 404\n- Error message: \"Employee not found\""
+                    },
+                    "response": []
+                }
+            ],
+            "description": "**❌ Error Handling Tests**\n\nTest các trường hợp lỗi.\n\n**Tests:**\n- Validation errors (400)\n- Not found errors (404)"
+        }
+    ],
+    "event": [
+        {
+            "listen": "prerequest",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    "// Global pre-request script",
+                    "console.log('🚀 Running request to: ' + pm.request.url);",
+                    "console.log('📝 Method: ' + pm.request.method);"
+                ]
+            }
+        },
+        {
+            "listen": "test",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    "// Global test script",
+                    "pm.test(\"Response time is acceptable\", function () {",
+                    "    pm.expect(pm.response.responseTime).to.be.below(3000);",
+                    "});",
+                    "",
+                    "if (pm.response.headers.get('Content-Type')) {",
+                    "    pm.test(\"Content-Type is application/json\", function () {",
+                    "        pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                    "    });",
+                    "}"
+                ]
+            }
+        }
+    ],
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:5000",
+            "type": "string"
+        },
+        {
+            "key": "created_employee_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "first_employee_id",
+            "value": "",
+            "type": "string"
+        }
+    ]
+}

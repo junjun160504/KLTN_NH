@@ -1,0 +1,1322 @@
+{
+    "info": {
+        "_postman_id": "order-api-2024",
+        "name": "Order Management API",
+        "description": "Complete Order Management API với 3 tính năng mới:\n- Xóa món khỏi order (DELETE)\n- Cập nhật số lượng món (PUT)\n- Hủy đơn hàng (PUT)\n\nCreated: October 20, 2025",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "🔧 Setup & Prerequisites",
+            "item": [
+                {
+                    "name": "1. Get Active QR Session",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Response has qr_session\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data).to.be.an('array');",
+                                    "    if (jsonData.data.length > 0) {",
+                                    "        pm.environment.set(\"test_qr_session_id\", jsonData.data[0].id);",
+                                    "        console.log(\"✅ Saved qr_session_id:\", jsonData.data[0].id);",
+                                    "    }",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/qr-sessions?status=ACTIVE",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "qr-sessions"
+                            ],
+                            "query": [
+                                {
+                                    "key": "status",
+                                    "value": "ACTIVE"
+                                }
+                            ]
+                        },
+                        "description": "Lấy active QR session để test. Lưu qr_session_id vào environment variable."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "2. Get Available Menu Items",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Response has menu items\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data).to.be.an('array');",
+                                    "    if (jsonData.data.length >= 3) {",
+                                    "        pm.environment.set(\"menu_item_1\", jsonData.data[0].id);",
+                                    "        pm.environment.set(\"menu_item_2\", jsonData.data[1].id);",
+                                    "        pm.environment.set(\"menu_item_3\", jsonData.data[2].id);",
+                                    "        console.log(\"✅ Saved 3 menu items:\", jsonData.data[0].id, jsonData.data[1].id, jsonData.data[2].id);",
+                                    "    }",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/menu?is_available=true&limit=10",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "menu"
+                            ],
+                            "query": [
+                                {
+                                    "key": "is_available",
+                                    "value": "true"
+                                },
+                                {
+                                    "key": "limit",
+                                    "value": "10"
+                                }
+                            ]
+                        },
+                        "description": "Lấy menu items để test. Lưu 3 item IDs vào environment."
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Setup và lấy dữ liệu cần thiết để test"
+        },
+        {
+            "name": "📦 Create Order",
+            "item": [
+                {
+                    "name": "Create Order with 3 Items",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 201\", function () {",
+                                    "    pm.response.to.have.status(201);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Order created successfully\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.status).to.eql(201);",
+                                    "    pm.expect(jsonData.data).to.have.property('id');",
+                                    "    pm.expect(jsonData.data.items).to.be.an('array');",
+                                    "    pm.expect(jsonData.data.items).to.have.lengthOf(3);",
+                                    "    ",
+                                    "    // Save order ID and item IDs for later tests",
+                                    "    pm.environment.set(\"test_order_id\", jsonData.data.id);",
+                                    "    pm.environment.set(\"test_order_item_1\", jsonData.data.items[0].id);",
+                                    "    pm.environment.set(\"test_order_item_2\", jsonData.data.items[1].id);",
+                                    "    pm.environment.set(\"test_order_item_3\", jsonData.data.items[2].id);",
+                                    "    ",
+                                    "    console.log(\"✅ Created Order ID:\", jsonData.data.id);",
+                                    "    console.log(\"✅ Order Items:\", jsonData.data.items.map(i => i.id));",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Order status is NEW\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data.status).to.eql('NEW');",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Total price calculated\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data.total_price).to.be.above(0);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"qr_session_id\": {{test_qr_session_id}},\n  \"items\": [\n    {\n      \"menu_item_id\": {{menu_item_1}},\n      \"quantity\": 2,\n      \"note\": \"Không hành\"\n    },\n    {\n      \"menu_item_id\": {{menu_item_2}},\n      \"quantity\": 1,\n      \"note\": \"Ít cay\"\n    },\n    {\n      \"menu_item_id\": {{menu_item_3}},\n      \"quantity\": 3\n    }\n  ]\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/orders",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders"
+                            ]
+                        },
+                        "description": "Tạo order mới với 3 món để test các tính năng mới"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Order by ID",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Order details retrieved\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data).to.have.property('id');",
+                                    "    pm.expect(jsonData.data.items).to.be.an('array');",
+                                    "    ",
+                                    "    console.log(\"📊 Order Status:\", jsonData.data.status);",
+                                    "    console.log(\"📊 Total Items:\", jsonData.data.items.length);",
+                                    "    console.log(\"📊 Total Price:\", jsonData.data.total_price);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/orders/{{test_order_id}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders",
+                                "{{test_order_id}}"
+                            ]
+                        },
+                        "description": "Lấy chi tiết order để verify"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Tạo order để test"
+        },
+        {
+            "name": "✏️ Update Item Quantity (NEW)",
+            "item": [
+                {
+                    "name": "Update Item Quantity - Success",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Item quantity updated\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.status).to.eql(200);",
+                                    "    pm.expect(jsonData.message).to.include('updated');",
+                                    "    pm.expect(jsonData.data.items).to.be.an('array');",
+                                    "    ",
+                                    "    // Find the updated item",
+                                    "    const updatedItem = jsonData.data.items.find(item => ",
+                                    "        item.id == pm.environment.get('test_order_item_1')",
+                                    "    );",
+                                    "    ",
+                                    "    if (updatedItem) {",
+                                    "        pm.expect(updatedItem.quantity).to.eql(5);",
+                                    "        console.log(\"✅ Item quantity updated to:\", updatedItem.quantity);",
+                                    "    }",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Total price recalculated\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data.total_price).to.be.above(0);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"quantity\": 5\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/orders/{{test_order_id}}/items/{{test_order_item_1}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders",
+                                "{{test_order_id}}",
+                                "items",
+                                "{{test_order_item_1}}"
+                            ]
+                        },
+                        "description": "Cập nhật số lượng món đầu tiên từ 2 → 5"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Item Quantity to 0 (Delete Item)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Item deleted when quantity = 0\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.status).to.eql(200);",
+                                    "    ",
+                                    "    // Check if item was deleted",
+                                    "    if (jsonData.data.deleted) {",
+                                    "        console.log(\"✅ Order deleted (no items left)\");",
+                                    "    } else {",
+                                    "        pm.expect(jsonData.data.items).to.be.an('array');",
+                                    "        const deletedItem = jsonData.data.items.find(item => ",
+                                    "            item.id == pm.environment.get('test_order_item_2')",
+                                    "        );",
+                                    "        pm.expect(deletedItem).to.be.undefined;",
+                                    "        console.log(\"✅ Item deleted, order still exists\");",
+                                    "    }",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"quantity\": 0\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/orders/{{test_order_id}}/items/{{test_order_item_2}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders",
+                                "{{test_order_id}}",
+                                "items",
+                                "{{test_order_item_2}}"
+                            ]
+                        },
+                        "description": "Set quantity = 0 để xóa món thứ 2"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Item Quantity - Invalid (Negative)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 400\", function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Error message for negative quantity\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('non-negative');",
+                                    "    console.log(\"✅ Validation working: Negative quantity rejected\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"quantity\": -5\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/orders/{{test_order_id}}/items/{{test_order_item_1}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders",
+                                "{{test_order_id}}",
+                                "items",
+                                "{{test_order_item_1}}"
+                            ]
+                        },
+                        "description": "Test validation: quantity không được âm"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Item Quantity - Missing Quantity",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 400\", function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Error message for missing quantity\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('required');",
+                                    "    console.log(\"✅ Validation working: Missing quantity rejected\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/orders/{{test_order_id}}/items/{{test_order_item_1}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders",
+                                "{{test_order_id}}",
+                                "items",
+                                "{{test_order_item_1}}"
+                            ]
+                        },
+                        "description": "Test validation: quantity bắt buộc"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Test tính năng cập nhật số lượng món (NEW FEATURE)"
+        },
+        {
+            "name": "🗑️ Remove Item from Order (NEW)",
+            "item": [
+                {
+                    "name": "Remove Item - Success",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Item removed successfully\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.status).to.eql(200);",
+                                    "    pm.expect(jsonData.message).to.include('removed');",
+                                    "    ",
+                                    "    if (jsonData.data.deleted) {",
+                                    "        console.log(\"✅ Order deleted (was last item)\");",
+                                    "    } else {",
+                                    "        pm.expect(jsonData.data.items).to.be.an('array');",
+                                    "        const removedItem = jsonData.data.items.find(item => ",
+                                    "            item.id == pm.environment.get('test_order_item_3')",
+                                    "        );",
+                                    "        pm.expect(removedItem).to.be.undefined;",
+                                    "        console.log(\"✅ Item removed, order still exists\");",
+                                    "    }",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/orders/{{test_order_id}}/items/{{test_order_item_3}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders",
+                                "{{test_order_id}}",
+                                "items",
+                                "{{test_order_item_3}}"
+                            ]
+                        },
+                        "description": "Xóa món thứ 3 khỏi order"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Remove Item - Item Not Found",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 404\", function () {",
+                                    "    pm.response.to.have.status(404);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Error message for not found\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('not found');",
+                                    "    console.log(\"✅ Error handling working: Item not found\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/orders/{{test_order_id}}/items/99999",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders",
+                                "{{test_order_id}}",
+                                "items",
+                                "99999"
+                            ]
+                        },
+                        "description": "Test error: Xóa item không tồn tại"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Test tính năng xóa món khỏi order (NEW FEATURE)"
+        },
+        {
+            "name": "❌ Cancel Order (NEW)",
+            "item": [
+                {
+                    "name": "Cancel Order - With Reason",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Order cancelled successfully\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.status).to.eql(200);",
+                                    "    pm.expect(jsonData.message).to.include('cancelled');",
+                                    "    pm.expect(jsonData.data.status).to.eql('CANCELLED');",
+                                    "    console.log(\"✅ Order cancelled successfully\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"reason\": \"Khách hàng đổi ý, không muốn ăn nữa\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/orders/{{test_order_id}}/cancel",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders",
+                                "{{test_order_id}}",
+                                "cancel"
+                            ]
+                        },
+                        "description": "Hủy order với lý do"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Cancel Order - Without Reason",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Order cancelled without reason\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.status).to.eql(200);",
+                                    "    pm.expect(jsonData.data.status).to.eql('CANCELLED');",
+                                    "    console.log(\"✅ Order cancelled (no reason)\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/orders/{{test_order_id}}/cancel",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders",
+                                "{{test_order_id}}",
+                                "cancel"
+                            ]
+                        },
+                        "description": "Hủy order không có lý do (optional)"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Cancel Order - Already Cancelled",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 403 or 404\", function () {",
+                                    "    pm.expect([403, 404]).to.include(pm.response.code);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Error message for cannot cancel\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('cannot be cancelled');",
+                                    "    console.log(\"✅ Error handling: Cannot cancel twice\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/orders/{{test_order_id}}/cancel",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders",
+                                "{{test_order_id}}",
+                                "cancel"
+                            ]
+                        },
+                        "description": "Test error: Hủy order đã bị hủy"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Test tính năng hủy đơn hàng (NEW FEATURE)"
+        },
+        {
+            "name": "🧪 Complete Flow Test",
+            "item": [
+                {
+                    "name": "Step 1: Create New Order",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Order created\", function () {",
+                                    "    pm.response.to.have.status(201);",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.environment.set(\"flow_test_order_id\", jsonData.data.id);",
+                                    "    pm.environment.set(\"flow_test_item_1\", jsonData.data.items[0].id);",
+                                    "    pm.environment.set(\"flow_test_item_2\", jsonData.data.items[1].id);",
+                                    "    pm.environment.set(\"flow_test_item_3\", jsonData.data.items[2].id);",
+                                    "    console.log(\"✅ Step 1: Order created with 3 items\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"qr_session_id\": {{test_qr_session_id}},\n  \"items\": [\n    {\"menu_item_id\": {{menu_item_1}}, \"quantity\": 2},\n    {\"menu_item_id\": {{menu_item_2}}, \"quantity\": 3},\n    {\"menu_item_id\": {{menu_item_3}}, \"quantity\": 1}\n  ]\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/orders",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Step 2: Update Quantity of Item 1",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Quantity updated\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    console.log(\"✅ Step 2: Item 1 quantity updated (2 → 5)\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"quantity\": 5\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/orders/{{flow_test_order_id}}/items/{{flow_test_item_1}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders",
+                                "{{flow_test_order_id}}",
+                                "items",
+                                "{{flow_test_item_1}}"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Step 3: Remove Item 2",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Item removed\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    console.log(\"✅ Step 3: Item 2 removed\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/orders/{{flow_test_order_id}}/items/{{flow_test_item_2}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders",
+                                "{{flow_test_order_id}}",
+                                "items",
+                                "{{flow_test_item_2}}"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Step 4: Verify Order State",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Order has 2 items left\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data.items).to.have.lengthOf(2);",
+                                    "    console.log(\"✅ Step 4: Order verified - 2 items remaining\");",
+                                    "    console.log(\"📊 Total Price:\", jsonData.data.total_price);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/orders/{{flow_test_order_id}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders",
+                                "{{flow_test_order_id}}"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Step 5: Cancel Order",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Order cancelled\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data.status).to.eql('CANCELLED');",
+                                    "    console.log(\"✅ Step 5: Order cancelled\");",
+                                    "    console.log(\"🎉 Complete flow test PASSED!\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"reason\": \"Complete flow test\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/orders/{{flow_test_order_id}}/cancel",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders",
+                                "{{flow_test_order_id}}",
+                                "cancel"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Test complete flow: Create → Update → Remove → Verify → Cancel"
+        },
+        {
+            "name": "🚫 Error Cases & Edge Cases",
+            "item": [
+                {
+                    "name": "Update Item - Order IN_PROGRESS (Should Fail)",
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "exec": [
+                                    "// Create order and set to IN_PROGRESS for this test",
+                                    "const createOrderRequest = {",
+                                    "    url: pm.environment.get('baseUrl') + '/api/orders',",
+                                    "    method: 'POST',",
+                                    "    header: {'Content-Type': 'application/json'},",
+                                    "    body: {",
+                                    "        mode: 'raw',",
+                                    "        raw: JSON.stringify({",
+                                    "            qr_session_id: pm.environment.get('test_qr_session_id'),",
+                                    "            items: [{menu_item_id: pm.environment.get('menu_item_1'), quantity: 1}]",
+                                    "        })",
+                                    "    }",
+                                    "};",
+                                    "",
+                                    "pm.sendRequest(createOrderRequest, (err, res) => {",
+                                    "    if (!err) {",
+                                    "        const orderId = res.json().data.id;",
+                                    "        const itemId = res.json().data.items[0].id;",
+                                    "        pm.environment.set('error_test_order_id', orderId);",
+                                    "        pm.environment.set('error_test_item_id', itemId);",
+                                    "        ",
+                                    "        // Update status to IN_PROGRESS",
+                                    "        const updateStatusRequest = {",
+                                    "            url: pm.environment.get('baseUrl') + '/api/orders/' + orderId + '/status',",
+                                    "            method: 'PUT',",
+                                    "            header: {'Content-Type': 'application/json'},",
+                                    "            body: {",
+                                    "                mode: 'raw',",
+                                    "                raw: JSON.stringify({status: 'IN_PROGRESS'})",
+                                    "            }",
+                                    "        };",
+                                    "        pm.sendRequest(updateStatusRequest);",
+                                    "    }",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        },
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 403\", function () {",
+                                    "    pm.response.to.have.status(403);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Error message for wrong status\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('cannot be modified');",
+                                    "    console.log(\"✅ Validation: Cannot modify IN_PROGRESS order\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"quantity\": 5\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/orders/{{error_test_order_id}}/items/{{error_test_item_id}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders",
+                                "{{error_test_order_id}}",
+                                "items",
+                                "{{error_test_item_id}}"
+                            ]
+                        },
+                        "description": "Test: Không thể sửa món khi order đã IN_PROGRESS"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete Last Item (Order Should Be Deleted)",
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "exec": [
+                                    "// Create order with only 1 item",
+                                    "const createOrderRequest = {",
+                                    "    url: pm.environment.get('baseUrl') + '/api/orders',",
+                                    "    method: 'POST',",
+                                    "    header: {'Content-Type': 'application/json'},",
+                                    "    body: {",
+                                    "        mode: 'raw',",
+                                    "        raw: JSON.stringify({",
+                                    "            qr_session_id: pm.environment.get('test_qr_session_id'),",
+                                    "            items: [{menu_item_id: pm.environment.get('menu_item_1'), quantity: 1}]",
+                                    "        })",
+                                    "    }",
+                                    "};",
+                                    "",
+                                    "pm.sendRequest(createOrderRequest, (err, res) => {",
+                                    "    if (!err) {",
+                                    "        const orderId = res.json().data.id;",
+                                    "        const itemId = res.json().data.items[0].id;",
+                                    "        pm.environment.set('last_item_order_id', orderId);",
+                                    "        pm.environment.set('last_item_id', itemId);",
+                                    "    }",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        },
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Order deleted when last item removed\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data.deleted).to.be.true;",
+                                    "    console.log(\"✅ Edge case: Order auto-deleted (last item removed)\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/orders/{{last_item_order_id}}/items/{{last_item_id}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders",
+                                "{{last_item_order_id}}",
+                                "items",
+                                "{{last_item_id}}"
+                            ]
+                        },
+                        "description": "Test edge case: Xóa món cuối cùng → Order bị xóa"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Cancel Order - Wrong Status (PAID)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 403 or 404\", function () {",
+                                    "    pm.expect([403, 404]).to.include(pm.response.code);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Cannot cancel PAID order\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('cannot be cancelled');",
+                                    "    console.log(\"✅ Validation: Cannot cancel PAID order\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/orders/99999/cancel",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders",
+                                "99999",
+                                "cancel"
+                            ]
+                        },
+                        "description": "Test: Không thể hủy order đã PAID"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Test các error cases và edge cases"
+        },
+        {
+            "name": "📋 List & Query Orders",
+            "item": [
+                {
+                    "name": "Get All Orders",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Orders list retrieved\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data).to.be.an('array');",
+                                    "    console.log(\"📊 Total orders:\", jsonData.pagination.total);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/orders?limit=20&offset=0",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders"
+                            ],
+                            "query": [
+                                {
+                                    "key": "limit",
+                                    "value": "20"
+                                },
+                                {
+                                    "key": "offset",
+                                    "value": "0"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Orders by Status - NEW",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"All orders have NEW status\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    jsonData.data.forEach(order => {",
+                                    "        pm.expect(order.status).to.eql('NEW');",
+                                    "    });",
+                                    "    console.log(\"📊 NEW orders:\", jsonData.data.length);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/orders?status=NEW",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders"
+                            ],
+                            "query": [
+                                {
+                                    "key": "status",
+                                    "value": "NEW"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Orders by Status - CANCELLED",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"All orders have CANCELLED status\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    jsonData.data.forEach(order => {",
+                                    "        pm.expect(order.status).to.eql('CANCELLED');",
+                                    "    });",
+                                    "    console.log(\"📊 CANCELLED orders:\", jsonData.data.length);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/orders?status=CANCELLED",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "orders"
+                            ],
+                            "query": [
+                                {
+                                    "key": "status",
+                                    "value": "CANCELLED"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Query và list orders"
+        }
+    ],
+    "event": [
+        {
+            "listen": "prerequest",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    ""
+                ]
+            }
+        },
+        {
+            "listen": "test",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    ""
+                ]
+            }
+        }
+    ],
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:3000",
+            "type": "string"
+        }
+    ]
+}

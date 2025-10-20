@@ -21,6 +21,7 @@ import tableRoutes from './routes/table.routes.js';           // Quản lý bàn
 import auditRoutes from './routes/audit.routes.js';           // Audit log
 import menuItem from './routes/menuItem.routes.js';
 import notificationRoutes from './routes/notification.routes.js'; // Notification system
+import employeeRoutes from './routes/employee.routes.js';     // Employee management
 
 const app = express();
 app.use(cors());
@@ -45,6 +46,7 @@ app.use('/api/tables', tableRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/menu-item', menuItem);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/employees', employeeRoutes);
 
 
 app.get('/', (req, res) => res.send('Restaurant API running...'));

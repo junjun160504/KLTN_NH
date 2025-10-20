@@ -6,11 +6,70 @@ import {
   getItemsByCategory,
   getAllItemsController,
   getMenuItemDetail,
+  getCategoryById,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  hardDeleteCategory,
+  exportCategoriesToExcel,
+  downloadExcelTemplate,
+  importCategoriesFromExcel,
+  updateMenuItem,
+  deleteMenuItem,
+  hardDeleteMenuItem,
+  exportMenuItemsToExcel,
+  downloadMenuItemExcelTemplate,
+  importMenuItemsFromExcel,
 } from "../controllers/menu.controller.js";
+import { uploadExcel, handleUploadError } from "../middlewares/upload.middleware.js";
+
 console.log("Mounting /api/menu routes...");
 const router = express.Router();
-// Khách hàng xem danh mục
+
+// ================ CATEGORY ROUTES ================
+
+// Khách hàng xem danh sách danh mục
 router.get("/cus/menus/categories", getMenuCategories);
+
+// Admin: Lấy chi tiết một danh mục theo ID
+router.get("/admin/categories/:id", getCategoryById);
+
+// Admin: Tạo danh mục mới
+router.post("/admin/categories", createCategory);
+
+// Admin: Cập nhật danh mục
+router.put("/admin/categories/:id", updateCategory);
+
+// Admin: Xóa mềm danh mục (soft delete)
+router.delete("/admin/categories/:id", deleteCategory);
+
+// Admin: Xóa vĩnh viễn danh mục (hard delete) - Cẩn thận!
+router.delete("/admin/categories/:id/permanent", hardDeleteCategory);
+
+// ================ EXCEL ROUTES ================
+
+// Admin: Export categories to Excel
+router.get("/admin/categories/export/excel", exportCategoriesToExcel);
+
+// Admin: Download Excel template
+router.get("/admin/categories/template/excel", downloadExcelTemplate);
+
+// Admin: Import categories from Excel
+router.post("/admin/categories/import/excel", uploadExcel, handleUploadError, importCategoriesFromExcel);
+
+// ================ MENU ITEM ROUTES ================
+
+// Admin: Excel operations cho Menu Items
+// Note: Đặt Excel routes TRƯỚC các parameterized routes để tránh conflict
+
+// Admin: Export menu items to Excel
+router.get("/admin/menus/export/excel", exportMenuItemsToExcel);
+
+// Admin: Download menu item Excel template
+router.get("/admin/menus/template/excel", downloadMenuItemExcelTemplate);
+
+// Admin: Import menu items from Excel
+router.post("/admin/menus/import/excel", uploadExcel, handleUploadError, importMenuItemsFromExcel);
 
 // Khách hàng xem chi tiết món ăn (với reviews)
 router.get("/cus/menus/item/:id", getMenuItemDetail);
@@ -26,5 +85,14 @@ router.get("/cus/menus/all", getAllItemsController);
 
 // Admin: thêm món
 router.post("/admin/menus", createMenuItem);
+
+// Admin: cập nhật món
+router.put("/admin/menus/:id", updateMenuItem);
+
+// Admin: xóa mềm món (soft delete)
+router.delete("/admin/menus/:id", deleteMenuItem);
+
+// Admin: xóa vĩnh viễn món (hard delete) - Cẩn thận!
+router.delete("/admin/menus/:id/permanent", hardDeleteMenuItem);
 
 export default router;

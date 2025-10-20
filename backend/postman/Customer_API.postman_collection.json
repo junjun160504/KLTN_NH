@@ -1,0 +1,1038 @@
+{
+    "info": {
+        "_postman_id": "customer-api-2025-v1",
+        "name": "Customer API - Loyalty Points System",
+        "description": "Complete Customer Management & Loyalty Points API collection.\n\n**Features:**\n- Customer registration (Public)\n- Customer info lookup (Public)\n- Loyalty points calculation (Public)\n- Customer management (Admin)\n- Points management (Admin)\n- Order history (Admin)\n- 40+ automated tests\n\n**Business Rules:**\n- Phone is required (UNIQUE)\n- Email & Name are optional\n- Loyalty formula: 1 point = 10,000 VNĐ\n- Points cannot be negative\n- Same phone = UPDATE, new phone = CREATE\n\n**Authorization Levels:**\n- 🌐 Public: Customer registration, Check points, Calculate points\n- 🔒 Admin (OWNER/MANAGER): List customers, Update info, Manage points, View history\n- ❌ STAFF: No access to customer endpoints\n\n**Test Scenarios:**\n1. Public Flow: Create customer → Check points → Calculate\n2. Admin Flow: Login → View customers → Update points → View history\n3. Authorization: Test STAFF denied, MANAGER allowed\n4. Error Cases: Invalid phone, duplicate email, etc.\n\n**Created:** October 19, 2025\n**Author:** Senior Backend Developer\n**Version:** 1.0",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "🌐 Public Endpoints",
+            "item": [
+                {
+                    "name": "Create or Update Customer",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200 or 201\", function () {",
+                                    "    pm.expect([200, 201]).to.include(pm.response.code);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Response has correct structure\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData).to.have.property('status');",
+                                    "    pm.expect(jsonData).to.have.property('message');",
+                                    "    pm.expect(jsonData).to.have.property('data');",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Customer data is valid\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data).to.have.property('id');",
+                                    "    pm.expect(jsonData.data).to.have.property('phone');",
+                                    "    pm.expect(jsonData.data).to.have.property('points');",
+                                    "    pm.expect(jsonData.data).to.have.property('created_at');",
+                                    "});",
+                                    "",
+                                    "if (pm.response.code === 201) {",
+                                    "    pm.test(\"New customer created\", function () {",
+                                    "        var jsonData = pm.response.json();",
+                                    "        pm.expect(jsonData.message).to.include('created');",
+                                    "        pm.expect(jsonData.data.points).to.equal(0);",
+                                    "    });",
+                                    "    ",
+                                    "    // Save customer ID for later tests",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.environment.set('test_customer_id', jsonData.data.id);",
+                                    "    pm.environment.set('test_customer_phone', jsonData.data.phone);",
+                                    "    console.log('✅ New customer created with ID:', jsonData.data.id);",
+                                    "} else if (pm.response.code === 200) {",
+                                    "    pm.test(\"Customer updated\", function () {",
+                                    "        var jsonData = pm.response.json();",
+                                    "        pm.expect(jsonData.message).to.include('updated');",
+                                    "    });",
+                                    "    console.log('✅ Customer info updated');",
+                                    "}",
+                                    "",
+                                    "pm.test(\"Response time is less than 500ms\", function () {",
+                                    "    pm.expect(pm.response.responseTime).to.be.below(500);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"phone\": \"0912345678\",\n  \"name\": \"Nguyễn Văn A\",\n  \"email\": \"nguyenvana@gmail.com\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/customers",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customers"
+                            ]
+                        },
+                        "description": "🌐 **PUBLIC** - Create new customer or update if phone exists.\n\n**Request Body:**\n- `phone` (required): Vietnam phone number\n- `name` (optional): Customer name\n- `email` (optional): Customer email\n\n**Response:**\n- 201: New customer created\n- 200: Customer info updated\n- 400: Missing/invalid phone\n- 409: Email already exists"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Customer by Phone",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Response has correct structure\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData).to.have.property('status');",
+                                    "    pm.expect(jsonData).to.have.property('message');",
+                                    "    pm.expect(jsonData).to.have.property('data');",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Customer data is complete\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data).to.have.property('id');",
+                                    "    pm.expect(jsonData.data).to.have.property('phone');",
+                                    "    pm.expect(jsonData.data).to.have.property('points');",
+                                    "    pm.expect(jsonData.data.phone).to.equal('0912345678');",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Points is a number\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data.points).to.be.a('number');",
+                                    "    pm.expect(jsonData.data.points).to.be.at.least(0);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Response time is less than 300ms\", function () {",
+                                    "    pm.expect(pm.response.responseTime).to.be.below(300);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/customers/me/0912345678",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customers",
+                                "me",
+                                "0912345678"
+                            ]
+                        },
+                        "description": "🌐 **PUBLIC** - Get customer info by phone number.\n\n**Use Case:** Customer checks their loyalty points.\n\n**Response:**\n- 200: Customer found\n- 404: Customer not found"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Customer by Email",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Customer email matches\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data.email).to.equal('nguyenvana@gmail.com');",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Response time is less than 300ms\", function () {",
+                                    "    pm.expect(pm.response.responseTime).to.be.below(300);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/customers/me/nguyenvana@gmail.com",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customers",
+                                "me",
+                                "nguyenvana@gmail.com"
+                            ]
+                        },
+                        "description": "🌐 **PUBLIC** - Get customer info by email.\n\n**Use Case:** Customer checks points using email.\n\n**Response:**\n- 200: Customer found\n- 404: Customer not found"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Calculate Loyalty Points",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Response has correct structure\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData).to.have.property('data');",
+                                    "    pm.expect(jsonData.data).to.have.property('orderAmount');",
+                                    "    pm.expect(jsonData.data).to.have.property('points');",
+                                    "    pm.expect(jsonData.data).to.have.property('formula');",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Points calculation is correct\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    var expectedPoints = Math.floor(jsonData.data.orderAmount / 10000);",
+                                    "    pm.expect(jsonData.data.points).to.equal(expectedPoints);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Formula is correct\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data.formula).to.include('10,000');",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Response time is less than 100ms\", function () {",
+                                    "    pm.expect(pm.response.responseTime).to.be.below(100);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"orderAmount\": 150000\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/customers/calculate-points",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customers",
+                                "calculate-points"
+                            ]
+                        },
+                        "description": "🌐 **PUBLIC** - Calculate loyalty points from order amount.\n\n**Formula:** 1 point = 10,000 VNĐ\n\n**Examples:**\n- 150,000 VNĐ → 15 points\n- 200,000 VNĐ → 20 points\n- 9,999 VNĐ → 0 points"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Public endpoints - No authentication required.\n\nThese endpoints are used by customers to:\n- Register their phone/email\n- Check their loyalty points\n- Calculate points before ordering"
+        },
+        {
+            "name": "🔒 Admin Endpoints",
+            "item": [
+                {
+                    "name": "Get All Customers",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Response has correct structure\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData).to.have.property('status');",
+                                    "    pm.expect(jsonData).to.have.property('message');",
+                                    "    pm.expect(jsonData).to.have.property('data');",
+                                    "    pm.expect(jsonData.data).to.have.property('total');",
+                                    "    pm.expect(jsonData.data).to.have.property('customers');",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Customers is an array\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data.customers).to.be.an('array');",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Total count matches array length\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data.total).to.equal(jsonData.data.customers.length);",
+                                    "});",
+                                    "",
+                                    "if (pm.response.json().data.customers.length > 0) {",
+                                    "    pm.test(\"Each customer has required fields\", function () {",
+                                    "        var jsonData = pm.response.json();",
+                                    "        var customer = jsonData.data.customers[0];",
+                                    "        pm.expect(customer).to.have.property('id');",
+                                    "        pm.expect(customer).to.have.property('phone');",
+                                    "        pm.expect(customer).to.have.property('points');",
+                                    "    });",
+                                    "}",
+                                    "",
+                                    "pm.test(\"Response time is less than 500ms\", function () {",
+                                    "    pm.expect(pm.response.responseTime).to.be.below(500);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customers",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customers"
+                            ]
+                        },
+                        "description": "🔒 **ADMIN** (OWNER, MANAGER) - Get list of all customers.\n\n**Authorization:** Bearer Token\n**Roles:** OWNER, MANAGER\n\n**Response:**\n- 200: Success\n- 401: No token\n- 403: STAFF role (insufficient permissions)"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Customer by ID",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Customer data is complete\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data).to.have.property('id');",
+                                    "    pm.expect(jsonData.data).to.have.property('phone');",
+                                    "    pm.expect(jsonData.data).to.have.property('points');",
+                                    "    pm.expect(jsonData.data).to.have.property('created_at');",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Customer ID matches request\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    var requestedId = pm.environment.get('test_customer_id');",
+                                    "    if (requestedId) {",
+                                    "        pm.expect(jsonData.data.id).to.equal(parseInt(requestedId));",
+                                    "    }",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Response time is less than 300ms\", function () {",
+                                    "    pm.expect(pm.response.responseTime).to.be.below(300);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customers/{{test_customer_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customers",
+                                "{{test_customer_id}}"
+                            ]
+                        },
+                        "description": "🔒 **ADMIN** (OWNER, MANAGER) - Get customer details by ID.\n\n**Authorization:** Bearer Token\n**Roles:** OWNER, MANAGER\n\n**Response:**\n- 200: Success\n- 404: Customer not found\n- 401: No token\n- 403: STAFF role"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Customer Info",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Response has success message\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('updated');",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Customer data is returned\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data).to.have.property('id');",
+                                    "    pm.expect(jsonData.data).to.have.property('phone');",
+                                    "    pm.expect(jsonData.data).to.have.property('points');",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Updated fields are reflected\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data.name).to.equal('Nguyễn Văn An');",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Response time is less than 500ms\", function () {",
+                                    "    pm.expect(pm.response.responseTime).to.be.below(500);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"Nguyễn Văn An\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/customers/{{test_customer_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customers",
+                                "{{test_customer_id}}"
+                            ]
+                        },
+                        "description": "🔒 **ADMIN** (OWNER, MANAGER) - Update customer information.\n\n**Authorization:** Bearer Token\n**Roles:** OWNER, MANAGER\n\n**Request Body:**\n- `name` (optional)\n- `email` (optional)\n- `phone` (optional)\n\n**Response:**\n- 200: Success\n- 404: Customer not found\n- 409: Email/phone already exists\n- 401: No token\n- 403: STAFF role"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Add Loyalty Points",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Response has correct structure\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData).to.have.property('data');",
+                                    "    pm.expect(jsonData.data).to.have.property('customerId');",
+                                    "    pm.expect(jsonData.data).to.have.property('oldPoints');",
+                                    "    pm.expect(jsonData.data).to.have.property('newPoints');",
+                                    "    pm.expect(jsonData.data).to.have.property('operation');",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Points calculation is correct\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    var expectedNewPoints = jsonData.data.oldPoints + 50;",
+                                    "    pm.expect(jsonData.data.newPoints).to.equal(expectedNewPoints);",
+                                    "    pm.expect(jsonData.data.operation).to.equal('ADD');",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Changed by admin is recorded\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data).to.have.property('changedBy');",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Response time is less than 500ms\", function () {",
+                                    "    pm.expect(pm.response.responseTime).to.be.below(500);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"points\": 50,\n  \"operation\": \"ADD\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/customers/{{test_customer_id}}/points",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customers",
+                                "{{test_customer_id}}",
+                                "points"
+                            ]
+                        },
+                        "description": "🔒 **ADMIN** (OWNER, MANAGER) - Add loyalty points to customer.\n\n**Authorization:** Bearer Token\n**Roles:** OWNER, MANAGER\n\n**Request Body:**\n- `points` (required): Number of points\n- `operation`: \"ADD\" (default)\n\n**Use Cases:**\n- Customer completes order\n- Promotion bonus\n- Manual adjustment"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Subtract Loyalty Points",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Points calculation is correct\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    var expectedNewPoints = Math.max(0, jsonData.data.oldPoints - 30);",
+                                    "    pm.expect(jsonData.data.newPoints).to.equal(expectedNewPoints);",
+                                    "    pm.expect(jsonData.data.operation).to.equal('SUBTRACT');",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Points cannot be negative\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data.newPoints).to.be.at.least(0);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Response time is less than 500ms\", function () {",
+                                    "    pm.expect(pm.response.responseTime).to.be.below(500);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"points\": 30,\n  \"operation\": \"SUBTRACT\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/customers/{{test_customer_id}}/points",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customers",
+                                "{{test_customer_id}}",
+                                "points"
+                            ]
+                        },
+                        "description": "🔒 **ADMIN** (OWNER, MANAGER) - Subtract loyalty points from customer.\n\n**Authorization:** Bearer Token\n**Roles:** OWNER, MANAGER\n\n**Request Body:**\n- `points` (required): Number of points to subtract\n- `operation`: \"SUBTRACT\"\n\n**Use Cases:**\n- Customer redeems gift\n- Refund order\n- Manual adjustment\n\n**Note:** Points cannot go below 0"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Set Loyalty Points",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Points set correctly\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data.newPoints).to.equal(100);",
+                                    "    pm.expect(jsonData.data.operation).to.equal('SET');",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Old points is recorded\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data).to.have.property('oldPoints');",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Response time is less than 500ms\", function () {",
+                                    "    pm.expect(pm.response.responseTime).to.be.below(500);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"points\": 100,\n  \"operation\": \"SET\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/customers/{{test_customer_id}}/points",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customers",
+                                "{{test_customer_id}}",
+                                "points"
+                            ]
+                        },
+                        "description": "🔒 **ADMIN** (OWNER, MANAGER) - Set loyalty points to specific value.\n\n**Authorization:** Bearer Token\n**Roles:** OWNER, MANAGER\n\n**Request Body:**\n- `points` (required): Exact number of points\n- `operation`: \"SET\"\n\n**Use Cases:**\n- Manual correction\n- Admin adjustment\n- Reset points"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Customer Order History",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Response has correct structure\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData).to.have.property('data');",
+                                    "    pm.expect(jsonData.data).to.have.property('customer');",
+                                    "    pm.expect(jsonData.data).to.have.property('totalOrders');",
+                                    "    pm.expect(jsonData.data).to.have.property('orders');",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Customer info is present\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data.customer).to.have.property('id');",
+                                    "    pm.expect(jsonData.data.customer).to.have.property('phone');",
+                                    "    pm.expect(jsonData.data.customer).to.have.property('points');",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Orders is an array\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data.orders).to.be.an('array');",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Total orders count is accurate\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data.totalOrders).to.equal(jsonData.data.orders.length);",
+                                    "});",
+                                    "",
+                                    "if (pm.response.json().data.orders.length > 0) {",
+                                    "    pm.test(\"Each order has required fields\", function () {",
+                                    "        var jsonData = pm.response.json();",
+                                    "        var order = jsonData.data.orders[0];",
+                                    "        pm.expect(order).to.have.property('id');",
+                                    "        pm.expect(order).to.have.property('total_price');",
+                                    "        pm.expect(order).to.have.property('status');",
+                                    "        pm.expect(order).to.have.property('created_at');",
+                                    "    });",
+                                    "}",
+                                    "",
+                                    "pm.test(\"Response time is less than 500ms\", function () {",
+                                    "    pm.expect(pm.response.responseTime).to.be.below(500);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customers/{{test_customer_id}}/history",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customers",
+                                "{{test_customer_id}}",
+                                "history"
+                            ]
+                        },
+                        "description": "🔒 **ADMIN** (OWNER, MANAGER) - Get customer's order history.\n\n**Authorization:** Bearer Token\n**Roles:** OWNER, MANAGER\n\n**Response includes:**\n- Customer info\n- Total number of orders\n- List of orders with table info\n\n**Use Cases:**\n- View VIP customer history\n- Analyze customer behavior\n- Customer support"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Admin endpoints - Require OWNER or MANAGER role.\n\nThese endpoints are used by admin staff to:\n- View all customers\n- Update customer information\n- Manage loyalty points (ADD/SUBTRACT/SET)\n- View customer order history"
+        },
+        {
+            "name": "❌ Error Test Cases",
+            "item": [
+                {
+                    "name": "Create Customer - Missing Phone",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 400\", function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Error message is descriptive\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('Phone');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"Test User\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/customers",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customers"
+                            ]
+                        },
+                        "description": "❌ **ERROR TEST** - Should return 400 when phone is missing"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Customer - Invalid Phone Format",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 400\", function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Error message mentions format\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('format');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"phone\": \"123\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/customers",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customers"
+                            ]
+                        },
+                        "description": "❌ **ERROR TEST** - Should return 400 for invalid phone format"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Customer - Not Found",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 404\", function () {",
+                                    "    pm.response.to.have.status(404);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Error message is clear\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('not found');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/customers/me/0999999999",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customers",
+                                "me",
+                                "0999999999"
+                            ]
+                        },
+                        "description": "❌ **ERROR TEST** - Should return 404 for non-existent customer"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get All Customers - No Token",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 401\", function () {",
+                                    "    pm.response.to.have.status(401);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Error message mentions token\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('token');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/customers",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customers"
+                            ]
+                        },
+                        "description": "❌ **ERROR TEST** - Should return 401 when accessing admin endpoint without token"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Points - Invalid Operation",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 400\", function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Error message mentions operation\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('operation');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"points\": 50,\n  \"operation\": \"INVALID\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/customers/{{test_customer_id}}/points",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customers",
+                                "{{test_customer_id}}",
+                                "points"
+                            ]
+                        },
+                        "description": "❌ **ERROR TEST** - Should return 400 for invalid operation type"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Calculate Points - Invalid Amount",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 400\", function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Error message mentions amount\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('amount');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"orderAmount\": -1000\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/customers/calculate-points",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "customers",
+                                "calculate-points"
+                            ]
+                        },
+                        "description": "❌ **ERROR TEST** - Should return 400 for negative amount"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Error test cases to verify proper error handling.\n\nTests include:\n- Missing required fields\n- Invalid data formats\n- Not found scenarios\n- Authentication errors\n- Authorization errors"
+        }
+    ],
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:5000",
+            "type": "string"
+        },
+        {
+            "key": "test_customer_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "test_customer_phone",
+            "value": "",
+            "type": "string"
+        }
+    ]
+}

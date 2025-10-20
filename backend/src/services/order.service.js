@@ -472,3 +472,292 @@ export async function updateStatus(orderId, status) {
   await pool.query("UPDATE orders SET status = ? WHERE id = ?", [status, orderId]);
   return { orderId, status };
 }
+
+// ========== NEW FEATURES ==========
+
+/**
+ * Xóa món khỏi order (chỉ khi status = NEW)
+ */
+export async function removeItemFromOrder(orderId, itemId) {
+  const connection = await pool.getConnection();
+  await connection.beginTransaction();
+
+  try {
+    // 1. Validate order exists and status = NEW
+    const [[order]] = await connection.query(
+      `SELECT * FROM orders WHERE id = ? AND status = 'NEW'`,
+      [orderId]
+    );
+
+    if (!order) {
+      throw new Error("Order not found or cannot be modified (status must be NEW)");
+    }
+
+    // 2. Check if order_item exists
+    const [[orderItem]] = await connection.query(
+      `SELECT * FROM order_items WHERE id = ? AND order_id = ?`,
+      [itemId, orderId]
+    );
+
+    if (!orderItem) {
+      throw new Error("Order item not found");
+    }
+
+    // 3. Delete order_item (trigger will auto-update total_price)
+    await connection.query(
+      `DELETE FROM order_items WHERE id = ?`,
+      [itemId]
+    );
+
+    // 4. Check if order has no items left
+    const [[{ itemCount }]] = await connection.query(
+      `SELECT COUNT(*) as itemCount FROM order_items WHERE order_id = ?`,
+      [orderId]
+    );
+
+    // 5. If no items left, delete the order
+    if (itemCount === 0) {
+      await connection.query(`DELETE FROM orders WHERE id = ?`, [orderId]);
+      await connection.commit();
+
+      console.log(`✅ Order #${orderId} deleted (no items left)`);
+      return { orderId, deleted: true, message: "Order deleted (no items left)" };
+    }
+
+    await connection.commit();
+
+    // 6. Get updated order data
+    const updatedOrder = await getOrderById(orderId);
+
+    // 7. Get table info and send notification
+    const [[tableInfo]] = await connection.query(
+      `SELECT t.id, t.table_number, o.qr_session_id
+       FROM orders o
+       JOIN qr_sessions qs ON o.qr_session_id = qs.id
+       JOIN tables t ON qs.table_id = t.id
+       WHERE o.id = ?`,
+      [orderId]
+    );
+
+    try {
+      const tableName = tableInfo ? `Bàn ${tableInfo.table_number}` : 'Bàn N/A';
+
+      await notificationService.createNotification({
+        target_type: "STAFF",
+        target_id: null,
+        type: "ORDER_UPDATE",
+        title: `🗑️ ${tableName} - Xóa món khỏi đơn #${orderId}`,
+        message: `Khách hàng đã xóa 1 món khỏi đơn hàng`,
+        priority: "low",
+        action_url: `/management/orders/${orderId}`,
+        metadata: {
+          orderId,
+          qrSessionId: tableInfo?.qr_session_id,
+          tableId: tableInfo?.id,
+          tableName: tableInfo?.table_number,
+          removedItemId: itemId,
+          remainingItems: itemCount
+        },
+      });
+      console.log(`📤 Notification sent: Removed item from order #${orderId}`);
+    } catch (notifError) {
+      console.error('⚠️ Failed to send notification:', notifError);
+    }
+
+    return updatedOrder;
+
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
+}
+
+/**
+ * Cập nhật số lượng món trong order (chỉ khi status = NEW)
+ */
+export async function updateOrderItemQuantity(orderId, itemId, quantity) {
+  const connection = await pool.getConnection();
+  await connection.beginTransaction();
+
+  try {
+    // 1. Validate quantity
+    if (!quantity || quantity < 0) {
+      throw new Error("Quantity must be greater than or equal to 0");
+    }
+
+    // 2. Validate order exists and status = NEW
+    const [[order]] = await connection.query(
+      `SELECT * FROM orders WHERE id = ? AND status = 'NEW'`,
+      [orderId]
+    );
+
+    if (!order) {
+      throw new Error("Order not found or cannot be modified (status must be NEW)");
+    }
+
+    // 3. Check if order_item exists
+    const [[orderItem]] = await connection.query(
+      `SELECT * FROM order_items WHERE id = ? AND order_id = ?`,
+      [itemId, orderId]
+    );
+
+    if (!orderItem) {
+      throw new Error("Order item not found");
+    }
+
+    // 4. If quantity = 0, delete the item
+    if (quantity === 0) {
+      await connection.query(
+        `DELETE FROM order_items WHERE id = ?`,
+        [itemId]
+      );
+
+      // Check if order has no items left
+      const [[{ itemCount }]] = await connection.query(
+        `SELECT COUNT(*) as itemCount FROM order_items WHERE order_id = ?`,
+        [orderId]
+      );
+
+      if (itemCount === 0) {
+        await connection.query(`DELETE FROM orders WHERE id = ?`, [orderId]);
+        await connection.commit();
+
+        console.log(`✅ Order #${orderId} deleted (quantity set to 0, no items left)`);
+        return { orderId, deleted: true, message: "Order deleted (no items left)" };
+      }
+    } else {
+      // 5. Update quantity (trigger will auto-update total_price)
+      await connection.query(
+        `UPDATE order_items SET quantity = ? WHERE id = ?`,
+        [quantity, itemId]
+      );
+    }
+
+    await connection.commit();
+
+    // 6. Get updated order data
+    const updatedOrder = await getOrderById(orderId);
+
+    // 7. Get table info and send notification
+    const [[tableInfo]] = await connection.query(
+      `SELECT t.id, t.table_number, o.qr_session_id
+       FROM orders o
+       JOIN qr_sessions qs ON o.qr_session_id = qs.id
+       JOIN tables t ON qs.table_id = t.id
+       WHERE o.id = ?`,
+      [orderId]
+    );
+
+    try {
+      const tableName = tableInfo ? `Bàn ${tableInfo.table_number}` : 'Bàn N/A';
+      const action = quantity === 0 ? 'xóa' : 'cập nhật số lượng';
+
+      await notificationService.createNotification({
+        target_type: "STAFF",
+        target_id: null,
+        type: "ORDER_UPDATE",
+        title: `✏️ ${tableName} - Cập nhật đơn #${orderId}`,
+        message: `Khách hàng đã ${action} món (số lượng: ${orderItem.quantity} → ${quantity})`,
+        priority: "low",
+        action_url: `/management/orders/${orderId}`,
+        metadata: {
+          orderId,
+          qrSessionId: tableInfo?.qr_session_id,
+          tableId: tableInfo?.id,
+          tableName: tableInfo?.table_number,
+          updatedItemId: itemId,
+          oldQuantity: orderItem.quantity,
+          newQuantity: quantity
+        },
+      });
+      console.log(`📤 Notification sent: Updated item quantity in order #${orderId}`);
+    } catch (notifError) {
+      console.error('⚠️ Failed to send notification:', notifError);
+    }
+
+    return updatedOrder;
+
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
+}
+
+/**
+ * Hủy đơn hàng (chỉ khi status = NEW hoặc IN_PROGRESS)
+ */
+export async function cancelOrder(orderId, reason = null) {
+  const connection = await pool.getConnection();
+  await connection.beginTransaction();
+
+  try {
+    // 1. Validate order exists and can be cancelled
+    const [[order]] = await connection.query(
+      `SELECT * FROM orders WHERE id = ? AND status IN ('NEW', 'IN_PROGRESS')`,
+      [orderId]
+    );
+
+    if (!order) {
+      throw new Error("Order not found or cannot be cancelled (status must be NEW or IN_PROGRESS)");
+    }
+
+    // 2. Update order status to CANCELLED
+    await connection.query(
+      `UPDATE orders SET status = 'CANCELLED' WHERE id = ?`,
+      [orderId]
+    );
+
+    await connection.commit();
+
+    // 3. Get updated order data
+    const updatedOrder = await getOrderById(orderId);
+
+    // 4. Get table info and send notification
+    const [[tableInfo]] = await connection.query(
+      `SELECT t.id, t.table_number, o.qr_session_id
+       FROM orders o
+       JOIN qr_sessions qs ON o.qr_session_id = qs.id
+       JOIN tables t ON qs.table_id = t.id
+       WHERE o.id = ?`,
+      [orderId]
+    );
+
+    try {
+      const tableName = tableInfo ? `Bàn ${tableInfo.table_number}` : 'Bàn N/A';
+      const reasonText = reason ? ` (Lý do: ${reason})` : '';
+
+      await notificationService.createNotification({
+        target_type: "STAFF",
+        target_id: null,
+        type: "ORDER_UPDATE",
+        title: `❌ ${tableName} - Hủy đơn #${orderId}`,
+        message: `Khách hàng đã hủy đơn hàng${reasonText}`,
+        priority: "medium",
+        action_url: `/management/orders/${orderId}`,
+        metadata: {
+          orderId,
+          qrSessionId: tableInfo?.qr_session_id,
+          tableId: tableInfo?.id,
+          tableName: tableInfo?.table_number,
+          previousStatus: order.status,
+          cancelReason: reason
+        },
+      });
+      console.log(`📤 Notification sent: Order #${orderId} cancelled`);
+    } catch (notifError) {
+      console.error('⚠️ Failed to send notification:', notifError);
+    }
+
+    return updatedOrder;
+
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
+}
