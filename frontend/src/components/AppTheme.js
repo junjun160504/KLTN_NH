@@ -9,6 +9,7 @@ const AppTheme = ({ children }) => {
         token: {
           colorPrimary: "#226533",   // màu chủ đạo
           fontSize: 16,
+          //fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
         },
         components: {
           Menu: {

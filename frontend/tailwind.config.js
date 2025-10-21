@@ -26,7 +26,9 @@ module.exports = {
         }
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        //sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['"Nunito Sans"', 'sans-serif'],
+        nunito: ['Nunito', 'sans-serif'], // nếu dùng cả 2 loại
       },
       borderRadius: {
         'xl': '12px',
