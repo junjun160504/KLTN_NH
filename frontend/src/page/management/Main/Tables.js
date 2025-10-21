@@ -1,43 +1,141 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react'
 import {
   Layout,
   Button,
   Space,
   Typography,
   Input,
-  Table,
   Tag,
   message,
-  Popconfirm,
   Drawer,
   Form,
   Select,
-} from "antd";
-import axios from "axios";
-import AppHeader from "../../../components/AppHeader";
-import AppSidebar from "../../../components/AppSidebar";
+  Badge,
+  Card,
+  Divider,
+  Empty,
+  Dropdown,
+  Modal
+} from 'antd'
+import {
+  PlusOutlined,
+  PrinterOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  CloseOutlined,
+  ShoppingCartOutlined,
+  DollarOutlined,
+  MoreOutlined,
+  MinusOutlined,
+  BellOutlined
+} from '@ant-design/icons'
+import axios from 'axios'
+import AppHeader from '../../../components/AppHeader'
+import AppSidebar from '../../../components/AppSidebar'
 
-const { Content } = Layout;
-const { Text } = Typography;
-const { Option } = Select;
+const { Content } = Layout
+const { Text, Title } = Typography
+const { Option } = Select
 
-const REACT_APP_API_URL = process.env.REACT_APP_API_URL;
+const REACT_APP_API_URL = process.env.REACT_APP_API_URL
+
+// Mock data cho orders (tạm thời)
+const MOCK_ORDERS = {
+  1: {
+    order_id: 101,
+    status: 'NEW',
+    items: [
+      {
+        id: 1,
+        name: 'Kem McSundae sốt Sôcôla',
+        quantity: 1,
+        price: 25000,
+        image: 'https://product.hstatic.net/1000093072/product/nom_cu_hu_dua_tom_thit_c27e302f8c144b2cad41006fa569596e_medium.jpg'
+      },
+      {
+        id: 2,
+        name: 'McNuggets 4 miếng',
+        quantity: 1,
+        price: 20000,
+        image: 'https://product.hstatic.net/1000093072/product/nom_cu_hu_dua_tom_thit_c27e302f8c144b2cad41006fa569596e_medium.jpg'
+      },
+      {
+        id: 3,
+        name: 'Sữa Tươi',
+        quantity: 1,
+        price: 20000,
+        image: 'https://product.hstatic.net/1000093072/product/nom_cu_hu_dua_tom_thit_c27e302f8c144b2cad41006fa569596e_medium.jpg'
+      }
+    ],
+    total: 65000,
+    created_at: '2025-10-21 14:30:00'
+  },
+  5: {
+    order_id: 102,
+    status: 'IN_PROGRESS',
+    items: [
+      {
+        id: 4,
+        name: 'Big Mac',
+        quantity: 2,
+        price: 89000,
+        image: 'https://product.hstatic.net/1000093072/product/nom_cu_hu_dua_tom_thit_c27e302f8c144b2cad41006fa569596e_medium.jpg'
+      },
+      {
+        id: 5,
+        name: 'French Fries (L)',
+        quantity: 1,
+        price: 45000,
+        image: 'https://product.hstatic.net/1000093072/product/nom_cu_hu_dua_tom_thit_c27e302f8c144b2cad41006fa569596e_medium.jpg'
+      }
+    ],
+    total: 223000,
+    created_at: '2025-10-21 14:15:00'
+  },
+  9: {
+    order_id: 103,
+    status: 'NEW',
+    items: [
+      {
+        id: 6,
+        name: 'McFlurry Oreo',
+        quantity: 1,
+        price: 35000,
+        image: 'https://product.hstatic.net/1000093072/product/nom_cu_hu_dua_tom_thit_c27e302f8c144b2cad41006fa569596e_medium.jpg'
+      },
+      {
+        id: 7,
+        name: 'Coca Cola (M)',
+        quantity: 2,
+        price: 25000,
+        image: 'https://product.hstatic.net/1000093072/product/nom_cu_hu_dua_tom_thit_c27e302f8c144b2cad41006fa569596e_medium.jpg'
+      }
+    ],
+    total: 85000,
+    created_at: '2025-10-21 14:45:00'
+  }
+}
 
 const TablesPage = () => {
-  const [collapsed, setCollapsed] = useState(false);
-  const [pageTitle] = useState("Quản lý bàn");
-  const [tables, setTables] = useState([]); // Dữ liệu từ API
-  const [loading, setLoading] = useState(false);
+  const [collapsed, setCollapsed] = useState(false)
+  const [pageTitle] = useState('Quản lý bàn')
+  const [tables, setTables] = useState([])
+  const [loading, setLoading] = useState(false)
 
-  const [searchText, setSearchText] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [searchText, setSearchText] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
 
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [addForm] = Form.useForm();
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [addForm] = Form.useForm()
 
-  const [editDrawerOpen, setEditDrawerOpen] = useState(false);
-  const [editForm] = Form.useForm();
-  const [editingTable, setEditingTable] = useState(null);
+  const [editDrawerOpen, setEditDrawerOpen] = useState(false)
+  const [editForm] = Form.useForm()
+  const [editingTable, setEditingTable] = useState(null)
+
+  // Order panel state
+  const [orderPanelOpen, setOrderPanelOpen] = useState(false)
+  const [selectedTable, setSelectedTable] = useState(null)
+  const [currentOrderItems, setCurrentOrderItems] = useState([])
 
   // ================= API =================
   async function fetchTables() {
@@ -84,289 +182,134 @@ const TablesPage = () => {
   };
 
   // Mở popup chỉnh sửa
-  const openEditDrawer = (table) => {
-    setEditingTable(table);
+  const openEditDrawer = (table, e) => {
+    e.stopPropagation() // Prevent table card click
+    setEditingTable(table)
     editForm.setFieldsValue({
       table_number: table.table_number,
-      is_active: table.is_active,
-    });
-    setEditDrawerOpen(true);
-  };
+      is_active: table.is_active
+    })
+    setEditDrawerOpen(true)
+  }
 
   // Sửa bàn
   const handleEditTable = async () => {
     try {
-      const values = await editForm.validateFields();
+      const values = await editForm.validateFields()
       await axios.put(`${REACT_APP_API_URL}/tables/${editingTable.id}`, {
         table_number: values.table_number,
-        is_active: values.is_active,
-      });
-      message.success("Cập nhật bàn thành công!");
-      setEditDrawerOpen(false);
-      editForm.resetFields();
-      fetchTables();
+        is_active: values.is_active
+      })
+      message.success('Cập nhật bàn thành công!')
+      setEditDrawerOpen(false)
+      editForm.resetFields()
+      fetchTables()
     } catch (err) {
-      if (err?.errorFields) return;
-      const errorMsg = err.response?.data?.message || "Cập nhật bàn thất bại!";
-      message.error(errorMsg);
+      if (err?.errorFields) return
+      const errorMsg = err.response?.data?.message || 'Cập nhật bàn thất bại!'
+      message.error(errorMsg)
     }
-  };
+  }
 
-  // ================= Print QR Functions =================
-
-  // Phương án in đơn giản - trực tiếp từ browser hiện tại
-  const handleSimplePrint = (content, title = "In QR Code") => {
-    // Tạo element ẩn để in
-    const printElement = document.createElement('div');
-    printElement.innerHTML = content;
-    printElement.style.display = 'none';
-    document.body.appendChild(printElement);
-
-    // Backup CSS gốc
-    const originalContents = document.body.innerHTML;
-    const originalTitle = document.title;
-
-    // Thay thế nội dung page
-    document.title = title;
-    document.body.innerHTML = content;
-
-    // Gọi print dialog
-    window.print();
-
-    // Khôi phục nội dung gốc
-    document.title = originalTitle;
-    document.body.innerHTML = originalContents;
-
-    // Remove element ẩn
-    if (document.body.contains(printElement)) {
-      document.body.removeChild(printElement);
+  // ================= Table Card Actions =================
+  const handleTableClick = (table) => {
+    setSelectedTable(table)
+    const order = MOCK_ORDERS[table.id]
+    if (order && order.items) {
+      setCurrentOrderItems([...order.items])
+    } else {
+      setCurrentOrderItems([])
     }
-  };
+    setOrderPanelOpen(true)
+  }
 
-  // In QR cho một bàn
-  const handlePrintSingleQR = (table) => {
+  const handlePrintQR = (table, e) => {
+    e.stopPropagation()
     if (!table.qr_code_url) {
-      message.error("Bàn này chưa có mã QR!");
-      return;
+      message.error('Bàn này chưa có mã QR!')
+      return
     }
+    message.info(`In QR cho bàn ${table.table_number}`)
+    // Implement print logic here (sử dụng lại logic cũ nếu cần)
+  }
 
-    const qrUrl = `${replaceUrlServer(REACT_APP_API_URL)}${table.qr_code_url}`;
+  const handleDeleteClick = (table, e) => {
+    if (e) e.stopPropagation()
 
-    const printStyles = `
-      <style>
-        body {
-          margin: 0;
-          padding: 20px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          font-family: Arial, sans-serif;
-        }
-        .qr-container {
-          text-align: center;
-          page-break-inside: avoid;
-          margin-bottom: 30px;
-        }
-        .qr-title {
-          font-size: 24px;
-          font-weight: bold;
-          margin-bottom: 15px;
-          color: #333;
-        }
-        .qr-image {
-          width: 200px;
-          height: 200px;
-          border: 2px solid #ddd;
-          border-radius: 8px;
-        }
-        .qr-info {
-          margin-top: 15px;
-          font-size: 16px;
-          color: #666;
-        }
-        @media print {
-          body { margin: 0; }
-          .qr-container { page-break-inside: avoid; }
-        }
-      </style>
-    `;
+    Modal.confirm({
+      title: 'Xác nhận xóa bàn',
+      content: `Bạn có chắc chắn muốn xóa bàn ${table.table_number}?`,
+      okText: 'Xóa',
+      okType: 'danger',
+      cancelText: 'Hủy',
+      onOk: () => handleDeleteTable(table.id)
+    })
+  }
 
-    const printBody = `
-      <div class="qr-container">
-        <div class="qr-title">Bàn ${table.table_number}</div>
-        <img src="${qrUrl}" alt="QR Code Bàn ${table.table_number}" class="qr-image" />
-        <div class="qr-info">Quét mã QR để xem menu</div>
-      </div>
-    `;
+  // ================= Order Item Actions =================
+  const handleIncreaseQuantity = (itemId) => {
+    setCurrentOrderItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId ? { ...item, quantity: item.quantity + 1 } : item
+      )
+    )
+  }
 
-    // Thử phương án window mới trước
-    try {
-      const printWindow = window.open('', '_blank', 'width=800,height=600');
-      if (printWindow) {
-        const htmlContent = `
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <title>In QR Code - Bàn ${table.table_number}</title>
-              ${printStyles}
-            </head>
-            <body>
-              ${printBody}
-              <script>
-                setTimeout(() => {
-                  window.print();
-                  window.close();
-                }, 500);
-              </script>
-            </body>
-          </html>
-        `;
+  const handleDecreaseQuantity = (itemId) => {
+    setCurrentOrderItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId && item.quantity > 1
+          ? { ...item, quantity: item.quantity - 1 }
+          : item
+      )
+    )
+  }
 
-        printWindow.document.write(htmlContent);
-        printWindow.document.close();
-
-        // Backup timer
-        setTimeout(() => {
-          if (printWindow && !printWindow.closed) {
-            printWindow.print();
-            printWindow.close();
-          }
-        }, 1000);
-      } else {
-        throw new Error('Popup blocked');
+  const handleRemoveItem = (itemId) => {
+    Modal.confirm({
+      title: 'Xác nhận xóa món',
+      content: 'Bạn có chắc chắn muốn xóa món này khỏi đơn hàng?',
+      okText: 'Xóa',
+      okType: 'danger',
+      cancelText: 'Hủy',
+      onOk: () => {
+        setCurrentOrderItems((prev) => prev.filter((item) => item.id !== itemId))
+        message.success('Đã xóa món khỏi đơn hàng')
       }
-    } catch (error) {
-      // Fallback: In trực tiếp từ trang hiện tại
-      console.log('Using fallback print method');
-      const fallbackContent = printStyles + printBody;
-      handleSimplePrint(fallbackContent, `In QR Code - Bàn ${table.table_number}`);
+    })
+  }
+
+  const handleNotifyKitchen = () => {
+    message.success('Đã gửi thông báo xuống bếp!')
+    // TODO: Implement API call to notify kitchen
+  }
+
+  const handlePayment = () => {
+    message.info('Chức năng thanh toán đang được phát triển...')
+    // TODO: Implement payment logic
+  }
+
+  const calculateTotal = () => {
+    return currentOrderItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  }
+
+  // ================= Table Status Logic =================
+  const getTableStatus = (table) => {
+    // Kiểm tra có order không (mock data)
+    const hasOrder = MOCK_ORDERS[table.id]
+
+    if (!table.is_active) {
+      return 'inactive' // Badge đỏ
     }
-  };
-
-  // In tất cả QR
-  const handlePrintAllQR = () => {
-    const tablesWithQR = filteredTables.filter(table => table.qr_code_url);
-
-    if (tablesWithQR.length === 0) {
-      message.error("Không có bàn nào có mã QR để in!");
-      return;
+    if (hasOrder) {
+      return 'occupied' // Viền xanh
     }
+    return 'available' // Xám
+  }
 
-    let qrItems = '';
-    tablesWithQR.forEach((table) => {
-      const qrUrl = `${replaceUrlServer(REACT_APP_API_URL)}${table.qr_code_url}`;
-      qrItems += `
-        <div class="qr-container">
-          <div class="qr-title">Bàn ${table.table_number}</div>
-          <img src="${qrUrl}" alt="QR Code Bàn ${table.table_number}" class="qr-image" />
-          <div class="qr-info">Quét mã QR để xem menu</div>
-        </div>
-      `;
-    });
-
-    const printStyles = `
-      <style>
-        body {
-          margin: 0;
-          padding: 20px;
-          font-family: Arial, sans-serif;
-        }
-        .print-header {
-          text-align: center;
-          margin-bottom: 30px;
-          font-size: 28px;
-          font-weight: bold;
-          color: #333;
-        }
-        .qr-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-          gap: 30px;
-          justify-items: center;
-        }
-        .qr-container {
-          text-align: center;
-          page-break-inside: avoid;
-          border: 1px solid #eee;
-          padding: 20px;
-          border-radius: 8px;
-        }
-        .qr-title {
-          font-size: 20px;
-          font-weight: bold;
-          margin-bottom: 15px;
-          color: #333;
-        }
-        .qr-image {
-          width: 180px;
-          height: 180px;
-          border: 2px solid #ddd;
-          border-radius: 8px;
-        }
-        .qr-info {
-          margin-top: 15px;
-          font-size: 14px;
-          color: #666;
-        }
-        @media print {
-          body { margin: 0; }
-          .qr-container { page-break-inside: avoid; }
-        }
-      </style>
-    `;
-
-    const printBody = `
-      <div class="print-header">Danh sách QR Code các bàn</div>
-      <div class="qr-grid">
-        ${qrItems}
-      </div>
-    `;
-
-    // Thử phương án window mới trước
-    try {
-      const printWindow = window.open('', '_blank', 'width=1000,height=800');
-      if (printWindow) {
-        const htmlContent = `
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <title>In tất cả QR Code</title>
-              ${printStyles}
-            </head>
-            <body>
-              ${printBody}
-              <script>
-                setTimeout(() => {
-                  window.print();
-                  window.close();
-                }, 1000);
-              </script>
-            </body>
-          </html>
-        `;
-
-        printWindow.document.write(htmlContent);
-        printWindow.document.close();
-
-        // Backup timer
-        setTimeout(() => {
-          if (printWindow && !printWindow.closed) {
-            printWindow.print();
-            printWindow.close();
-          }
-        }, 2000);
-      } else {
-        throw new Error('Popup blocked');
-      }
-    } catch (error) {
-      // Fallback: In trực tiếp từ trang hiện tại
-      console.log('Using fallback print method for all QR');
-      const fallbackContent = printStyles + printBody;
-      handleSimplePrint(fallbackContent, 'In tất cả QR Code');
-    }
-
-    message.success(`Đang chuẩn bị in ${tablesWithQR.length} mã QR...`);
-  };
+  const getTableOrder = (table) => {
+    return MOCK_ORDERS[table.id] || null
+  }
 
   // ================= Effect =================
   useEffect(() => {
@@ -375,121 +318,367 @@ const TablesPage = () => {
 
   // ================= Filter logic =================
   const filteredTables = tables.filter((t) => {
-    // Lọc theo tên bàn
-    const search = searchText.trim().toLowerCase();
+    const search = searchText.trim().toLowerCase()
     const searchMatch =
-      !search || (t.table_number || "").toLowerCase().includes(search);
+      !search || (t.table_number || '').toLowerCase().includes(search)
 
-    // Lọc theo trạng thái
-    let statusMatch = true;
-    if (statusFilter !== "all") {
-      statusMatch =
-        (statusFilter === "active" && t.is_active === 1) ||
-        (statusFilter === "inactive" && t.is_active === 0);
+    let statusMatch = true
+    if (statusFilter !== 'all') {
+      const tableStatus = getTableStatus(t)
+      statusMatch = statusFilter === tableStatus
     }
-    return searchMatch && statusMatch;
-  });
+    return searchMatch && statusMatch
+  })
 
   const replaceUrlServer = (url) => {
-    return url.replace("/api", "");
+    return url.replace('/api', '')
   }
 
-  // ================= Columns Table =================
-  const columns = [
-    {
-      title: "ID",
-      dataIndex: "id",
-      key: "id",
-      width: 80,
-      align: "center",
-      sorter: (a, b) => a.id - b.id,
-    },
-    {
-      title: "Số bàn",
-      dataIndex: "table_number",
-      key: "table_number",
-      align: "center",
-      sorter: (a, b) => (a.table_number || "").localeCompare(b.table_number || "", "vi"),
-    },
-    {
-      title: "Trạng thái",
-      dataIndex: "is_active",
-      key: "is_active",
-      align: "center",
-      sorter: (a, b) => a.is_active - b.is_active,
-      render: (val) =>
-        val === 1 ? (
-          <Tag color="green">Hoạt động</Tag>
-        ) : (
-          <Tag color="red">Tạm ngừng</Tag>
-        ),
-    },
-    {
-      title: "QR Code",
-      dataIndex: "qr_code_url",
-      key: "qr_code_url",
-      align: "center",
-      render: (qrUrl, record) => {
-        if (qrUrl) {
-          // Backend QR URL: /qr/table-1.png (served statically)
+  // ================= Order Status Tag =================
+  const getOrderStatusTag = (status) => {
+    const statusMap = {
+      NEW: { text: 'Chờ xác nhận', color: 'orange' },
+      IN_PROGRESS: { text: 'Đang chế biến', color: 'blue' },
+      DONE: { text: 'Hoàn thành', color: 'green' },
+      PAID: { text: 'Đã thanh toán', color: 'success' }
+    }
+    const config = statusMap[status] || { text: status, color: 'default' }
+    return <Tag color={config.color}>{config.text}</Tag>
+  }
 
-          const fullQrUrl = `${replaceUrlServer(REACT_APP_API_URL)}${qrUrl}`;
-          return (
-            <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
-              <img
-                src={fullQrUrl}
-                alt={`QR code for ${record.table_number}`}
-                style={{ width: 60, height: 60 }}
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                }}
-              />
-              <span style={{ color: "#aaa", display: "none" }}>QR lỗi</span>
-            </div>
-          );
-        } else {
-          return <span style={{ color: "#aaa" }}>Chưa có QR</span>;
-        }
+  // ================= Table Card Component =================
+  const TableCard = ({ table }) => {
+    const status = getTableStatus(table)
+    const order = getTableOrder(table)
+
+    // Styling based on status
+    const cardStyles = {
+      available: {
+        borderColor: '#d9d9d9',
+        backgroundColor: '#fafafa',
+        cursor: 'pointer'
       },
-    },
-    {
-      title: "Hành động",
-      key: "action",
-      align: "center",
-      render: (_, record) => (
-        <Space>
-          <Button
-            size="small"
-            type="default"
-            disabled={!record.qr_code_url}
-            onClick={() => handlePrintSingleQR(record)}
-            style={{ color: "#1890ff" }}
-          >
-            In QR
-          </Button>
-          <Button size="small" onClick={() => openEditDrawer(record)}>
-            Chỉnh sửa
-          </Button>
+      occupied: {
+        borderColor: '#52c41a',
+        borderWidth: '3px',
+        backgroundColor: '#ffffff',
+        cursor: 'pointer',
+        boxShadow: '0 2px 8px rgba(82, 196, 26, 0.2)'
+      },
+      inactive: {
+        borderColor: '#ff4d4f',
+        backgroundColor: '#fff2f0',
+        cursor: 'not-allowed',
+        opacity: 0.7
+      }
+    }
 
-          <Popconfirm
-            title="Bạn có chắc chắn muốn xóa bàn này?"
-            description="Không thể xóa nếu bàn đang có khách hoặc đơn hàng pending."
-            onConfirm={() => handleDeleteTable(record.id)}
-            okText="Xóa"
-            cancelText="Hủy"
+    const currentStyle = cardStyles[status] || cardStyles.available
+
+    // Menu items for Dropdown
+    const menuItems = [
+      {
+        key: 'print',
+        icon: <PrinterOutlined />,
+        label: 'In QR',
+        disabled: !table.qr_code_url,
+        onClick: () => handlePrintQR(table, null)
+      },
+      {
+        key: 'edit',
+        icon: <EditOutlined />,
+        label: 'Chỉnh sửa',
+        onClick: () => openEditDrawer(table, null)
+      },
+      {
+        type: 'divider'
+      },
+      {
+        key: 'delete',
+        icon: <DeleteOutlined />,
+        label: 'Xóa',
+        danger: true,
+        onClick: () => handleDeleteClick(table, null)
+      }
+    ]
+
+    return (
+      <Badge.Ribbon
+        text={status === 'inactive' ? 'Tạm ngừng' : null}
+        color="red"
+        style={{ display: status === 'inactive' ? 'block' : 'none' }}
+      >
+        <Card
+          hoverable={status !== 'inactive'}
+          onClick={() => status !== 'inactive' && handleTableClick(table)}
+          style={{
+            height: '180px',
+            ...currentStyle,
+            transition: 'all 0.3s',
+            position: 'relative'
+          }}
+          bodyStyle={{
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            padding: '16px'
+          }}
+        >
+          {/* Action Menu - Top Right */}
+          <Dropdown
+            menu={{ items: menuItems }}
+            trigger={['click']}
+            placement="bottomRight"
           >
-            <Button size="small" danger>
-              Xóa
-            </Button>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
+            <Button
+              type="text"
+              icon={<MoreOutlined style={{ fontSize: '18px' }} />}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: 'absolute',
+                top: 8,
+                right: 8,
+                zIndex: 10,
+                color: '#666'
+              }}
+            />
+          </Dropdown>
+
+          {/* Header: Table Number */}
+          <div style={{ textAlign: 'center', marginTop: 8 }}>
+            <Title level={2} style={{ margin: 0, fontSize: '36px', fontWeight: 'bold' }}>
+              {table.table_number}
+            </Title>
+          </div>
+
+          {/* Body: Order Info */}
+          {order && (
+            <div
+              style={{
+                fontSize: '12px',
+                color: '#666',
+                textAlign: 'center',
+                marginTop: 8
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                <ShoppingCartOutlined />
+                <Text style={{ fontSize: '12px' }}>{order.items.length} món</Text>
+              </div>
+              <Text strong style={{ fontSize: '14px', color: '#1890ff' }}>
+                {order.total.toLocaleString('vi-VN')}đ
+              </Text>
+            </div>
+          )}
+        </Card>
+      </Badge.Ribbon>
+    )
+  }
+
+  // ================= Order Panel Component =================
+  const OrderPanel = () => {
+    if (!selectedTable) return null
+
+    const order = getTableOrder(selectedTable)
+    const total = calculateTotal()
+
+    return (
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column'
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            padding: '16px',
+            borderBottom: '1px solid #f0f0f0',
+            backgroundColor: '#fafafa'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                <Title level={4} style={{ margin: 0, fontSize: '18px' }}>
+                  Bàn {selectedTable.table_number}
+                </Title>
+                {order && getOrderStatusTag(order.status)}
+              </div>
+              {order && (
+                <Text type="secondary" style={{ fontSize: '12px' }}>
+                  Đơn hàng #{order.order_id} • {order.created_at}
+                </Text>
+              )}
+            </div>
+            <Button
+              type="text"
+              icon={<CloseOutlined />}
+              onClick={() => setOrderPanelOpen(false)}
+            />
+          </div>
+        </div>
+
+        {/* Order Content */}
+        <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
+          {currentOrderItems.length > 0 ? (
+            <>
+              {/* Order Items */}
+              <div>
+                <Text strong style={{ fontSize: '14px' }}>
+                  Danh sách món ({currentOrderItems.length})
+                </Text>
+                <div style={{ marginTop: 12 }}>
+                  {currentOrderItems.map((item) => (
+                    <Card
+                      key={item.id}
+                      size="small"
+                      style={{
+                        marginBottom: '10px',
+                        borderRadius: '8px',
+                        overflow: 'hidden'
+                      }}
+                      bodyStyle={{ padding: '10px' }}
+                    >
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        {/* Item Image */}
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          style={{
+                            width: '70px',
+                            height: '70px',
+                            objectFit: 'cover',
+                            borderRadius: '6px',
+                            flexShrink: 0
+                          }}
+                          onError={(e) => {
+                            e.target.src = 'https://via.placeholder.com/70x70.png?text=No+Image'
+                          }}
+                        />
+
+                        {/* Item Info */}
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                          <div>
+                            <Text strong style={{ fontSize: '14px', display: 'block' }}>
+                              {item.name}
+                            </Text>
+                            <Text type="secondary" style={{ fontSize: '12px' }}>
+                              {item.price.toLocaleString('vi-VN')}đ
+                            </Text>
+                          </div>
+
+                          {/* Quantity Controls */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Space size="small">
+                              <Button
+                                size="small"
+                                icon={<MinusOutlined />}
+                                onClick={() => handleDecreaseQuantity(item.id)}
+                                disabled={item.quantity <= 1}
+                              />
+                              <Text strong style={{ fontSize: '13px', minWidth: '25px', textAlign: 'center' }}>
+                                {item.quantity}
+                              </Text>
+                              <Button
+                                size="small"
+                                icon={<PlusOutlined />}
+                                onClick={() => handleIncreaseQuantity(item.id)}
+                              />
+                            </Space>
+
+                            <Space>
+                              <Text strong style={{ color: '#1890ff', fontSize: '14px' }}>
+                                {(item.price * item.quantity).toLocaleString('vi-VN')}đ
+                              </Text>
+                              <Button
+                                size="small"
+                                danger
+                                icon={<DeleteOutlined />}
+                                onClick={() => handleRemoveItem(item.id)}
+                              />
+                            </Space>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              <Divider />
+            </>
+          ) : (
+            <Empty
+              description="Bàn này chưa có đơn hàng"
+              style={{ marginTop: '60px' }}
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+            />
+          )}
+        </div>
+
+        {/* Footer Actions */}
+        {currentOrderItems.length > 0 && (
+          <div
+            style={{
+              padding: '20px',
+              borderTop: '1px solid #f0f0f0',
+              backgroundColor: '#ffffff',
+              boxShadow: '0 -2px 8px rgba(0,0,0,0.06)'
+            }}
+          >
+            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+              <Button
+                type="primary"
+                size="large"
+                block
+                icon={<DollarOutlined />}
+                onClick={handlePayment}
+                style={{
+                  height: '48px',
+                  fontSize: '15px',
+                  fontWeight: 'bold'
+                }}
+              >
+                Thanh toán • {total.toLocaleString('vi-VN')}đ
+              </Button>
+              <Space style={{ width: '100%' }} size="middle">
+                <Button
+                  size="medium"
+                  icon={<BellOutlined />}
+                  onClick={handleNotifyKitchen}
+                  style={{ flex: 1 }}
+                >
+                  Báo bếp
+                </Button>
+                <Button
+                  size="medium"
+                  icon={<PlusOutlined />}
+                  style={{ flex: 1 }}
+                >
+                  Thêm món
+                </Button>
+                <Button
+                  size="medium"
+                  danger
+                  style={{ flex: 1 }}
+                >
+                  Hủy đơn
+                </Button>
+              </Space>
+            </Space>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   // ================= Render =================
   return (
-    <Layout style={{ minHeight: "100vh" }}>
+    <Layout style={{ minHeight: '100vh' }}>
       {/* Sidebar */}
       <AppSidebar collapsed={collapsed} currentPageKey="tables" />
 
@@ -505,84 +694,123 @@ const TablesPage = () => {
           style={{
             marginTop: 64,
             padding: 20,
-            background: "#f9f9f9",
-            minHeight: "calc(100vh - 64px)",
-            overflow: "auto",
+            background: '#f0f2f5',
+            minHeight: 'calc(100vh - 64px)',
+            overflow: 'auto'
           }}
         >
-          {/* Bộ lọc */}
+          {/* Filters */}
           <div style={{ marginBottom: 20 }}>
-            {/* Dòng 1: Tìm kiếm và lọc */}
             <div
               style={{
-                display: "flex",
+                display: 'flex',
                 gap: 12,
-                flexWrap: "wrap",
-                alignItems: "center",
-                justifyContent: "flex-start",
-                marginBottom: 12,
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                justifyContent: 'space-between'
               }}
             >
-              <Input.Search
-                placeholder="Tìm tên bàn..."
-                style={{ width: 300 }}
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                allowClear
-              />
+              {/* Search & Filter */}
+              <Space>
+                <Input.Search
+                  placeholder="Tìm số bàn..."
+                  style={{ width: 250 }}
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  allowClear
+                />
 
-              <Select
-                value={statusFilter}
-                style={{ width: 200 }}
-                onChange={(val) => setStatusFilter(val)}
-              >
-                <Option value="all">Tất cả trạng thái</Option>
-                <Option value="active">Đang hoạt động</Option>
-                <Option value="inactive">Đã đóng</Option>
-              </Select>
+                <Select
+                  value={statusFilter}
+                  style={{ width: 180 }}
+                  onChange={(val) => setStatusFilter(val)}
+                >
+                  <Option value="all">Tất cả</Option>
+                  <Option value="available">
+                    <Tag color="default">Trống</Tag>
+                  </Option>
+                  <Option value="occupied">
+                    <Tag color="green">Đang sử dụng</Tag>
+                  </Option>
+                  <Option value="inactive">
+                    <Tag color="red">Tạm ngừng</Tag>
+                  </Option>
+                </Select>
+              </Space>
+
+              {/* Actions */}
+              <Space>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  style={{ background: '#226533' }}
+                  onClick={() => setDrawerOpen(true)}
+                >
+                  Thêm bàn mới
+                </Button>
+              </Space>
             </div>
 
-            {/* Dòng 2: Button, căn phải */}
+            {/* Stats */}
             <div
               style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 8,
-                flexWrap: "wrap",
+                marginTop: 16,
+                padding: '12px 16px',
+                background: '#fff',
+                borderRadius: '8px',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
               }}
             >
-              <Button
-                type="default"
-                onClick={handlePrintAllQR}
-                disabled={filteredTables.filter(t => t.qr_code_url).length === 0}
-              >
-                🖨️ In tất cả QR
-              </Button>
-              <Button
-                type="primary"
-                style={{ background: "#226533" }}
-                onClick={() => setDrawerOpen(true)}
-              >
-                + Thêm bàn mới
-              </Button>
+              <Space size="large">
+                <Text>
+                  <span style={{ fontWeight: 'bold', color: '#1890ff' }}>
+                    {filteredTables.length}
+                  </span>{' '}
+                  bàn
+                </Text>
+                <Text>
+                  <span style={{ fontWeight: 'bold', color: '#52c41a' }}>
+                    {filteredTables.filter((t) => getTableStatus(t) === 'occupied').length}
+                  </span>{' '}
+                  đang sử dụng
+                </Text>
+                <Text>
+                  <span style={{ fontWeight: 'bold', color: '#999' }}>
+                    {filteredTables.filter((t) => getTableStatus(t) === 'available').length}
+                  </span>{' '}
+                  trống
+                </Text>
+                <Text>
+                  <span style={{ fontWeight: 'bold', color: '#ff4d4f' }}>
+                    {filteredTables.filter((t) => getTableStatus(t) === 'inactive').length}
+                  </span>{' '}
+                  tạm ngừng
+                </Text>
+              </Space>
             </div>
           </div>
 
-          {/* Bảng */}
-          <Table
-            rowKey="id"
-            loading={loading}
-            columns={columns}
-            dataSource={filteredTables}
-            pagination={{
-              pageSizeOptions: ["5", "8", "10", "20", "50"],
-              showSizeChanger: true,
-              showQuickJumper: true,
-              defaultPageSize: 8,
-              showTotal: (total, range) =>
-                `${range[0]}-${range[1]} trên tổng ${total} bàn`,
+          {/* Grid Layout */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+              gap: '20px',
+              marginBottom: '20px'
             }}
-          />
+          >
+            {loading ? (
+              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px' }}>
+                <Text>Đang tải...</Text>
+              </div>
+            ) : filteredTables.length === 0 ? (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Empty description="Không tìm thấy bàn nào" />
+              </div>
+            ) : (
+              filteredTables.map((table) => <TableCard key={table.id} table={table} />)
+            )}
+          </div>
 
           {/* Drawer thêm bàn mới */}
           <Drawer
@@ -709,10 +937,30 @@ const TablesPage = () => {
               )}
             </Form>
           </Drawer>
+
+          {/* Drawer: Order Panel */}
+          <Drawer
+            title={null}
+            placement="right"
+            width={480}
+            open={orderPanelOpen}
+            onClose={() => setOrderPanelOpen(false)}
+            closable={false}
+            bodyStyle={{ padding: 0, height: '100%' }}
+            styles={{
+              body: {
+                display: 'flex',
+                flexDirection: 'column',
+                height: '100%'
+              }
+            }}
+          >
+            <OrderPanel />
+          </Drawer>
         </Content>
       </Layout>
     </Layout>
-  );
-};
+  )
+}
 
-export default TablesPage;
+export default TablesPage
