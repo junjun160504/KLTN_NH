@@ -10,9 +10,21 @@ import {
   removeItemFromOrder,
   updateItemQuantity,
   cancelOrder,
+  createOrderByAdmin, // NEW: Admin create order
 } from "../controllers/order.controller.js";
 
 const router = express.Router();
+
+// ========== ADMIN ROUTES ==========
+
+/**
+ * POST /api/orders/admin/create
+ * Admin tạo order cho khách hàng tại quầy (không cần QR session)
+ * Body: { table_id, items: [{menu_item_id, quantity, note}], customer_phone? }
+ */
+router.post("/admin/create", createOrderByAdmin);
+
+// ========== CUSTOMER ROUTES ==========
 
 // Lấy danh sách đơn (có thể filter theo status, qr_session_id, table_id)
 router.get("/", getAllOrders);

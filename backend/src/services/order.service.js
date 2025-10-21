@@ -1,6 +1,208 @@
 import { pool, query } from "../config/db.js";
 import * as notificationService from "./notification.service.js";
 
+/**
+ * Admin tạo order cho khách hàng (order tại quầy)
+ * Không cần qr_session_id, admin chỉ cần table_id
+ */
+export async function createOrderByAdmin({ table_id, items, admin_id, customer_phone }) {
+  // Validate items
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    throw new Error("Order must have at least 1 item");
+  }
+
+  if (!table_id) {
+    throw new Error("table_id is required");
+  }
+
+  const connection = await pool.getConnection();
+  await connection.beginTransaction();
+
+  try {
+    // 1. Validate table exists
+    const [[table]] = await connection.query(
+      "SELECT * FROM tables WHERE id = ? AND is_active = true",
+      [table_id]
+    );
+
+    if (!table) {
+      throw new Error("Table not found or inactive");
+    }
+
+    // 2. Tìm hoặc tạo customer nếu có phone
+    let customerId = null;
+    if (customer_phone) {
+      const [[customer]] = await connection.query(
+        "SELECT id FROM customers WHERE phone = ?",
+        [customer_phone]
+      );
+
+      if (customer) {
+        customerId = customer.id;
+      }
+    }
+
+    // 3. Tìm hoặc tạo qr_session ACTIVE cho bàn này
+    let qrSessionId;
+    const [[existingSession]] = await connection.query(
+      `SELECT id FROM qr_sessions 
+       WHERE table_id = ? AND status = 'ACTIVE' 
+       ORDER BY created_at DESC 
+       LIMIT 1`,
+      [table_id]
+    );
+
+    if (existingSession) {
+      qrSessionId = existingSession.id;
+
+      // Update customer_id nếu có
+      if (customerId) {
+        await connection.query(
+          "UPDATE qr_sessions SET customer_id = ? WHERE id = ?",
+          [customerId, qrSessionId]
+        );
+      }
+    } else {
+      // Tạo qr_session mới
+      const [sessionResult] = await connection.query(
+        "INSERT INTO qr_sessions (table_id, customer_id, status) VALUES (?, ?, 'ACTIVE')",
+        [table_id, customerId]
+      );
+      qrSessionId = sessionResult.insertId;
+    }
+
+    // 4. Check if there's already an active order for this session
+    const [[existingOrder]] = await connection.query(
+      `SELECT * FROM orders 
+       WHERE qr_session_id = ? 
+       AND status IN ('NEW', 'IN_PROGRESS')
+       ORDER BY created_at DESC 
+       LIMIT 1`,
+      [qrSessionId]
+    );
+
+    let orderId;
+    let isNewOrder = false;
+
+    if (existingOrder) {
+      // Reuse existing active order
+      orderId = existingOrder.id;
+      isNewOrder = false;
+
+      // Update admin_id
+      if (admin_id) {
+        await connection.query(
+          "UPDATE orders SET admin_id = ? WHERE id = ?",
+          [admin_id, orderId]
+        );
+      }
+
+      console.log(`✅ [ADMIN] Adding items to existing order #${orderId}`);
+    } else {
+      // Create new order
+      const [orderResult] = await connection.query(
+        "INSERT INTO orders (qr_session_id, admin_id, status) VALUES (?, ?, 'NEW')",
+        [qrSessionId, admin_id || null]
+      );
+      orderId = orderResult.insertId;
+      isNewOrder = true;
+      console.log(`✅ [ADMIN] Created new order #${orderId} for table #${table_id}`);
+    }
+
+    // 5. Validate menu items and prepare batch insert data
+    const orderItems = [];
+    for (const item of items) {
+      if (!item.menu_item_id || !item.quantity || item.quantity < 1) {
+        throw new Error("Invalid item data: menu_item_id and quantity (>0) are required");
+      }
+
+      const [[menuItem]] = await connection.query(
+        "SELECT * FROM menu_items WHERE id = ? AND is_available = true",
+        [item.menu_item_id]
+      );
+
+      if (!menuItem) {
+        throw new Error(`Menu item ${item.menu_item_id} not found or unavailable`);
+      }
+
+      orderItems.push([
+        orderId,
+        item.menu_item_id,
+        item.quantity,
+        item.note || null,
+        menuItem.price
+      ]);
+    }
+
+    // 6. Batch insert all order items
+    await connection.query(
+      `INSERT INTO order_items 
+       (order_id, menu_item_id, quantity, note, unit_price)
+       VALUES ?`,
+      [orderItems]
+    );
+
+    // 7. Manual calculate total_price
+    const totalPrice = orderItems.reduce((sum, item) => {
+      return sum + (item[2] * item[4]); // quantity * unit_price
+    }, 0);
+
+    // 8. Update total_price vào orders table
+    await connection.query(
+      `UPDATE orders 
+       SET total_price = total_price + ? 
+       WHERE id = ?`,
+      [totalPrice, orderId]
+    );
+
+    await connection.commit();
+
+    // 9. Get complete order data
+    const orderData = await getOrderById(orderId);
+
+    // 10. Send notification to STAFF
+    try {
+      const itemNames = items.map((item, index) => {
+        const orderItem = orderItems[index];
+        return `${item.quantity}x món (giá: ${orderItem[4].toLocaleString()}đ)`;
+      }).join(', ');
+
+      const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+      const tableName = `Bàn ${table.table_number}`;
+
+      await notificationService.createNotification({
+        target_type: "STAFF",
+        target_id: null,
+        type: isNewOrder ? "ORDER_NEW" : "ORDER_UPDATE",
+        title: `🔧 [ADMIN] ${tableName} - ${isNewOrder ? 'Đơn mới' : 'Thêm món'} #${orderId}`,
+        message: `Admin đã tạo đơn với ${totalItems} món: ${itemNames}`,
+        priority: "high",
+        action_url: `/management/orders/${orderId}`,
+        metadata: {
+          orderId,
+          qrSessionId,
+          tableId: table_id,
+          tableName: table.table_number,
+          totalItems,
+          createdByAdmin: true,
+          adminId: admin_id
+        },
+      });
+      console.log(`📤 [ADMIN] Notification sent: Order #${orderId} - ${tableName}`);
+    } catch (notifError) {
+      console.error('⚠️ Failed to send notification:', notifError);
+    }
+
+    return orderData;
+
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
+}
+
 // Tạo hoặc thêm items vào đơn hiện tại (Smart logic)
 export async function createOrder({ qr_session_id, items }) {
   // Validate items
@@ -85,7 +287,18 @@ export async function createOrder({ qr_session_id, items }) {
       [orderItems]
     );
 
-    // 5. Database trigger will auto-calculate total_price
+    // 5. Manual calculate total_price (không rely vào trigger)
+    const totalPrice = orderItems.reduce((sum, item) => {
+      return sum + (item[2] * item[4]); // quantity * unit_price
+    }, 0);
+
+    // 6. Update total_price vào orders table
+    await connection.query(
+      `UPDATE orders 
+       SET total_price = total_price + ? 
+       WHERE id = ?`,
+      [totalPrice, orderId]
+    );
 
     await connection.commit();
 
@@ -224,7 +437,18 @@ export async function addItem(orderId, itemsData) {
       [orderItems]
     );
 
-    // 5. Database trigger will auto-update total_price
+    // 5. Manual calculate total_price (không rely vào trigger)
+    const totalPrice = orderItems.reduce((sum, item) => {
+      return sum + (item[2] * item[4]); // quantity * unit_price
+    }, 0);
+
+    // 6. Update total_price vào orders table
+    await connection.query(
+      `UPDATE orders 
+       SET total_price = total_price + ? 
+       WHERE id = ?`,
+      [totalPrice, orderId]
+    );
 
     await connection.commit();
 
@@ -503,13 +727,24 @@ export async function removeItemFromOrder(orderId, itemId) {
       throw new Error("Order item not found");
     }
 
-    // 3. Delete order_item (trigger will auto-update total_price)
+    // 3. Calculate price to subtract
+    const priceToSubtract = orderItem.quantity * orderItem.unit_price;
+
+    // 4. Delete order_item
     await connection.query(
       `DELETE FROM order_items WHERE id = ?`,
       [itemId]
     );
 
-    // 4. Check if order has no items left
+    // 5. Update total_price manually
+    await connection.query(
+      `UPDATE orders 
+       SET total_price = total_price - ? 
+       WHERE id = ?`,
+      [priceToSubtract, orderId]
+    );
+
+    // 6. Check if order has no items left
     const [[{ itemCount }]] = await connection.query(
       `SELECT COUNT(*) as itemCount FROM order_items WHERE order_id = ?`,
       [orderId]
@@ -609,9 +844,20 @@ export async function updateOrderItemQuantity(orderId, itemId, quantity) {
 
     // 4. If quantity = 0, delete the item
     if (quantity === 0) {
+      // Calculate price to subtract
+      const priceToSubtract = orderItem.quantity * orderItem.unit_price;
+
       await connection.query(
         `DELETE FROM order_items WHERE id = ?`,
         [itemId]
+      );
+
+      // Update total_price
+      await connection.query(
+        `UPDATE orders 
+         SET total_price = total_price - ? 
+         WHERE id = ?`,
+        [priceToSubtract, orderId]
       );
 
       // Check if order has no items left
@@ -628,10 +874,23 @@ export async function updateOrderItemQuantity(orderId, itemId, quantity) {
         return { orderId, deleted: true, message: "Order deleted (no items left)" };
       }
     } else {
-      // 5. Update quantity (trigger will auto-update total_price)
+      // 5. Calculate price difference
+      const oldPrice = orderItem.quantity * orderItem.unit_price;
+      const newPrice = quantity * orderItem.unit_price;
+      const priceDifference = newPrice - oldPrice;
+
+      // 6. Update quantity
       await connection.query(
         `UPDATE order_items SET quantity = ? WHERE id = ?`,
         [quantity, itemId]
+      );
+
+      // 7. Update total_price manually
+      await connection.query(
+        `UPDATE orders 
+         SET total_price = total_price + ? 
+         WHERE id = ?`,
+        [priceDifference, orderId]
       );
     }
 

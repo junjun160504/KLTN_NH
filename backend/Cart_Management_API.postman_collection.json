@@ -1,0 +1,1192 @@
+{
+    "info": {
+        "_postman_id": "cart-api-2024",
+        "name": "Cart Management API",
+        "description": "Complete Cart Management API với CRUD đầy đủ:\n- Xem giỏ hàng (GET)\n- Thêm món vào giỏ (POST)\n- Cập nhật số lượng/note (PUT)\n- Xóa món khỏi giỏ (DELETE)\n- Xóa toàn bộ giỏ hàng (DELETE)\n- Cập nhật status (PUT)\n\nCreated: October 21, 2025",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "🔧 Setup & Prerequisites",
+            "item": [
+                {
+                    "name": "1. Get Active QR Session",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Response has qr_session\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data).to.be.an('array');",
+                                    "    if (jsonData.data.length > 0) {",
+                                    "        pm.environment.set(\"test_qr_session_id\", jsonData.data[0].id);",
+                                    "        console.log(\"✅ Saved qr_session_id:\", jsonData.data[0].id);",
+                                    "    }",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/qr-sessions?status=ACTIVE",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "qr-sessions"
+                            ],
+                            "query": [
+                                {
+                                    "key": "status",
+                                    "value": "ACTIVE"
+                                }
+                            ]
+                        },
+                        "description": "Lấy active QR session để test"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "2. Get Available Menu Items",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Response has menu items\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data).to.be.an('array');",
+                                    "    if (jsonData.data.length >= 3) {",
+                                    "        pm.environment.set(\"menu_item_1\", jsonData.data[0].id);",
+                                    "        pm.environment.set(\"menu_item_2\", jsonData.data[1].id);",
+                                    "        pm.environment.set(\"menu_item_3\", jsonData.data[2].id);",
+                                    "        console.log(\"✅ Saved 3 menu items:\", jsonData.data[0].id, jsonData.data[1].id, jsonData.data[2].id);",
+                                    "    }",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/menu?is_available=true&limit=10",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "menu"
+                            ],
+                            "query": [
+                                {
+                                    "key": "is_available",
+                                    "value": "true"
+                                },
+                                {
+                                    "key": "limit",
+                                    "value": "10"
+                                }
+                            ]
+                        },
+                        "description": "Lấy menu items để test"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Setup và lấy dữ liệu cần thiết"
+        },
+        {
+            "name": "📦 Get Cart",
+            "item": [
+                {
+                    "name": "Get Cart - Success",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Response has cart data\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.status).to.eql(200);",
+                                    "    pm.expect(jsonData.data).to.be.an('array');",
+                                    "    console.log(\"📊 Cart Items:\", jsonData.total_items);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart/cus/cart?qr_session_id={{test_qr_session_id}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "cus",
+                                "cart"
+                            ],
+                            "query": [
+                                {
+                                    "key": "qr_session_id",
+                                    "value": "{{test_qr_session_id}}"
+                                }
+                            ]
+                        },
+                        "description": "Lấy giỏ hàng theo qr_session_id"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Cart - Missing qr_session_id",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 400\", function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Error message for missing qr_session_id\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('required');",
+                                    "    console.log(\"✅ Validation working\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart/cus/cart",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "cus",
+                                "cart"
+                            ]
+                        },
+                        "description": "Test validation: qr_session_id bắt buộc"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Xem giỏ hàng"
+        },
+        {
+            "name": "➕ Add to Cart",
+            "item": [
+                {
+                    "name": "Add Item to Cart - Success",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 201\", function () {",
+                                    "    pm.response.to.have.status(201);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Item added successfully\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.status).to.eql(201);",
+                                    "    pm.expect(jsonData.data).to.have.property('cart_item_id');",
+                                    "    pm.expect(jsonData.data.quantity).to.eql(2);",
+                                    "    ",
+                                    "    // Save cart item ID",
+                                    "    pm.environment.set(\"test_cart_item_1\", jsonData.data.cart_item_id);",
+                                    "    console.log(\"✅ Added Cart Item ID:\", jsonData.data.cart_item_id);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"qr_session_id\": {{test_qr_session_id}},\n  \"menu_item_id\": {{menu_item_1}},\n  \"quantity\": 2,\n  \"note\": \"Không hành\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart/cus/cart",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "cus",
+                                "cart"
+                            ]
+                        },
+                        "description": "Thêm món vào giỏ hàng"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Add Multiple Items",
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "exec": [
+                                    "// Add item 2",
+                                    "const addItem2 = {",
+                                    "    url: pm.environment.get('baseUrl') + '/api/cart/cus/cart',",
+                                    "    method: 'POST',",
+                                    "    header: {'Content-Type': 'application/json'},",
+                                    "    body: {",
+                                    "        mode: 'raw',",
+                                    "        raw: JSON.stringify({",
+                                    "            qr_session_id: pm.environment.get('test_qr_session_id'),",
+                                    "            menu_item_id: pm.environment.get('menu_item_2'),",
+                                    "            quantity: 3,",
+                                    "            note: 'Ít đá'",
+                                    "        })",
+                                    "    }",
+                                    "};",
+                                    "",
+                                    "pm.sendRequest(addItem2, (err, res) => {",
+                                    "    if (!err) {",
+                                    "        pm.environment.set('test_cart_item_2', res.json().data.cart_item_id);",
+                                    "        console.log('✅ Added item 2');",
+                                    "    }",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        },
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 201\", function () {",
+                                    "    pm.response.to.have.status(201);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Item 3 added\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.environment.set('test_cart_item_3', jsonData.data.cart_item_id);",
+                                    "    console.log('✅ Cart now has 3 items');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"qr_session_id\": {{test_qr_session_id}},\n  \"menu_item_id\": {{menu_item_3}},\n  \"quantity\": 1\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart/cus/cart",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "cus",
+                                "cart"
+                            ]
+                        },
+                        "description": "Thêm nhiều món vào giỏ"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Add Item - Missing menu_item_id",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 400\", function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Error message\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('required');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"qr_session_id\": {{test_qr_session_id}},\n  \"quantity\": 1\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart/cus/cart",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "cus",
+                                "cart"
+                            ]
+                        },
+                        "description": "Test validation: menu_item_id bắt buộc"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Thêm món vào giỏ hàng"
+        },
+        {
+            "name": "✏️ Update Cart Item",
+            "item": [
+                {
+                    "name": "Update Item Quantity - Success",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Item updated successfully\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.status).to.eql(200);",
+                                    "    pm.expect(jsonData.data.quantity).to.eql(5);",
+                                    "    console.log(\"✅ Quantity updated to:\", jsonData.data.quantity);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"quantity\": 5\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart/items/{{test_cart_item_1}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "items",
+                                "{{test_cart_item_1}}"
+                            ]
+                        },
+                        "description": "Cập nhật số lượng món (2 → 5)"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Item Note - Success",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Note updated\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data.note).to.eql('Không hành, ít cay');",
+                                    "    console.log(\"✅ Note updated\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"note\": \"Không hành, ít cay\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart/items/{{test_cart_item_2}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "items",
+                                "{{test_cart_item_2}}"
+                            ]
+                        },
+                        "description": "Cập nhật note của món"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Quantity to 0 (Delete Item)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Item deleted when quantity = 0\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.deleted).to.be.true;",
+                                    "    console.log(\"✅ Item deleted (quantity = 0)\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"quantity\": 0\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart/items/{{test_cart_item_3}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "items",
+                                "{{test_cart_item_3}}"
+                            ]
+                        },
+                        "description": "Set quantity = 0 để xóa món"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Item - Negative Quantity",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 400\", function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Error for negative quantity\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('non-negative');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"quantity\": -5\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart/items/{{test_cart_item_1}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "items",
+                                "{{test_cart_item_1}}"
+                            ]
+                        },
+                        "description": "Test validation: quantity không được âm"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Item - Not Found",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 404\", function () {",
+                                    "    pm.response.to.have.status(404);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Error for not found\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('not found');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"quantity\": 3\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart/items/99999",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "items",
+                                "99999"
+                            ]
+                        },
+                        "description": "Test error: Item không tồn tại"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Cập nhật cart item (quantity/note)"
+        },
+        {
+            "name": "🗑️ Remove Cart Item",
+            "item": [
+                {
+                    "name": "Remove Item - Success",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Item removed successfully\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.success).to.be.true;",
+                                    "    console.log(\"✅ Item removed from cart\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart/items/{{test_cart_item_2}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "items",
+                                "{{test_cart_item_2}}"
+                            ]
+                        },
+                        "description": "Xóa món khỏi giỏ hàng"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Remove Item - Not Found",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 404\", function () {",
+                                    "    pm.response.to.have.status(404);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Error for not found\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('not found');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart/items/99999",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "items",
+                                "99999"
+                            ]
+                        },
+                        "description": "Test error: Xóa item không tồn tại"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Xóa món khỏi giỏ hàng"
+        },
+        {
+            "name": "🧹 Clear Cart",
+            "item": [
+                {
+                    "name": "Clear Cart - Success",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Cart cleared successfully\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.success).to.be.true;",
+                                    "    pm.expect(jsonData.deleted_count).to.be.above(0);",
+                                    "    console.log(\"✅ Cleared\", jsonData.deleted_count, \"items\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart?qr_session_id={{test_qr_session_id}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart"
+                            ],
+                            "query": [
+                                {
+                                    "key": "qr_session_id",
+                                    "value": "{{test_qr_session_id}}"
+                                }
+                            ]
+                        },
+                        "description": "Xóa tất cả items trong giỏ hàng"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Clear Cart - Missing qr_session_id",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status code is 400\", function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Error for missing qr_session_id\", function () {",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('required');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart"
+                            ]
+                        },
+                        "description": "Test validation: qr_session_id bắt buộc"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Xóa toàn bộ giỏ hàng"
+        },
+        {
+            "name": "🧪 Complete Flow Test",
+            "item": [
+                {
+                    "name": "Step 1: Add 3 Items to Cart",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Item added\", function () {",
+                                    "    pm.response.to.have.status(201);",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.environment.set('flow_cart_item_1', jsonData.data.cart_item_id);",
+                                    "    console.log('✅ Step 1: Added item 1');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        },
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "exec": [
+                                    "// Add items 2 and 3",
+                                    "const baseUrl = pm.environment.get('baseUrl');",
+                                    "const sessionId = pm.environment.get('test_qr_session_id');",
+                                    "",
+                                    "// Add item 2",
+                                    "pm.sendRequest({",
+                                    "    url: baseUrl + '/api/cart/cus/cart',",
+                                    "    method: 'POST',",
+                                    "    header: {'Content-Type': 'application/json'},",
+                                    "    body: {",
+                                    "        mode: 'raw',",
+                                    "        raw: JSON.stringify({",
+                                    "            qr_session_id: sessionId,",
+                                    "            menu_item_id: pm.environment.get('menu_item_2'),",
+                                    "            quantity: 2",
+                                    "        })",
+                                    "    }",
+                                    "}, (err, res) => {",
+                                    "    if (!err) {",
+                                    "        pm.environment.set('flow_cart_item_2', res.json().data.cart_item_id);",
+                                    "    }",
+                                    "});",
+                                    "",
+                                    "// Add item 3",
+                                    "pm.sendRequest({",
+                                    "    url: baseUrl + '/api/cart/cus/cart',",
+                                    "    method: 'POST',",
+                                    "    header: {'Content-Type': 'application/json'},",
+                                    "    body: {",
+                                    "        mode: 'raw',",
+                                    "        raw: JSON.stringify({",
+                                    "            qr_session_id: sessionId,",
+                                    "            menu_item_id: pm.environment.get('menu_item_3'),",
+                                    "            quantity: 1",
+                                    "        })",
+                                    "    }",
+                                    "}, (err, res) => {",
+                                    "    if (!err) {",
+                                    "        pm.environment.set('flow_cart_item_3', res.json().data.cart_item_id);",
+                                    "    }",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"qr_session_id\": {{test_qr_session_id}},\n  \"menu_item_id\": {{menu_item_1}},\n  \"quantity\": 3\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart/cus/cart",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "cus",
+                                "cart"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Step 2: View Cart",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Cart has 3 items\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.total_items).to.eql(3);",
+                                    "    console.log('✅ Step 2: Cart has', jsonData.total_items, 'items');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart/cus/cart?qr_session_id={{test_qr_session_id}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "cus",
+                                "cart"
+                            ],
+                            "query": [
+                                {
+                                    "key": "qr_session_id",
+                                    "value": "{{test_qr_session_id}}"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Step 3: Update Item 1 Quantity",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Quantity updated\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data.quantity).to.eql(5);",
+                                    "    console.log('✅ Step 3: Updated quantity to 5');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"quantity\": 5\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart/items/{{flow_cart_item_1}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "items",
+                                "{{flow_cart_item_1}}"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Step 4: Remove Item 2",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Item removed\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    console.log('✅ Step 4: Removed item 2');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart/items/{{flow_cart_item_2}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "items",
+                                "{{flow_cart_item_2}}"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Step 5: Verify Cart has 2 Items",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Cart has 2 items left\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.total_items).to.eql(2);",
+                                    "    console.log('✅ Step 5: Cart has', jsonData.total_items, 'items');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart/cus/cart?qr_session_id={{test_qr_session_id}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "cus",
+                                "cart"
+                            ],
+                            "query": [
+                                {
+                                    "key": "qr_session_id",
+                                    "value": "{{test_qr_session_id}}"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Step 6: Clear Cart",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Cart cleared\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.success).to.be.true;",
+                                    "    console.log('✅ Step 6: Cart cleared');",
+                                    "    console.log('🎉 Complete flow test PASSED!');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart?qr_session_id={{test_qr_session_id}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart"
+                            ],
+                            "query": [
+                                {
+                                    "key": "qr_session_id",
+                                    "value": "{{test_qr_session_id}}"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Step 7: Verify Cart is Empty",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Cart is empty\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    const jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.total_items).to.eql(0);",
+                                    "    console.log('✅ Step 7: Cart is empty');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart/cus/cart?qr_session_id={{test_qr_session_id}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "cus",
+                                "cart"
+                            ],
+                            "query": [
+                                {
+                                    "key": "qr_session_id",
+                                    "value": "{{test_qr_session_id}}"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Test complete flow: Add → View → Update → Remove → Clear"
+        }
+    ],
+    "event": [
+        {
+            "listen": "prerequest",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    ""
+                ]
+            }
+        },
+        {
+            "listen": "test",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    ""
+                ]
+            }
+        }
+    ],
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:5000",
+            "type": "string"
+        }
+    ]
+}

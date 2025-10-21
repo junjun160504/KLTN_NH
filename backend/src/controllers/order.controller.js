@@ -28,7 +28,40 @@ export async function getAllOrders(req, res) {
   }
 }
 
-// Tạo đơn hàng mới với items
+
+/**
+ * POST /api/orders/admin/create
+ * Admin tạo order cho khách hàng tại quầy (không cần QR)
+ */
+export async function createOrderByAdmin(req, res) {
+  try {
+    const { table_id, items, customer_phone } = req.body;
+
+    // admin_id từ token (nếu có auth)
+    const admin_id = req.user?.id || null;
+
+    const order = await orderService.createOrderByAdmin({
+      table_id,
+      items,
+      admin_id,
+      customer_phone, // optional
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Order created successfully by admin",
+      data: order,
+    });
+  } catch (error) {
+    console.error("❌ [ADMIN CREATE ORDER] Error:", error);
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+}
+
+// POST /api/orders - Tạo đơn mới (smart logic: reuse or create new)
 export async function createOrder(req, res) {
   try {
     const { qr_session_id, items } = req.body;
