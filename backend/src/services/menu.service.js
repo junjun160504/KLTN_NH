@@ -172,7 +172,6 @@ export async function hardDeleteMenuItem(id) {
 export async function getMenuCategories() {
   const sql = "SELECT * FROM menu_categories WHERE is_available = 1";
   const rows = await query(sql);
-  console.log("[getMenuCategories] rows:", rows);
   return rows;
 }
 

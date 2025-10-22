@@ -706,6 +706,8 @@ export async function removeItemFromOrder(orderId, itemId) {
   const connection = await pool.getConnection();
   await connection.beginTransaction();
 
+  console.log(`🗑️ Removing item #${itemId} from order #${orderId}...`);
+
   try {
     // 1. Validate order exists and status = NEW
     const [[order]] = await connection.query(
@@ -777,23 +779,23 @@ export async function removeItemFromOrder(orderId, itemId) {
     try {
       const tableName = tableInfo ? `Bàn ${tableInfo.table_number}` : 'Bàn N/A';
 
-      await notificationService.createNotification({
-        target_type: "STAFF",
-        target_id: null,
-        type: "ORDER_UPDATE",
-        title: `🗑️ ${tableName} - Xóa món khỏi đơn #${orderId}`,
-        message: `Khách hàng đã xóa 1 món khỏi đơn hàng`,
-        priority: "low",
-        action_url: `/management/orders/${orderId}`,
-        metadata: {
-          orderId,
-          qrSessionId: tableInfo?.qr_session_id,
-          tableId: tableInfo?.id,
-          tableName: tableInfo?.table_number,
-          removedItemId: itemId,
-          remainingItems: itemCount
-        },
-      });
+      // await notificationService.createNotification({
+      //   target_type: "STAFF",
+      //   target_id: null,
+      //   type: "ORDER_UPDATE",
+      //   title: `🗑️ ${tableName} - Xóa món khỏi đơn #${orderId}`,
+      //   message: `Khách hàng đã xóa 1 món khỏi đơn hàng`,
+      //   priority: "low",
+      //   action_url: `/management/orders/${orderId}`,
+      //   metadata: {
+      //     orderId,
+      //     qrSessionId: tableInfo?.qr_session_id,
+      //     tableId: tableInfo?.id,
+      //     tableName: tableInfo?.table_number,
+      //     removedItemId: itemId,
+      //     remainingItems: itemCount
+      //   },
+      // });
       console.log(`📤 Notification sent: Removed item from order #${orderId}`);
     } catch (notifError) {
       console.error('⚠️ Failed to send notification:', notifError);
@@ -912,25 +914,26 @@ export async function updateOrderItemQuantity(orderId, itemId, quantity) {
     try {
       const tableName = tableInfo ? `Bàn ${tableInfo.table_number}` : 'Bàn N/A';
       const action = quantity === 0 ? 'xóa' : 'cập nhật số lượng';
+      // update logic notification for quantity change
 
-      await notificationService.createNotification({
-        target_type: "STAFF",
-        target_id: null,
-        type: "ORDER_UPDATE",
-        title: `✏️ ${tableName} - Cập nhật đơn #${orderId}`,
-        message: `Khách hàng đã ${action} món (số lượng: ${orderItem.quantity} → ${quantity})`,
-        priority: "low",
-        action_url: `/management/orders/${orderId}`,
-        metadata: {
-          orderId,
-          qrSessionId: tableInfo?.qr_session_id,
-          tableId: tableInfo?.id,
-          tableName: tableInfo?.table_number,
-          updatedItemId: itemId,
-          oldQuantity: orderItem.quantity,
-          newQuantity: quantity
-        },
-      });
+      // await notificationService.createNotification({
+      //   target_type: "STAFF",
+      //   target_id: null,
+      //   type: "ORDER_UPDATE",
+      //   title: `✏️ ${tableName} - Cập nhật đơn #${orderId}`,
+      //   message: `Khách hàng đã ${action} món (số lượng: ${orderItem.quantity} → ${quantity})`,
+      //   priority: "low",
+      //   action_url: `/management/orders/${orderId}`,
+      //   metadata: {
+      //     orderId,
+      //     qrSessionId: tableInfo?.qr_session_id,
+      //     tableId: tableInfo?.id,
+      //     tableName: tableInfo?.table_number,
+      //     updatedItemId: itemId,
+      //     oldQuantity: orderItem.quantity,
+      //     newQuantity: quantity
+      //   },
+      // });
       console.log(`📤 Notification sent: Updated item quantity in order #${orderId}`);
     } catch (notifError) {
       console.error('⚠️ Failed to send notification:', notifError);
