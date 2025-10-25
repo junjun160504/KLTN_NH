@@ -299,17 +299,15 @@ const TablesPage = () => {
   const handleCategoryChange = (categoryId) => {
     // Only fetch if category actually changed
     if (categoryId === selectedCategory) {
-      console.log('Category unchanged, skipping fetch')
       return
     }
 
-    console.log('Category changed from', selectedCategory, 'to', categoryId)
     setSelectedCategory(categoryId)
     fetchMenuItems(categoryId === 'all' ? null : categoryId)
   }
 
   // ================= Fetch Orders by Table =================
-  const fetchOrdersByTable = async (tableId) => {
+  const fetchOrdersByTable = async (tableId, forceUpdate = false) => {
     try {
       setLoadingOrders(true)
       const response = await axios.get(`${REACT_APP_API_URL}/orders/table/${tableId}`)
@@ -319,12 +317,13 @@ const TablesPage = () => {
         const activeOrders = response.data.data.filter(
           order => order.status !== 'CANCELLED' && order.status !== 'PAID'
         )
-        setTableOrders(activeOrders)
+
 
         // Nếu có orders, load items của order đầu tiên (hoặc combine tất cả items)
+        let newItems = []
         if (activeOrders.length > 0) {
           // Combine tất cả items từ các orders active
-          const allItems = activeOrders.flatMap(order =>
+          newItems = activeOrders.flatMap(order =>
             (order.items || []).map(item => ({
               id: item.menu_item_id || item.id, // menu_item_id để hiển thị
               order_item_id: item.id, // order_item.id để update/delete
@@ -336,9 +335,15 @@ const TablesPage = () => {
               order_status: order.status
             }))
           )
-          setCurrentOrderItems(allItems)
+        }
+
+        // So sánh với data cũ để quyết định có cần update UI không
+        const hasChanges = forceUpdate || !areOrderItemsEqual(currentOrderItems, newItems)
+
+        if (hasChanges) {
+          setTableOrders(activeOrders)
+          setCurrentOrderItems(newItems)
         } else {
-          setCurrentOrderItems([])
         }
       }
     } catch (err) {
@@ -351,50 +356,70 @@ const TablesPage = () => {
     }
   }
 
-  const handleCreateOrder = async () => {
-    if (!selectedTable || cartItems.length === 0) {
-      message.warning('Vui lòng chọn món trước khi tạo đơn')
-      return
-    }
+  // Helper function to compare order items
+  const areOrderItemsEqual = (oldItems, newItems) => {
+    if (oldItems.length !== newItems.length) return false
 
-    try {
-      setLoadingMenu(true)
-      const orderData = {
-        table_id: selectedTable.id,
-        items: cartItems.map(item => ({
-          menu_item_id: item.id,
-          quantity: item.quantity,
-          note: item.note || ''
-        }))
-      }
+    // Sort by order_item_id for consistent comparison
+    const sortedOld = [...oldItems].sort((a, b) => (a.order_item_id || 0) - (b.order_item_id || 0))
+    const sortedNew = [...newItems].sort((a, b) => (a.order_item_id || 0) - (b.order_item_id || 0))
 
-      await axios.post(`${REACT_APP_API_URL}/orders/admin/create`, orderData)
-      message.success('Tạo đơn hàng thành công!')
-
-      // Reset state
-      setMenuModalOpen(false)
-      setCartItems([])
-      setSelectedCategory('all')
-      fetchTables() // Refresh tables
-
-      // Refresh orders
-      if (selectedTable) {
-        fetchOrdersByTable(selectedTable.id)
-      }
-    } catch (err) {
-      console.error('Failed to create order:', err)
-      const errorMsg = err.response?.data?.message || 'Tạo đơn hàng thất bại!'
-      message.error(errorMsg)
-    } finally {
-      setLoadingMenu(false)
-    }
+    // Compare each item
+    return sortedOld.every((oldItem, index) => {
+      const newItem = sortedNew[index]
+      return (
+        oldItem.order_item_id === newItem.order_item_id &&
+        oldItem.quantity === newItem.quantity &&
+        oldItem.order_status === newItem.order_status
+      )
+    })
   }
+
+  // const handleCreateOrder = async () => {
+  //   if (!selectedTable || cartItems.length === 0) {
+  //     message.warning('Vui lòng chọn món trước khi tạo đơn')
+  //     return
+  //   }
+
+  //   try {
+  //     setLoadingMenu(true)
+  //     const orderData = {
+  //       table_id: selectedTable.id,
+  //       items: cartItems.map(item => ({
+  //         menu_item_id: item.id,
+  //         quantity: item.quantity,
+  //         note: item.note || ''
+  //       }))
+  //     }
+
+  //     await axios.post(`${REACT_APP_API_URL}/orders/admin/create`, orderData)
+  //     message.success('Tạo đơn hàng thành công!')
+
+  //     // Reset state
+  //     setMenuModalOpen(false)
+  //     setCartItems([])
+  //     setSelectedCategory('all')
+  //     fetchTables() // Refresh tables
+
+  //     // Refresh orders - force update vì vừa tạo order mới
+  //     if (selectedTable) {
+  //       fetchOrdersByTable(selectedTable.id, true)
+  //     }
+  //   } catch (err) {
+  //     console.error('Failed to create order:', err)
+  //     const errorMsg = err.response?.data?.message || 'Tạo đơn hàng thất bại!'
+  //     message.error(errorMsg)
+  //   } finally {
+  //     setLoadingMenu(false)
+  //   }
+  // }
 
   // ================= Table Card Actions =================
   const handleTableClick = (table) => {
     setSelectedTable(table)
     setOrderPanelOpen(true)
-    // Fetch orders thực tế từ API
+    // Luôn fetch orders từ API mỗi khi click vào table
+    // API sẽ trả về data mới nhất, logic bên trong sẽ so sánh và chỉ update UI nếu có thay đổi
     fetchOrdersByTable(table.id)
   }
 
@@ -424,10 +449,11 @@ const TablesPage = () => {
 
   // ================= Order Item Actions =================
   const handleIncreaseQuantity = async (orderItemId) => {
-    // Tìm item bằng order_item_id
-    const item = currentOrderItems.find(i => (i.order_item_id || i.id) === orderItemId)
+    // Tìm item bằng order_item_id (KHÔNG fallback về menu_item_id)
+    const item = currentOrderItems.find(i => i.order_item_id === orderItemId)
 
     if (!item || !item.order_id) {
+      console.error('Item not found with order_item_id:', orderItemId)
       message.error('Không tìm thấy thông tin món ăn')
       return
     }
@@ -437,11 +463,13 @@ const TablesPage = () => {
     // Optimistic UI update - Cập nhật ngay lập tức
     setCurrentOrderItems(prev =>
       prev.map(i =>
-        (i.order_item_id || i.id) === orderItemId
+        i.order_item_id === orderItemId
           ? { ...i, quantity: newQuantity }
           : i
       )
     )
+
+
 
     try {
       // Gọi API để sync với backend
@@ -475,7 +503,7 @@ const TablesPage = () => {
       // Revert UI nếu API fail
       setCurrentOrderItems(prev =>
         prev.map(i =>
-          (i.order_item_id || i.id) === orderItemId
+          i.order_item_id === orderItemId
             ? { ...i, quantity: item.quantity }
             : i
         )
@@ -484,8 +512,8 @@ const TablesPage = () => {
   }
 
   const handleDecreaseQuantity = async (orderItemId) => {
-    // Tìm item bằng order_item_id
-    const item = currentOrderItems.find(i => (i.order_item_id || i.id) === orderItemId)
+    // Tìm item bằng order_item_id (KHÔNG fallback)
+    const item = currentOrderItems.find(i => i.order_item_id === orderItemId)
 
     if (!item || !item.order_id) {
       message.error('Không tìm thấy thông tin món ăn')
@@ -502,7 +530,7 @@ const TablesPage = () => {
     // Optimistic UI update - Cập nhật ngay lập tức
     setCurrentOrderItems(prev =>
       prev.map(i =>
-        (i.order_item_id || i.id) === orderItemId
+        i.order_item_id === orderItemId
           ? { ...i, quantity: newQuantity }
           : i
       )
@@ -540,7 +568,7 @@ const TablesPage = () => {
       // Revert UI nếu API fail
       setCurrentOrderItems(prev =>
         prev.map(i =>
-          (i.order_item_id || i.id) === orderItemId
+          i.order_item_id === orderItemId
             ? { ...i, quantity: item.quantity }
             : i
         )
@@ -550,7 +578,7 @@ const TablesPage = () => {
 
   const handleRemoveItem = async (orderItemId) => {
     // Tìm item bằng order_item_id
-    const item = currentOrderItems.find(i => (i.order_item_id || i.id) === orderItemId)
+    const item = currentOrderItems.find(i => i.order_item_id === orderItemId)
 
     if (!item || !item.order_id) {
       message.error('Không tìm thấy thông tin món ăn')
@@ -562,7 +590,7 @@ const TablesPage = () => {
 
     // Optimistic UI update - Xóa item khỏi giao diện ngay lập tức
     setCurrentOrderItems(prev =>
-      prev.filter(i => (i.order_item_id || i.id) !== orderItemId)
+      prev.filter(i => i.order_item_id !== orderItemId)
     )
 
     try {
@@ -620,12 +648,17 @@ const TablesPage = () => {
     setAddingItem(true)
 
     try {
-      // Kiểm tra xem món đã có trong order chưa
+      // Kiểm tra xem món đã có trong order chưa (theo menu_item_id)
       const existingItem = currentOrderItems.find((i) => i.id === menuItem.id)
 
       if (existingItem) {
         // Nếu món đã có trong order, tăng số lượng
-        await handleIncreaseQuantity(existingItem.order_item_id || existingItem.id)
+        if (!existingItem.order_item_id) {
+          console.error('Existing item missing order_item_id:', existingItem)
+          message.error('Lỗi: Không tìm thấy ID của món trong đơn hàng')
+          return
+        }
+        await handleIncreaseQuantity(existingItem.order_item_id)
       } else {
         // Nếu món chưa có, tạo order mới với item này
         const orderData = {
@@ -645,7 +678,7 @@ const TablesPage = () => {
 
         // Lấy order và item mới tạo
         const newOrder = response.data.data
-        const newOrderItem = newOrder.items[0]
+        const newOrderItem = newOrder.items[newOrder?.items?.length - 1]
 
         // Optimistic UI update - Thêm item mới vào currentOrderItems
         const newItem = {
@@ -1010,12 +1043,22 @@ const TablesPage = () => {
                 </Text>
                 <div style={{ marginTop: 12 }}>
                   {currentOrderItems.map((item) => {
-                    // Lấy đúng order_item_id để gọi API
-                    const orderItemId = item.order_item_id || item.id
+                    // CRITICAL: order_item_id phải tồn tại và unique
+                    // Không được fallback về menu_item_id vì nhiều items có thể cùng menu_item_id
+                    const orderItemId = item.order_item_id
+
+                    if (!orderItemId) {
+                      console.error('Missing order_item_id for item:', item)
+                      return null // Skip rendering items without valid ID
+                    }
+
+                    // Key MUST be unique - use order_item_id (not menu_item_id)
+                    // Combining with order_id for extra safety
+                    const uniqueKey = `${item.order_id}-${orderItemId}`
 
                     return (
                       <Card
-                        key={item.id}
+                        key={uniqueKey}
                         size="small"
                         style={{
                           marginBottom: '10px',

@@ -46,17 +46,6 @@ export async function getItemsByCategory(req, res) {
   }
 }
 
-// Lấy tất cả món (admin)
-export async function getAllItemsController(req, res) {
-  try {
-    const items = await menuService.getAllItems();
-    res.json({ status: 200, data: items });
-  } catch (err) {
-    console.error("getAllItemsController error:", err);
-    res.status(500).json({ status: 500, message: "Internal server error" });
-  }
-}
-
 // Lấy chi tiết món ăn kèm reviews
 export async function getMenuItemDetail(req, res) {
   try {
@@ -86,7 +75,7 @@ export async function getMenuItemDetail(req, res) {
 export async function updateMenuItem(req, res) {
   try {
     const { id } = req.params;
-    const { name, price, description, category_id, image_url, is_available } = req.body;
+    const { name, price, description, category, image_url, is_available } = req.body;
 
     // Validation: Kiểm tra price nếu có
     if (price !== undefined && (isNaN(price) || price < 0)) {
@@ -100,7 +89,7 @@ export async function updateMenuItem(req, res) {
       name,
       price,
       description,
-      category_id,
+      category,
       image_url,
       is_available
     });

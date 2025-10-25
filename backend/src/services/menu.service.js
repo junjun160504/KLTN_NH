@@ -7,18 +7,51 @@ export async function getAllMenuItems(name) {
   let params = [];
 
   if (name && name !== "all") {
-    sql = "SELECT * FROM menu_items WHERE is_available = 1 AND name LIKE ?";
+    sql = `select mi.id, mi.name, mi.price, mi.description, mi.image_url, mi.is_available,
+    mc.id as categoryId, mc.name as categoryName
+    from menu_items mi
+    left join menu_item_categories mic on mi.id = mic.item_id
+    left join menu_categories mc on mc.id = mic.category_id
+    where mi.name LIKE ?`;
     params.push(`%${name}%`);
   } else {
-    sql = "SELECT * FROM menu_items WHERE is_available = 1";
+    sql = `select mi.id, mi.name, mi.price, mi.description, mi.image_url, mi.is_available,
+    mc.id as categoryId, mc.name as categoryName
+    from menu_items mi
+    left join menu_item_categories mic on mi.id = mic.item_id
+    left join menu_categories mc on mc.id = mic.category_id`;
   }
 
+  const itemsMap = {};
   const [rows] = await pool.query(sql, params);
-  return rows;
+  rows.forEach(row => {
+    const id = row.id;
+    if (!itemsMap[id]) {
+      itemsMap[id] = {
+        id: row.id,
+        name: row.name,
+        price: row.price,
+        description: row.description,
+        image_url: row.image_url,
+        is_available: row.is_available,
+        categories: []
+      }
+    }
+    if (row.categoryId && row.categoryName) {
+      itemsMap[id].categories.push({
+        id: row.categoryId,
+        name: row.categoryName
+      });
+    }
+  })
+
+
+  return Object.values(itemsMap);
 }
 
-// Thêm món mới (Admin)
-export async function addMenuItem({ name, price, description, category_id, image_url, is_available }) {
+
+// Thêm món mới (Admin) - Hỗ trợ nhiều categories
+export async function addMenuItem({ name, price, description, category, image_url, is_available }) {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
@@ -32,16 +65,17 @@ export async function addMenuItem({ name, price, description, category_id, image
 
     const itemId = result.insertId;
 
-    // 2. Insert quan hệ món ↔ danh mục
-    if (category_id) {
+    // 2. Insert quan hệ món ↔ nhiều danh mục
+    if (category && Array.isArray(category) && category.length > 0) {
+      const values = category.map(catId => [itemId, catId]);
       await conn.query(
-        "INSERT INTO menu_item_categories (item_id, category_id) VALUES (?, ?)",
-        [itemId, category_id]
+        "INSERT INTO menu_item_categories (item_id, category_id) VALUES ?",
+        [values]
       );
     }
 
     await conn.commit();
-    return { id: itemId, name, price, category_id };
+    return { id: itemId, name, price, category };
   } catch (err) {
     await conn.rollback();
     throw err;
@@ -52,20 +86,43 @@ export async function addMenuItem({ name, price, description, category_id, image
 
 // Lấy một menu item theo ID (helper function)
 export async function getMenuItemById(id) {
-  const [rows] = await pool.query(
-    `SELECT 
-      mi.*,
-      mic.category_id
+  const sql =
+    `
+    SELECT 
+      mi.id, mi.name, mi.price, mi.description, mi.image_url, mi.is_available,
+      mc.id AS categoryId, mc.name AS categoryName
     FROM menu_items mi
-    LEFT JOIN menu_item_categories mic ON mi.id = mic.item_id
-    WHERE mi.id = ?`,
-    [id]
-  );
-  return rows[0] || null;
+    JOIN menu_item_categories mic ON mi.id = mic.item_id
+    JOIN menu_categories mc ON mc.id = mic.category_id
+    WHERE mi.id = ?
+    `
+  const [rows] = await pool.query(sql, [id]);
+  const itemsMap = {};
+  rows.forEach(row => {
+    const itemId = row.id;
+    if (!itemsMap[itemId]) {
+      itemsMap[itemId] = {
+        id: row.id,
+        name: row.name,
+        price: row.price,
+        description: row.description,
+        image_url: row.image_url,
+        is_available: row.is_available,
+        categories: []
+      }
+    }
+    if (row.categoryId && row.categoryName) {
+      itemsMap[itemId].categories.push({
+        id: row.categoryId,
+        name: row.categoryName
+      });
+    }
+  })
+  return Object.values(itemsMap)[0] || null;
 }
 
-// Cập nhật món ăn (Update)
-export async function updateMenuItem(id, { name, price, description, category_id, image_url, is_available }) {
+// Cập nhật món ăn (Update) - Hỗ trợ nhiều categories
+export async function updateMenuItem(id, { name, price, description, category, image_url, is_available }) {
   const conn = await pool.getConnection();
   try {
     // Kiểm tra menu item có tồn tại không
@@ -91,16 +148,17 @@ export async function updateMenuItem(id, { name, price, description, category_id
       ]
     );
 
-    // 2. Update category nếu có thay đổi
-    if (category_id !== undefined) {
-      // Xóa category cũ
+    // 2. Update categories nếu có thay đổi
+    if (category !== undefined) {
+      // Xóa tất cả categories cũ
       await conn.query("DELETE FROM menu_item_categories WHERE item_id = ?", [id]);
 
-      // Thêm category mới (nếu có)
-      if (category_id) {
+      // Thêm các categories mới (nếu có)
+      if (category && Array.isArray(category) && category.length > 0) {
+        const values = category.map(catId => [id, catId]);
         await conn.query(
-          "INSERT INTO menu_item_categories (item_id, category_id) VALUES (?, ?)",
-          [id, category_id]
+          "INSERT INTO menu_item_categories (item_id, category_id) VALUES ?",
+          [values]
         );
       }
     }
@@ -278,7 +336,7 @@ export async function hardDeleteCategory(id) {
 // ================ END CATEGORY CRUD ================
 // Lấy món theo category
 export async function getItemsByCategory(id) {
-  const [rows] = await pool.query(
+  const sql =
     `
     SELECT 
       mi.id, mi.name, mi.price, mi.description, mi.image_url, mi.is_available,
@@ -286,26 +344,31 @@ export async function getItemsByCategory(id) {
     FROM menu_items mi
     JOIN menu_item_categories mic ON mi.id = mic.item_id
     JOIN menu_categories mc ON mc.id = mic.category_id
-    WHERE mic.category_id = ? AND mi.is_available = 1
-    `,
-    [id]
-  );
-  return rows;
-}
-
-// Lấy tất cả món (admin)
-export async function getAllItems() {
-  const [rows] = await pool.query(
+    WHERE mic.category_id = ?
     `
-    SELECT 
-      mi.id, mi.name, mi.price, mi.description, mi.image_url, mi.is_available,
-      mc.id AS categoryId, mc.name AS categoryName
-    FROM menu_items mi
-    LEFT JOIN menu_item_categories mic ON mi.id = mic.item_id
-    LEFT JOIN menu_categories mc ON mc.id = mic.category_id
-    `
-  );
-  return rows;
+  const [rows] = await pool.query(sql, [id]);
+  const itemsMap = {};
+  rows.forEach(row => {
+    const itemId = row.id;
+    if (!itemsMap[itemId]) {
+      itemsMap[itemId] = {
+        id: row.id,
+        name: row.name,
+        price: row.price,
+        description: row.description,
+        image_url: row.image_url,
+        is_available: row.is_available,
+        categories: []
+      }
+    }
+    if (row.categoryId && row.categoryName) {
+      itemsMap[itemId].categories.push({
+        id: row.categoryId,
+        name: row.categoryName
+      });
+    }
+  })
+  return Object.values(itemsMap);
 }
 
 // Lấy chi tiết món ăn kèm reviews và rating
@@ -880,7 +943,10 @@ export async function importMenuItemsFromExcel(fileBuffer, options = {}) {
           name: row.getCell(1).value?.toString().trim(),
           price: parseFloat(row.getCell(2).value),
           description: row.getCell(3).value?.toString().trim() || null,
-          category_id: row.getCell(4).value ? parseInt(row.getCell(4).value) : null,
+          // Parse categories - có thể là một hoặc nhiều category IDs cách nhau bởi dấu phảy
+          category_ids: row.getCell(4).value 
+            ? row.getCell(4).value.toString().split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
+            : [],
           image_url: row.getCell(5).value?.toString().trim() || null,
           is_available: row.getCell(6).value !== undefined
             ? (row.getCell(6).value.toString().toLowerCase() === 'true' || row.getCell(6).value === true || row.getCell(6).value === 1)
@@ -896,14 +962,17 @@ export async function importMenuItemsFromExcel(fileBuffer, options = {}) {
           throw new Error('Giá không hợp lệ (phải là số dương)');
         }
 
-        // Check if category exists (if provided)
-        if (itemData.category_id) {
+        // Check if categories exist (if provided)
+        if (itemData.category_ids.length > 0) {
           const [categoryCheck] = await conn.query(
-            'SELECT id FROM menu_categories WHERE id = ?',
-            [itemData.category_id]
+            'SELECT id FROM menu_categories WHERE id IN (?)',
+            [itemData.category_ids]
           );
-          if (categoryCheck.length === 0) {
-            throw new Error(`Category ID ${itemData.category_id} không tồn tại`);
+          
+          if (categoryCheck.length !== itemData.category_ids.length) {
+            const foundIds = categoryCheck.map(c => c.id);
+            const missingIds = itemData.category_ids.filter(id => !foundIds.includes(id));
+            throw new Error(`Category IDs ${missingIds.join(', ')} không tồn tại`);
           }
         }
 
@@ -925,15 +994,19 @@ export async function importMenuItemsFromExcel(fileBuffer, options = {}) {
               [itemData.price, itemData.description, itemData.image_url, itemData.is_available, existingItemId]
             );
 
-            // Update category relationship if provided
-            if (itemData.category_id) {
-              // Delete old relationship
+            // Update category relationships if provided
+            if (itemData.category_ids.length > 0) {
+              // Delete old relationships
               await conn.query('DELETE FROM menu_item_categories WHERE item_id = ?', [existingItemId]);
-              // Insert new relationship
-              await conn.query(
-                'INSERT INTO menu_item_categories (item_id, category_id) VALUES (?, ?)',
-                [existingItemId, itemData.category_id]
-              );
+              
+              // Insert new relationships (multiple categories)
+              const values = itemData.category_ids.map(catId => [existingItemId, catId]);
+              if (values.length > 0) {
+                await conn.query(
+                  'INSERT INTO menu_item_categories (item_id, category_id) VALUES ?',
+                  [values]
+                );
+              }
             }
 
             results.success++;
@@ -942,7 +1015,8 @@ export async function importMenuItemsFromExcel(fileBuffer, options = {}) {
               row: i,
               name: itemData.name,
               status: 'updated',
-              id: existingItemId
+              id: existingItemId,
+              categories: itemData.category_ids.length
             });
           } else if (skipDuplicate) {
             // Skip duplicate
@@ -967,11 +1041,12 @@ export async function importMenuItemsFromExcel(fileBuffer, options = {}) {
 
           const newItemId = result.insertId;
 
-          // Insert category relationship if provided
-          if (itemData.category_id) {
+          // Insert category relationships if provided (multiple categories)
+          if (itemData.category_ids.length > 0) {
+            const values = itemData.category_ids.map(catId => [newItemId, catId]);
             await conn.query(
-              'INSERT INTO menu_item_categories (item_id, category_id) VALUES (?, ?)',
-              [newItemId, itemData.category_id]
+              'INSERT INTO menu_item_categories (item_id, category_id) VALUES ?',
+              [values]
             );
           }
 
@@ -981,7 +1056,8 @@ export async function importMenuItemsFromExcel(fileBuffer, options = {}) {
             row: i,
             name: itemData.name,
             status: 'created',
-            id: newItemId
+            id: newItemId,
+            categories: itemData.category_ids.length
           });
         }
       } catch (error) {

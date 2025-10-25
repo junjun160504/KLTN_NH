@@ -53,4 +53,262 @@
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
   }
+
+  /* Modern Table Styles */
+  .modern-table .ant-table {
+    @apply text-sm;
+  }
+
+  .modern-table .ant-table-thead>tr>th {
+    @apply bg-gray-100 font-bold text-gray-700 text-sm tracking-wide;
+    padding: 12px 20px !important;
+    border-bottom: 1px solid #e5e7eb !important;
+  }
+
+  .modern-table .ant-table-measure-row {
+    display: none !important;
+  }
+
+  .modern-table .ant-table-thead>tr>th::before {
+    display: none !important;
+  }
+
+  .modern-table .ant-table-tbody>tr>td {
+    @apply text-gray-700;
+    padding: 16px 20px !important;
+    vertical-align: middle;
+    border-bottom: 1px solid #f3f4f6 !important;
+  }
+
+  .modern-table .ant-table-tbody>tr {
+    @apply transition-all duration-200;
+  }
+
+  .modern-table .ant-table-tbody>tr:hover>td {
+    @apply bg-blue-50 shadow-sm;
+  }
+
+  .modern-table .ant-table-tbody>tr:last-child>td {
+    border-bottom: none !important;
+  }
+
+  .modern-table .ant-table-body {
+    scrollbar-width: thin;
+    scrollbar-color: #eaeaea transparent;
+    scrollbar-gutter: stable;
+  }
+
+  /* .modern-table .ant-pagination {
+    @apply flex items-center justify-between;
+  } */
+
+  .modern-table .ant-pagination-item {
+    @apply rounded-lg border-gray-300 transition-all duration-200;
+  }
+
+  .modern-table .ant-pagination-item:hover {
+    @apply border-blue-500 shadow-sm;
+  }
+
+  .modern-table .ant-pagination-item-active {
+    @apply bg-blue-600 border-blue-600;
+  }
+
+  .modern-table .ant-pagination-item-active a {
+    @apply text-white;
+  }
+
+  .modern-table .ant-table-filter-trigger {
+    @apply text-gray-400 hover:text-blue-600 transition-colors duration-200;
+  }
+
+  .modern-table .ant-table-column-sorter {
+    @apply text-gray-400;
+  }
+
+  .modern-table .ant-table-column-sorter-up.active,
+  .modern-table .ant-table-column-sorter-down.active {
+    @apply text-blue-600;
+  }
+
+  /* Custom Pagination Styles - Tách riêng với background trong suốt */
+  .custom-pagination {
+    background: transparent !important;
+  }
+
+  .custom-pagination .ant-pagination-item {
+    @apply rounded-lg border-gray-300 bg-white transition-all duration-200;
+    min-width: 30px;
+    height: 30px;
+    line-height: 28px;
+  }
+
+  .custom-pagination .ant-pagination-item:hover {
+    @apply border-green-500 bg-blue-50;
+  }
+
+  .custom-pagination .ant-pagination-item-active {
+    @apply bg-white border-green-600;
+  }
+
+  /* .custom-pagination .ant-pagination-item-active a {
+    @apply text-white font-semibold;
+  } */
+
+  .custom-pagination .ant-pagination-prev,
+  .custom-pagination .ant-pagination-next,
+  .custom-pagination .ant-pagination-jump-prev,
+  .custom-pagination .ant-pagination-jump-next {
+    @apply rounded-lg bg-white border-gray-300 transition-all duration-200;
+    min-width: 30px;
+    height: 30px;
+    line-height: 28px;
+  }
+
+  .custom-pagination .ant-pagination-prev:hover,
+  .custom-pagination .ant-pagination-next:hover,
+  .custom-pagination .ant-pagination-jump-prev:hover,
+  .custom-pagination .ant-pagination-jump-next:hover {
+    @apply border-green-500 bg-green-50;
+  }
+
+  .custom-pagination .ant-pagination-options {
+    @apply ml-4;
+  }
+
+  .custom-pagination .ant-select-selector {
+    @apply rounded-lg border-gray-300 bg-white transition-all duration-200;
+    height: 30px !important;
+  }
+
+  .custom-pagination .ant-select-selector:hover {
+    @apply border-green-500;
+  }
+
+  .custom-pagination .ant-pagination-options-quick-jumper input {
+    @apply rounded-lg border-gray-300 bg-white transition-all duration-200;
+    height: 30px;
+  }
+
+  .custom-pagination .ant-pagination-options-quick-jumper input:hover {
+    @apply border-green-500;
+  }
+
+  .custom-pagination .ant-pagination-options-quick-jumper input:focus {
+    @apply border-green-600 ring-2 ring-green-100;
+  }
+
+  /* Category Tags Styling */
+  .ant-tag {
+    margin: 0 !important;
+    border-radius: 9999px;
+    font-size: 11px;
+    line-height: 1.4;
+    padding: 2px 8px;
+    transition: all 0.2s ease;
+  }
+
+  .ant-tag:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Japanese-Style Modal */
+  .japanese-modal .ant-modal-content {
+    border-radius: 16px;
+    padding: 0;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08), 0 4px 16px rgba(0, 0, 0, 0.04);
+    border: 1px solid #f3f4f6;
+    overflow: hidden;
+  }
+
+  .japanese-modal .ant-modal-header {
+    background: linear-gradient(to bottom, #ffffff, #fafafa);
+    border-bottom: none;
+    padding: 24px 32px 0 32px;
+    margin-bottom: 0;
+  }
+
+  .japanese-modal .ant-modal-body {
+    padding: 0 32px 32px 32px;
+    max-height: 75vh;
+    overflow-y: auto;
+  }
+
+  .japanese-modal .ant-modal-body::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .japanese-modal .ant-modal-body::-webkit-scrollbar-track {
+    background: #f9fafb;
+    border-radius: 4px;
+  }
+
+  .japanese-modal .ant-modal-body::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+  }
+
+  .japanese-modal .ant-modal-body::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+  }
+
+  /* Form Elements in Japanese Modal */
+  .japanese-modal .ant-form-item-label>label {
+    font-weight: 500;
+    color: #374151;
+  }
+
+  .japanese-modal .ant-input,
+  /* .japanese-modal .ant-input-number, */
+  .japanese-modal .ant-select-selector {
+    border: 0 solid #e5e7eb !important;
+    transition: all 0.2s ease;
+  }
+
+  .japanese-modal .ant-input:hover,
+  .japanese-modal .ant-input-number:hover .ant-input-number-input,
+  .japanese-modal .ant-select-selector:hover {
+    border-color: #d1d5db !important;
+  }
+
+  .japanese-modal .ant-input:focus,
+  .japanese-modal .ant-input-number-focused .ant-input-number-input,
+  .japanese-modal .ant-select-focused .ant-select-selector {
+    border-color: #9ca3af !important;
+    box-shadow: none !important;
+    outline: none !important;
+  }
+
+  /* Fix InputNumber height */
+  .japanese-modal .ant-input-number {
+    height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  .japanese-modal .ant-input-number .ant-input-number-input {
+    height: 100% !important;
+  }
+
+  .japanese-modal .ant-switch {
+    background-color: #d1d5db;
+  }
+
+  .japanese-modal .ant-switch-checked {
+    background-color: #10b981;
+  }
+
+  .japanese-modal .ant-select-selection-item {
+    background: linear-gradient(135deg, #e9d5ff 0%, #d8b4fe 100%);
+    border: 1px solid #c084fc;
+    color: #1f2937;
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+
 }

@@ -4,7 +4,6 @@ import {
   createMenuItem,
   getMenuCategories,
   getItemsByCategory,
-  getAllItemsController,
   getMenuItemDetail,
   getCategoryById,
   createCategory,
@@ -73,15 +72,14 @@ router.post("/admin/menus/import/excel", uploadExcel, handleUploadError, importM
 
 // Khách hàng xem chi tiết món ăn (với reviews)
 router.get("/cus/menus/item/:id", getMenuItemDetail);
-
-// Khách hàng xem món theo tên
+// Khách hàng xem món theo danh mục
+// Đặt các route tĩnh trước
+router.get("/cus/menus/category/:id", getItemsByCategory);
+// Sau cùng mới đặt route động
 router.get("/cus/menus/:name", getMenuItems);
 
-// Khách hàng xem món theo danh mục
-router.get("/cus/menus/category/:id", getItemsByCategory);
 
-// Admin: xem tất cả món
-router.get("/cus/menus/all", getAllItemsController);
+
 
 // Admin: thêm món
 router.post("/admin/menus", createMenuItem);
