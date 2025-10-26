@@ -260,38 +260,6 @@ const MenuPage = () => {
     XLSX.writeFile(wb, "thuc_don.xlsx");
   };
 
-  // ======= Xử lý nhập Excel =======
-  const handleImportExcel = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      const data = evt.target.result;
-      const workbook = XLSX.read(data, { type: "binary" });
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json(sheet);
-
-      // Chuyển đổi dữ liệu và gọi API thêm món mới
-      for (const row of rows) {
-        try {
-          await axios.post(`${REACT_APP_API_URL}/menu`, {
-            name: row["Tên món"] || "",
-            price: row["Giá"] || 0,
-            description: row["Mô tả"] || "",
-            category: row["Danh mục"] || "",
-            image_url: "",
-            is_available: row["Trạng thái"] === "Đang bán" ? 1 : 0,
-          });
-        } catch (err) {
-          console.error("Import error:", err);
-        }
-      }
-      message.success("Nhập món từ Excel thành công!");
-      fetchFoods();
-    };
-    reader.readAsBinaryString(file);
-  };
 
   // ======= Table Columns =======
 

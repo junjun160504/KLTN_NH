@@ -18,8 +18,11 @@ import {
   Row,
   Col,
   Table,
-  Popconfirm
+  Popconfirm,
+  Pagination,
+  ConfigProvider
 } from 'antd'
+import vi_VN from "antd/lib/locale/vi_VN";
 import {
   SearchOutlined,
   FilterOutlined,
@@ -32,7 +35,8 @@ import {
   DeleteOutlined,
   CloseCircleOutlined,
   EditOutlined,
-  SaveOutlined
+  SaveOutlined,
+  EyeOutlined
 } from '@ant-design/icons'
 import * as XLSX from 'xlsx'
 import { saveAs } from 'file-saver'
@@ -94,6 +98,10 @@ function OrderPage() {
   const [orders, setOrders] = useState([])
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [modalThanhToan, setModalThanhToan] = useState({ open: false, order: null })
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
 
   // Edit item states
   const [editingItemId, setEditingItemId] = useState(null)
@@ -306,6 +314,11 @@ function OrderPage() {
     fetchOrders()
   }, [fetchOrders])
 
+  // Reset về trang 1 khi thay đổi filters
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filterStatus, filterTime, searchText])
+
   // ==================== COMPUTED VALUES (useMemo) ====================
 
   const filteredOrders = useMemo(() => {
@@ -373,7 +386,7 @@ function OrderPage() {
       title: 'Mã đơn',
       dataIndex: 'code',
       key: 'code',
-      width: 120,
+      width: '10%',
       sorter: (a, b) => (a.code || '').localeCompare(b.code || '', 'vi'),
       render: (code) => <span className='font-semibold text-blue-600'>{code}</span>
     },
@@ -381,7 +394,7 @@ function OrderPage() {
       title: 'Bàn',
       dataIndex: 'table',
       key: 'table',
-      width: 100,
+      width: '8%',
       sorter: (a, b) => (parseInt(a.tableNumber) || 0) - (parseInt(b.tableNumber) || 0),
       render: (text) => <span className='font-medium'>{text}</span>
     },
@@ -389,13 +402,13 @@ function OrderPage() {
       title: 'Số điện thoại',
       dataIndex: 'phone',
       key: 'phone',
-      width: 130
+      width: '12%'
     },
     {
       title: 'Điểm tích lũy',
       dataIndex: 'point',
       key: 'point',
-      width: 120,
+      width: '14%',
       align: 'center',
       render: (point) => (
         <span className='text-orange-600 font-medium'>{point} điểm</span>
@@ -405,7 +418,7 @@ function OrderPage() {
       title: 'Tổng tiền',
       dataIndex: 'total',
       key: 'total',
-      width: 130,
+      width: '12%',
       align: 'right',
       sorter: (a, b) => (a.totalAmount || 0) - (b.totalAmount || 0),
       render: (text) => (
@@ -418,7 +431,7 @@ function OrderPage() {
       title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
-      width: 150,
+      width: '12%',
       align: 'center',
       render: (status) => <StatusBadge status={status} />
     },
@@ -426,7 +439,7 @@ function OrderPage() {
       title: 'Thời gian',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      width: 150,
+      width: '12%',
       sorter: (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
       render: (time) => (
         <div className='text-gray-600 text-sm'>
@@ -438,18 +451,17 @@ function OrderPage() {
     {
       title: 'Thao tác',
       key: 'action',
-      width: 240,
-      fixed: 'right',
+      width: '20%',
+      align: 'center',
       render: (_, record) => (
         <Space size='small' wrap>
           <Button
-            type='link'
+            type='text'
             size='small'
+            icon={<EyeOutlined className='text-blue-600' />}
             onClick={() => handleViewDetails(record.id)}
-            className='text-blue-600 hover:text-blue-700'
-          >
-            Chi tiết
-          </Button>
+            title="Chi tiết"
+          />
           {record.status === 'NEW' && (
             <Popconfirm
               title='Hủy đơn hàng'
@@ -461,12 +473,11 @@ function OrderPage() {
             >
               <Button
                 danger
-                type='link'
+                type='text'
                 size='small'
                 icon={<CloseCircleOutlined />}
-              >
-                Hủy
-              </Button>
+                title="Hủy"
+              />
             </Popconfirm>
           )}
           {(record.status === 'IN_PROGRESS' || record.status === 'DONE') && (
@@ -814,20 +825,63 @@ function OrderPage() {
               </Card>
 
               {/* Table View - Simple Order List */}
-              <Table
-                rowKey='id'
-                loading={loading}
-                columns={columns}
-                dataSource={filteredOrders}
-                pagination={{
-                  pageSizeOptions: ['10', '20', '50', '100'],
-                  showSizeChanger: true,
-                  showQuickJumper: true,
-                  defaultPageSize: 20,
-                  showTotal: (total, range) =>
-                    `${range[0]}-${range[1]} trên tổng ${total} đơn hàng`
-                }}
-              />
+              <ConfigProvider locale={vi_VN}>
+                <div className="bg-white rounded-xl shadow-xl overflow-hidden border border-gray-100">
+                  <Table
+                    key={`table-${filterStatus}-${filterTime}-${searchText}-${currentPage}`}
+                    rowKey='id'
+                    loading={loading}
+                    columns={columns}
+                    dataSource={filteredOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize)}
+                    pagination={false}
+                    bordered={false}
+                    scroll={{ y: 600 }}
+                    size="middle"
+                    tableLayout="fixed"
+                    rowClassName={(record, index) =>
+                      `transition-all duration-200 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`
+                    }
+                    className="modern-table"
+                    locale={{
+                      emptyText: (
+                        <div className="py-12">
+                          <div className="text-gray-400 text-6xl mb-4">📋</div>
+                          <div className="text-gray-500 font-medium">Không tìm thấy đơn hàng nào</div>
+                          <div className="text-gray-400 text-sm mt-2">Thử thay đổi bộ lọc hoặc tìm kiếm khác</div>
+                        </div>
+                      )
+                    }}
+                  />
+
+                  {/* Pagination tách riêng với đường line phân cách */}
+                  {filteredOrders.length > 0 && (
+                    <div className="border-t-2 border-gray-200 bg-transparent px-6 py-5">
+                      <div className="flex justify-end flex-wrap gap-4">
+                        {/* Pagination Component */}
+                        <ConfigProvider locale={vi_VN}>
+                          <Pagination
+                            current={currentPage}
+                            pageSize={pageSize}
+                            total={filteredOrders.length}
+                            onChange={(page, pageSize) => {
+                              setCurrentPage(page);
+                              setPageSize(pageSize);
+                            }}
+                            onShowSizeChange={(current, size) => {
+                              setCurrentPage(1);
+                              setPageSize(size);
+                            }}
+                            showSizeChanger
+                            showQuickJumper
+                            pageSizeOptions={['10', '20', '50', '100']}
+                            className="custom-pagination"
+                          />
+                        </ConfigProvider>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </ConfigProvider>
             </Spin>
 
             {/* Drawer Chi tiết đơn hàng */}

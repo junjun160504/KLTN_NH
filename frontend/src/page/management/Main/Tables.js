@@ -162,7 +162,6 @@ const TablesPage = () => {
   const [categories, setCategories] = useState([])
   const [menuItems, setMenuItems] = useState([])
   const [selectedCategory, setSelectedCategory] = useState('all')
-  const [cartItems, setCartItems] = useState([])
   const [loadingMenu, setLoadingMenu] = useState(false)
   const [addingItem, setAddingItem] = useState(false) // Loading state khi thêm món
 
@@ -202,6 +201,27 @@ const TablesPage = () => {
     }
   }
 
+  // Update single table orders (optimize performance)
+  async function updateSingleTableOrders(tableId) {
+    try {
+      const orderRes = await axios.get(`${REACT_APP_API_URL}/orders/table/${tableId}`);
+      if (orderRes.data && orderRes.data.data) {
+        // Filter: Chỉ lấy orders active
+        const activeOrders = orderRes.data.data.filter(
+          order => order.status !== 'CANCELLED' && order.status !== 'PAID'
+        );
+
+        // Chỉ update state cho table này
+        setAllTablesOrders(prev => ({
+          ...prev,
+          [tableId]: activeOrders
+        }));
+      }
+    } catch (err) {
+      console.error(`Failed to update orders for table ${tableId}:`, err);
+    }
+  }
+
   async function handleDeleteTable(id) {
     try {
       await axios.delete(`${REACT_APP_API_URL}/tables/${id}`);
@@ -234,7 +254,7 @@ const TablesPage = () => {
 
   // Mở popup chỉnh sửa
   const openEditDrawer = (table, e) => {
-    e.stopPropagation() // Prevent table card click
+    if (e) e.stopPropagation() // Prevent table card click
     setEditingTable(table)
     editForm.setFieldsValue({
       table_number: table.table_number,
@@ -424,13 +444,210 @@ const TablesPage = () => {
   }
 
   const handlePrintQR = (table, e) => {
-    e.stopPropagation()
+    if (e) e.stopPropagation()
+
     if (!table.qr_code_url) {
       message.error('Bàn này chưa có mã QR!')
       return
     }
-    message.info(`In QR cho bàn ${table.table_number}`)
-    // Implement print logic here (sử dụng lại logic cũ nếu cần)
+
+    const qrImageUrl = `${replaceUrlServer(REACT_APP_API_URL)}${table.qr_code_url}`
+
+    // Tạo iframe ẩn
+    const iframe = document.createElement('iframe')
+    iframe.style.position = 'fixed'
+    iframe.style.right = '0'
+    iframe.style.bottom = '0'
+    iframe.style.width = '0'
+    iframe.style.height = '0'
+    iframe.style.border = 'none'
+
+    document.body.appendChild(iframe)
+
+    const iframeDoc = iframe.contentWindow.document
+
+    iframeDoc.open()
+    iframeDoc.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>In QR - Bàn ${table.table_number}</title>
+          <style>
+            @page {
+              size: A4;
+              margin: 20mm;
+            }
+            body {
+              margin: 0;
+              padding: 0;
+              font-family: Arial, sans-serif;
+            }
+            .qr-container {
+              text-align: center;
+              padding: 40px 20px;
+            }
+            h1 {
+              font-size: 32px;
+              margin: 0 0 10px 0;
+              color: #333;
+            }
+            img {
+              width: 300px;
+              height: 300px;
+              border: 2px solid #ddd;
+              border-radius: 8px;
+              margin: 20px 0;
+              display: block;
+              margin-left: auto;
+              margin-right: auto;
+            }
+            .table-info {
+              font-size: 28px;
+              font-weight: bold;
+              color: #1890ff;
+              margin: 15px 0;
+            }
+            p {
+              font-size: 16px;
+              color: #666;
+              margin: 10px 0 0 0;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="qr-container">
+            <div class="table-info">Bàn ${table.table_number}</div>
+            <img src="${qrImageUrl}" alt="QR Code Bàn ${table.table_number}" />
+            <p>Quét mã QR để xem thực đơn và đặt món</p>
+          </div>
+        </body>
+      </html>
+    `)
+    iframeDoc.close()
+
+    // Đợi ảnh load xong rồi trigger print
+    iframe.onload = () => {
+      setTimeout(() => {
+        iframe.contentWindow.focus()
+        iframe.contentWindow.print()
+
+        // Xóa iframe sau khi in (hoặc cancel)
+        setTimeout(() => {
+          document.body.removeChild(iframe)
+        }, 1000)
+      }, 500)
+    }
+  }
+
+  // In tất cả QR code của các bàn
+  const handlePrintAllQR = () => {
+    const tablesWithQR = tables.filter(table => table.qr_code_url)
+
+    if (tablesWithQR.length === 0) {
+      message.error('Không có bàn nào có mã QR!')
+      return
+    }
+
+    // Tạo iframe ẩn
+    const iframe = document.createElement('iframe')
+    iframe.style.position = 'fixed'
+    iframe.style.right = '0'
+    iframe.style.bottom = '0'
+    iframe.style.width = '0'
+    iframe.style.height = '0'
+    iframe.style.border = 'none'
+
+    document.body.appendChild(iframe)
+
+    const iframeDoc = iframe.contentWindow.document
+
+    iframeDoc.open()
+
+    // Generate HTML cho tất cả QR
+    const qrPages = tablesWithQR.map((table) => {
+      const qrImageUrl = `${replaceUrlServer(REACT_APP_API_URL)}${table.qr_code_url}`
+      return `
+        <div class="qr-container">
+          <h1>🍽️ Nhà hàng</h1>
+          <div class="table-info">Bàn ${table.table_number}</div>
+          <img src="${qrImageUrl}" alt="QR Code Bàn ${table.table_number}" />
+          <p>Quét mã QR để xem thực đơn và đặt món</p>
+        </div>
+      `
+    }).join('')
+
+    iframeDoc.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>In tất cả QR Code</title>
+          <style>
+            @page {
+              size: A4;
+              margin: 20mm;
+            }
+            body {
+              margin: 0;
+              padding: 0;
+              font-family: Arial, sans-serif;
+            }
+            .qr-container {
+              text-align: center;
+              padding: 40px 20px;
+              page-break-after: always;
+            }
+            .qr-container:last-child {
+              page-break-after: auto;
+            }
+            h1 {
+              font-size: 32px;
+              margin: 0 0 10px 0;
+              color: #333;
+            }
+            img {
+              width: 300px;
+              height: 300px;
+              border: 2px solid #ddd;
+              border-radius: 8px;
+              margin: 20px 0;
+              display: block;
+              margin-left: auto;
+              margin-right: auto;
+            }
+            .table-info {
+              font-size: 28px;
+              font-weight: bold;
+              color: #1890ff;
+              margin: 15px 0;
+            }
+            p {
+              font-size: 16px;
+              color: #666;
+              margin: 10px 0 0 0;
+            }
+          </style>
+        </head>
+        <body>
+          ${qrPages}
+        </body>
+      </html>
+    `)
+    iframeDoc.close()
+
+    // Đợi tất cả ảnh load xong rồi trigger print
+    iframe.onload = () => {
+      setTimeout(() => {
+        iframe.contentWindow.focus()
+        iframe.contentWindow.print()
+
+        // Xóa iframe sau khi in
+        setTimeout(() => {
+          document.body.removeChild(iframe)
+        }, 1000)
+      }, 1000) // Tăng timeout để đảm bảo tất cả ảnh đã load
+    }
+
+    message.success(`Đang chuẩn bị in ${tablesWithQR.length} mã QR...`)
   }
 
   const handleDeleteClick = (table, e) => {
@@ -734,9 +951,175 @@ const TablesPage = () => {
     // TODO: Implement API call to notify kitchen
   }
 
-  const handlePayment = () => {
-    message.info('Chức năng thanh toán đang được phát triển...')
-    // TODO: Implement payment logic
+  const handleCancelOrder = async () => {
+    const order = getTableOrder(selectedTable)
+
+    if (!order) {
+      message.warning('Không tìm thấy đơn hàng!')
+      return
+    }
+
+    // Show confirmation modal
+    modal.confirm({
+      title: 'Xác nhận hủy đơn hàng',
+      content: `Bạn có chắc chắn muốn hủy đơn hàng #${order.order_id} của bàn ${selectedTable.table_number}?`,
+      okText: 'Hủy đơn',
+      okType: 'danger',
+      cancelText: 'Quay lại',
+      onOk: async () => {
+        try {
+          setLoadingOrders(true)
+
+          await axios.put(`${REACT_APP_API_URL}/orders/${order.order_id}/cancel`, {
+            reason: 'Admin hủy đơn từ quản lý bàn'
+          })
+
+          message.success('Đã hủy đơn hàng thành công!')
+
+          // Chỉ update table hiện tại thay vì fetch tất cả
+          await updateSingleTableOrders(selectedTable.id)
+
+          // Close order panel if no more orders
+          const updatedOrders = allTablesOrders[selectedTable.id] || []
+          if (updatedOrders.length === 0) {
+            setOrderPanelOpen(false)
+          }
+        } catch (err) {
+          console.error('Failed to cancel order:', err)
+          const errorMsg = err.response?.data?.message || 'Hủy đơn hàng thất bại!'
+          message.error(errorMsg)
+        } finally {
+          setLoadingOrders(false)
+        }
+      }
+    })
+  }
+
+  const handlePayment = async () => {
+    const order = getTableOrder(selectedTable)
+
+    if (!order) {
+      message.warning('Không tìm thấy đơn hàng!')
+      return
+    }
+
+    const total = calculateTotal()
+    const itemCount = currentOrderItems.length
+    const totalQuantity = currentOrderItems.reduce((sum, item) => sum + item.quantity, 0)
+
+    // Show confirmation modal with Japanese design (Tailwind CSS)
+    modal.confirm({
+      title: null,
+      icon: null,
+      width: 420,
+      centered: true,
+      content: (
+        <div className="py-2">
+          {/* Header with icon */}
+          <div className="text-center mb-6">
+            <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-gradient-to-br from-[#fff7e6] to-[#ffe7ba] flex items-center justify-center shadow-[0_4px_12px_rgba(250,173,20,0.15)]">
+              <DollarOutlined className="text-[28px] text-[#faad14]" />
+            </div>
+            <div className="text-xl font-semibold text-[#262626] tracking-tight mb-1.5">
+              Xác nhận thanh toán
+            </div>
+            <div className="text-[13px] text-[#8c8c8c] font-normal">
+              Vui lòng kiểm tra thông tin trước khi xác nhận
+            </div>
+          </div>
+
+          {/* Order Info Card */}
+          <div className="bg-[#fafafa] rounded-xl p-4 mb-5 border border-[#f0f0f0]">
+            {/* Table & Order ID */}
+            <div className="flex justify-between items-center mb-3 pb-3 border-b border-[#f0f0f0]">
+              <div className="flex-1">
+                <div className="text-xs text-[#8c8c8c] mb-1 font-medium">
+                  Bàn
+                </div>
+                <div className="text-lg font-semibold text-[#1890ff] tracking-tight">
+                  {selectedTable.table_number}
+                </div>
+              </div>
+              <div className="flex-1 text-right">
+                <div className="text-xs text-[#8c8c8c] mb-1 font-medium">
+                  Đơn hàng
+                </div>
+                <div className="text-[15px] font-semibold text-[#262626] font-mono">
+                  #{order.order_id}
+                </div>
+              </div>
+            </div>
+
+            {/* Order Details */}
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-[13px] text-[#595959] font-medium">
+                Số lượng món
+              </span>
+              <span className="text-[13px] text-[#262626] font-semibold">
+                {itemCount} món ({totalQuantity} phần)
+              </span>
+            </div>
+
+            {/* Divider */}
+            <div className="h-px bg-gradient-to-r from-transparent via-[#d9d9d9] to-transparent my-3" />
+
+            {/* Total Amount */}
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-[#262626] font-semibold">
+                Tổng thanh toán
+              </span>
+              <div className="text-2xl font-bold text-[#52c41a] tracking-tight">
+                {Number(total)?.toLocaleString('vi-VN')}₫
+              </div>
+            </div>
+          </div>
+
+          {/* Confirmation Message */}
+          <div className="bg-[#e6f4ff] border border-[#91caff] rounded-lg p-3 px-4 flex items-start gap-2.5">
+            <span className="text-base leading-5">
+              💳
+            </span>
+            <div className="flex-1 text-[13px] text-[#0958d9] leading-relaxed">
+              Xác nhận khách hàng đã thanh toán đầy đủ số tiền trên?
+            </div>
+          </div>
+        </div>
+      ),
+      okText: 'Xác nhận thanh toán',
+      okType: 'primary',
+      cancelText: 'Quay lại',
+      okButtonProps: {
+        size: 'large',
+        className: 'h-11 text-[15px] font-semibold rounded-lg bg-[#226533] border-[#226533] shadow-[0_2px_8px_rgba(34,101,51,0.25)] hover:bg-[#1a4d26]'
+      },
+      cancelButtonProps: {
+        size: 'large',
+        className: 'h-11 text-[15px] font-medium rounded-lg border border-[#d9d9d9]'
+      },
+      onOk: async () => {
+        try {
+          setLoadingOrders(true)
+
+          await axios.put(`${REACT_APP_API_URL}/orders/${order.order_id}/status`, {
+            status: 'PAID'
+          })
+
+          message.success('Đã cập nhật trạng thái thanh toán!')
+
+          // Chỉ update table hiện tại thay vì fetch tất cả
+          await updateSingleTableOrders(selectedTable.id)
+
+          // Close order panel
+          setOrderPanelOpen(false)
+        } catch (err) {
+          console.error('Failed to update payment status:', err)
+          const errorMsg = err.response?.data?.message || 'Cập nhật trạng thái thất bại!'
+          message.error(errorMsg)
+        } finally {
+          setLoadingOrders(false)
+        }
+      }
+    })
   }
 
   const calculateTotal = () => {
@@ -847,20 +1230,41 @@ const TablesPage = () => {
 
     const currentStyle = cardStyles[status] || cardStyles.available
 
+    // Menu click handler để prevent propagation
+    const handleMenuClick = ({ key, domEvent }) => {
+      // Stop event propagation để không trigger card click
+      if (domEvent) {
+        domEvent.stopPropagation()
+      }
+
+      // Execute action based on key
+      switch (key) {
+        case 'print':
+          handlePrintQR(table, domEvent)
+          break
+        case 'edit':
+          openEditDrawer(table, domEvent)
+          break
+        case 'delete':
+          handleDeleteClick(table, domEvent)
+          break
+        default:
+          break
+      }
+    }
+
     // Menu items for Dropdown
     const menuItems = [
       {
         key: 'print',
         icon: <PrinterOutlined />,
         label: 'In QR',
-        disabled: !table.qr_code_url,
-        onClick: () => handlePrintQR(table, null)
+        disabled: !table.qr_code_url
       },
       {
         key: 'edit',
         icon: <EditOutlined />,
-        label: 'Chỉnh sửa',
-        onClick: () => openEditDrawer(table, null)
+        label: 'Chỉnh sửa'
       },
       {
         type: 'divider'
@@ -869,8 +1273,7 @@ const TablesPage = () => {
         key: 'delete',
         icon: <DeleteOutlined />,
         label: 'Xóa',
-        danger: true,
-        onClick: () => handleDeleteClick(table, null)
+        danger: true
       }
     ]
 
@@ -899,7 +1302,10 @@ const TablesPage = () => {
         >
           {/* Action Menu - Top Right */}
           <Dropdown
-            menu={{ items: menuItems }}
+            menu={{
+              items: menuItems,
+              onClick: handleMenuClick
+            }}
             trigger={['click']}
             placement="bottomRight"
           >
@@ -1239,6 +1645,24 @@ const TablesPage = () => {
             }}
           >
             <Space direction="vertical" style={{ width: '100%' }} size="middle">
+              <Space style={{ width: '100%' }} size="middle">
+                <Button
+                  size="medium"
+                  icon={<BellOutlined />}
+                  onClick={handleNotifyKitchen}
+                  style={{ flex: 1 }}
+                >
+                  Báo bếp
+                </Button>
+                <Button
+                  size="medium"
+                  danger
+                  onClick={handleCancelOrder}
+                  style={{ flex: 1 }}
+                >
+                  Hủy đơn
+                </Button>
+              </Space>
               <Button
                 type="primary"
                 size="large"
@@ -1253,23 +1677,6 @@ const TablesPage = () => {
               >
                 Thanh toán • {Number(total)?.toLocaleString('vi-VN')}đ
               </Button>
-              <Space style={{ width: '100%' }} size="middle">
-                <Button
-                  size="medium"
-                  icon={<BellOutlined />}
-                  onClick={handleNotifyKitchen}
-                  style={{ flex: 1 }}
-                >
-                  Báo bếp
-                </Button>
-                <Button
-                  size="medium"
-                  danger
-                  style={{ flex: 1 }}
-                >
-                  Hủy đơn
-                </Button>
-              </Space>
             </Space>
           </div>
         )}
@@ -1346,6 +1753,12 @@ const TablesPage = () => {
 
                 {/* Actions */}
                 <Space>
+                  <Button
+                    icon={<PrinterOutlined />}
+                    onClick={handlePrintAllQR}
+                  >
+                    In tất cả QR
+                  </Button>
                   <Button
                     type="primary"
                     icon={<PlusOutlined />}
