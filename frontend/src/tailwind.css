@@ -310,5 +310,55 @@
     font-weight: 500;
   }
 
+  /* Custom Validation Error Styles */
+  .japanese-modal .ant-form-item-has-error .ant-input,
+  .japanese-modal .ant-form-item-has-error .ant-input:hover,
+  .japanese-modal .ant-form-item-has-error .ant-input:focus,
+  .japanese-modal .ant-form-item-has-error .ant-input-number,
+  .japanese-modal .ant-form-item-has-error .ant-input-number:hover,
+  .japanese-modal .ant-form-item-has-error .ant-input-number-focused,
+  .japanese-modal .ant-form-item-has-error .ant-select-selector,
+  .japanese-modal .ant-form-item-has-error .ant-select-selector:hover,
+  .japanese-modal .ant-form-item-has-error .ant-select-focused .ant-select-selector,
+  .japanese-modal .ant-form-item-has-error .ant-input-textarea-show-count::after {
+    border-color: #ef4444 !important;
+    border-width: 1.5px !important;
+    background-color: #fef2f2 !important;
+  }
+
+  .japanese-modal .ant-form-item-has-error .ant-input:focus,
+  .japanese-modal .ant-form-item-has-error .ant-input-number-focused,
+  .japanese-modal .ant-form-item-has-error .ant-select-focused .ant-select-selector {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
+  }
+
+  .japanese-modal .ant-form-item-explain-error {
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    color: #dc2626 !important;
+    margin-top: 6px !important;
+    padding-left: 4px !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    letter-spacing: 0.01em !important;
+    line-height: 1.4 !important;
+  }
+
+  .japanese-modal .ant-form-item-explain-error::before {
+    content: "⚠ ";
+    font-size: 13px;
+    margin-right: 4px;
+    opacity: 0.9;
+  }
+
+  /* Textarea error state */
+  .japanese-modal .ant-form-item-has-error textarea.ant-input {
+    border-color: #ef4444 !important;
+    border-width: 1.5px !important;
+    background-color: #fef2f2 !important;
+  }
+
+  .japanese-modal .ant-form-item-has-error textarea.ant-input:focus {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
+  }
 
 }

@@ -228,7 +228,7 @@ export async function hardDeleteMenuItem(id) {
 
 // Lấy danh sách tất cả danh mục (Read All)
 export async function getMenuCategories() {
-  const sql = "SELECT * FROM menu_categories WHERE is_available = 1";
+  const sql = "SELECT * FROM menu_categories";
   const rows = await query(sql);
   return rows;
 }
@@ -944,7 +944,7 @@ export async function importMenuItemsFromExcel(fileBuffer, options = {}) {
           price: parseFloat(row.getCell(2).value),
           description: row.getCell(3).value?.toString().trim() || null,
           // Parse categories - có thể là một hoặc nhiều category IDs cách nhau bởi dấu phảy
-          category_ids: row.getCell(4).value 
+          category_ids: row.getCell(4).value
             ? row.getCell(4).value.toString().split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
             : [],
           image_url: row.getCell(5).value?.toString().trim() || null,
@@ -968,7 +968,7 @@ export async function importMenuItemsFromExcel(fileBuffer, options = {}) {
             'SELECT id FROM menu_categories WHERE id IN (?)',
             [itemData.category_ids]
           );
-          
+
           if (categoryCheck.length !== itemData.category_ids.length) {
             const foundIds = categoryCheck.map(c => c.id);
             const missingIds = itemData.category_ids.filter(id => !foundIds.includes(id));
@@ -998,7 +998,7 @@ export async function importMenuItemsFromExcel(fileBuffer, options = {}) {
             if (itemData.category_ids.length > 0) {
               // Delete old relationships
               await conn.query('DELETE FROM menu_item_categories WHERE item_id = ?', [existingItemId]);
-              
+
               // Insert new relationships (multiple categories)
               const values = itemData.category_ids.map(catId => [existingItemId, catId]);
               if (values.length > 0) {

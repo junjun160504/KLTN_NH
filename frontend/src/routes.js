@@ -1,10 +1,12 @@
 import LoginPage from "./page/management/auth/Login";
 import Home from "./page/management/Main/Homes";
 import OrderPage from "./page/management/Main/Orders";
-import MenuPage from "./page/management/Main/Categorys";
+import MenuPage from "./page/management/Main/Menus";
+import CategoriesPage from "./page/management/Main/Categories";
 import TablePage from "./page/management/Main/Tables";
 import CustomerPage from "./page/management/Main/Customers";
 import StaffPage from "./page/management/Main/Staffs";
+import AccountPage from "./page/management/Main/Accounts";
 import ReportsSalesPage from "./page/management/Main/ReportsSales";
 import ReportsProductsPage from "./page/management/Main/ReportsProducts";
 import ReportsCustomersPage from "./page/management/Main/ReportsCustomers";
@@ -50,10 +52,18 @@ const routes = [
     ),
   },
   {
-    path: "/main/categorys",
+    path: "/main/menus",
     element: (
       <ProtectedAdminRoute>
         <AdminLayout><MenuPage /></AdminLayout>
+      </ProtectedAdminRoute>
+    ),
+  },
+  {
+    path: "/main/categorys",
+    element: (
+      <ProtectedAdminRoute>
+        <AdminLayout><CategoriesPage /></AdminLayout>
       </ProtectedAdminRoute>
     ),
   },
@@ -78,6 +88,14 @@ const routes = [
     element: (
       <ProtectedAdminRoute>
         <AdminLayout><StaffPage /></AdminLayout>
+      </ProtectedAdminRoute>
+    ),
+  },
+  {
+    path: "/main/accounts",
+    element: (
+      <ProtectedAdminRoute>
+        <AdminLayout><AccountPage /></AdminLayout>
       </ProtectedAdminRoute>
     ),
   },

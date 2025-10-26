@@ -9,6 +9,7 @@ import {
   BarChartOutlined,
   TableOutlined,
   WindowsOutlined,
+  SafetyOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 
@@ -22,10 +23,12 @@ const AppSidebar = ({ collapsed, currentPageKey, setPageTitle }) => {
   const menuConfig = {
     homes: { path: "/main/homes", title: "Tổng quan" },
     orders: { path: "/main/orders", title: "Đơn hàng" },
-    categorys: { path: "/main/categorys", title: "Thực đơn" },
+    categorys: { path: "/main/categorys", title: "Danh mục" },
+    menus: { path: "/main/menus", title: "Thực đơn" },
     tables: { path: "/main/tables", title: "Bàn" },
     customers: { path: "/main/customers", title: "Khách hàng" },
     staffs: { path: "/main/staffs", title: "Nhân viên" },
+    accounts: { path: "/main/accounts", title: "Tài khoản" },
     report_sales: { path: "/main/reports/sales", title: "Báo cáo bán hàng" },
     report_products: { path: "/main/reports/products", title: "Báo cáo sản phẩm" },
     report_customers: { path: "/main/reports/customers", title: "Báo cáo khách hàng" },
@@ -44,39 +47,19 @@ const AppSidebar = ({ collapsed, currentPageKey, setPageTitle }) => {
       collapsible
       collapsed={collapsed}
       width={220}
-      style={{
-        background: "#fff",
-        position: "fixed",
-        left: 0,
-        top: 0,
-        bottom: 0,
-        zIndex: 100,
-      }}
+      className="fixed left-0 top-0 bottom-0 z-[100] bg-white"
     >
-      {/* Logo */}
-      <div
-        style={{
-          height: 100,
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          overflow: "hidden",
-        }}
-      >
+      {/* Logo - Grid Layout */}
+      <div className="h-24 grid place-items-center overflow-hidden">
         <img
           src="/assets/images/Logo.png"
           alt="logo"
-          style={{ height: collapsed ? 40 : 80 }}
+          className={collapsed ? "h-10" : "h-20"}
         />
       </div>
 
-      {/* Menu có scroll */}
-      <div
-        style={{
-          height: "calc(100% - 100px)", // trừ chiều cao logo
-          overflowY: "auto",
-        }}
-      >
+      {/* Menu với scroll - Grid Layout */}
+      <div className="h-[calc(100%-6rem)] overflow-y-auto">
         <Menu
           mode="inline"
           selectedKeys={[currentPageKey]}
@@ -87,19 +70,21 @@ const AppSidebar = ({ collapsed, currentPageKey, setPageTitle }) => {
           }}
           items={[
             { key: "homes", icon: <AppstoreOutlined />, label: "Tổng quan" },
+            { key: 'tables', icon: <TableOutlined />, label: 'Bàn' },
             { key: "orders", icon: <ShoppingCartOutlined />, label: "Đơn hàng" },
             {
-              key: "category",
+              key: "menus",
               icon: <WindowsOutlined />,
-              label: "Danh mục",
+              label: "Sản phẩm",
               children: [
-                { key: "categorys", icon: <CoffeeOutlined />, label: "Thực đơn" },
-                { key: "tables", icon: <TableOutlined />, label: "Bàn" },
+                { key: "menus", icon: <CoffeeOutlined />, label: "Thực đơn" },
+                { key: "categorys", icon: <CoffeeOutlined />, label: "Danh mục" }
               ],
-              onTitleClick: () => toggleSubmenu("category"),
+              onTitleClick: () => toggleSubmenu("menus", "categorys"),
             },
             { key: "customers", icon: <UserOutlined />, label: "Khách hàng" },
             { key: "staffs", icon: <TeamOutlined />, label: "Nhân viên" },
+            { key: "accounts", icon: <SafetyOutlined />, label: "Tài khoản" },
             {
               key: "report",
               icon: <BarChartOutlined />,
