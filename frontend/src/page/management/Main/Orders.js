@@ -151,6 +151,138 @@ function OrderPage() {
     }
   }, [])
 
+  // Generate HTML template cho kitchen bill (MUST BE BEFORE printKitchenBill)
+  const getKitchenBillHTML = useCallback((order, items) => {
+    const now = new Date().toLocaleString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+
+    const totalItems = items.length
+    const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0)
+
+    return `
+      <!DOCTYPE html>
+      <html lang="vi">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Báo bếp - ${order.table}</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <style>
+            @page { 
+              size: 80mm auto; 
+              margin: 0; 
+            }
+            body { 
+              margin: 0;
+              padding: 0;
+              font-family: 'Courier New', monospace;
+            }
+            @media print {
+              body { 
+                width: 80mm;
+                margin: 0 auto;
+              }
+            }
+          </style>
+        </head>
+        <body class="bg-white p-4">
+          <!-- Header -->
+          <div class="text-center border-b-2 border-dashed border-gray-800 pb-3 mb-3">
+            <h1 class="text-2xl font-bold mb-1">🍽️ NHÀ HÀNG</h1>
+            <h2 class="text-xl font-bold">PHIẾU BÁO BẾP</h2>
+          </div>
+
+          <!-- Order Info -->
+          <div class="space-y-2 mb-3 text-sm">
+            <div class="flex justify-between items-center">
+              <span class="font-semibold">Bàn:</span>
+              <span class="text-xl font-bold">${order.table}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="font-semibold">Đơn hàng:</span>
+              <span class="font-mono">${order.code}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="font-semibold">Thời gian:</span>
+              <span>${now}</span>
+            </div>
+          </div>
+
+          <!-- Items List -->
+          <div class="space-y-3 mb-3">
+            ${items.map(item => `
+              <div class="border-b border-gray-300 pb-3">
+                <div class="flex justify-between items-start mb-1">
+                  <div class="font-bold text-base flex-1 pr-2">${item.name}</div>
+                  <div class="text-2xl font-bold whitespace-nowrap">x${item.quantity}</div>
+                </div>
+                ${item.note ? `
+                  <div class="text-sm italic text-gray-600 mt-2 pl-3 border-l-2 border-orange-400">
+                    📝 ${item.note}
+                  </div>
+                ` : ''}
+              </div>
+            `).join('')}
+          </div>
+
+          <!-- Footer -->
+          <div class="border-t-2 border-dashed border-gray-800 pt-3 text-center text-sm">
+            <div class="mb-2">━━━━━━━━━━━━━━━━━━━━</div>
+            <div class="font-bold">
+              Tổng: ${totalItems} món - ${totalQuantity} phần
+            </div>
+            <div class="mt-3 text-xs text-gray-600">
+              In lúc: ${now}
+            </div>
+          </div>
+        </body>
+      </html>
+    `
+  }, [])
+
+  // Print kitchen bill using iframe (same as Tables.js)
+  const printKitchenBill = useCallback((order, items) => {
+    if (!order || !items || items.length === 0) {
+      message.error('Không có thông tin đơn hàng để in!')
+      return
+    }
+
+    // Tạo iframe ẩn
+    const iframe = document.createElement('iframe')
+    iframe.style.position = 'fixed'
+    iframe.style.right = '0'
+    iframe.style.bottom = '0'
+    iframe.style.width = '0'
+    iframe.style.height = '0'
+    iframe.style.border = 'none'
+
+    document.body.appendChild(iframe)
+
+    const iframeDoc = iframe.contentWindow.document
+    iframeDoc.open()
+    iframeDoc.write(getKitchenBillHTML(order, items))
+    iframeDoc.close()
+
+    // Trigger print sau khi load xong
+    iframe.onload = () => {
+      setTimeout(() => {
+        iframe.contentWindow.focus()
+        iframe.contentWindow.print()
+
+        // Xóa iframe sau khi in
+        setTimeout(() => {
+          document.body.removeChild(iframe)
+        }, 1000)
+      }, 500)
+    }
+  }, [getKitchenBillHTML])
+
   const updateOrderStatusAPI = useCallback(async (orderId, newStatus) => {
     try {
       const response = await axios.put(
@@ -503,14 +635,28 @@ function OrderPage() {
   }, [fetchOrderDetails])
 
   const handleUpdateStatus = useCallback(async (orderId, newStatus) => {
+    // Lấy thông tin đơn hàng trước khi update
+    let orderToPrint = null
+    if (newStatus === 'IN_PROGRESS') {
+      // Tìm order từ danh sách hoặc selectedOrder
+      orderToPrint = selectedOrder?.id === orderId
+        ? selectedOrder
+        : orders.find(o => o.id === orderId)
+    }
+
     const success = await updateOrderStatusAPI(orderId, newStatus)
     if (success) {
+      // Nếu xác nhận đơn (NEW → IN_PROGRESS), in bill báo bếp
+      if (newStatus === 'IN_PROGRESS' && orderToPrint) {
+        printKitchenBill(orderToPrint, orderToPrint.items)
+      }
+
       // Refresh detail view nếu đang mở
       if (selectedOrder && selectedOrder.id === orderId) {
         await fetchOrderDetails(orderId)
       }
     }
-  }, [updateOrderStatusAPI, selectedOrder, fetchOrderDetails])
+  }, [updateOrderStatusAPI, selectedOrder, fetchOrderDetails, orders, printKitchenBill])
 
   const handlePaymentConfirm = useCallback((order) => {
     modal.confirm({

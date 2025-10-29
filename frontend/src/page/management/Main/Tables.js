@@ -157,6 +157,9 @@ const TablesPage = () => {
   const [loadingOrders, setLoadingOrders] = useState(false)
   const [allTablesOrders, setAllTablesOrders] = useState({}) // Lưu orders của tất cả bàn {table_id: [orders]}
 
+  // Note editing state - track which notes have been modified
+  const [editingNotes, setEditingNotes] = useState({}) // { [orderItemId]: { value: string, originalValue: string, isSaving: boolean } }
+
   // Menu selection state
   const [menuModalOpen, setMenuModalOpen] = useState(false)
   const [categories, setCategories] = useState([])
@@ -351,6 +354,7 @@ const TablesPage = () => {
               quantity: item.quantity,
               price: item.unit_price,
               image: item.image_url || item.image || 'https://via.placeholder.com/70',
+              note: item.note || '', // Thêm note field
               order_id: order.id,
               order_status: order.status
             }))
@@ -438,6 +442,7 @@ const TablesPage = () => {
   const handleTableClick = (table) => {
     setSelectedTable(table)
     setOrderPanelOpen(true)
+    setEditingNotes({}) // Clear editing notes when switching tables
     // Luôn fetch orders từ API mỗi khi click vào table
     // API sẽ trả về data mới nhất, logic bên trong sẽ so sánh và chỉ update UI nếu có thay đổi
     fetchOrdersByTable(table.id)
@@ -905,6 +910,7 @@ const TablesPage = () => {
           quantity: 1,
           price: menuItem.price,
           image: menuItem.image_url || 'https://via.placeholder.com/70',
+          note: newOrderItem.note || '', // Thêm note field
           order_id: newOrder.id,
           order_status: newOrder.status
         }
@@ -944,11 +950,247 @@ const TablesPage = () => {
     }
   }
 
+  // ================= Note Actions =================
+  const handleSaveNote = async (orderItemId, item) => {
+    // Lấy giá trị từ textarea khi nhấn "Lưu"
+    const textarea = document.getElementById(`note-textarea-${orderItemId}`)
+    if (!textarea) return
+
+    const newNote = textarea.value.trim()
+    const originalNote = (item.note || '').trim()
+
+    // Check if note actually changed
+    if (newNote === originalNote) {
+      // No change, just clear editing state
+      setEditingNotes(prev => {
+        const updated = { ...prev }
+        delete updated[orderItemId]
+        return updated
+      })
+      message.info('Không có thay đổi')
+      return
+    }
+
+    // Set saving state
+    setEditingNotes(prev => ({
+      ...prev,
+      [orderItemId]: { isEditing: true, isSaving: true }
+    }))
+
+    try {
+      // Call API to update note - sử dụng endpoint staff/orders
+      await axios.put(
+        `${REACT_APP_API_URL}/staff/orders/item/${orderItemId}`,
+        {
+          quantity: item.quantity,
+          note: newNote || null
+        }
+      )
+
+      // Update currentOrderItems with new note
+      setCurrentOrderItems(prev =>
+        prev.map(i =>
+          i.order_item_id === orderItemId
+            ? { ...i, note: newNote }
+            : i
+        )
+      )
+
+      // Clear editing state
+      setEditingNotes(prev => {
+        const updated = { ...prev }
+        delete updated[orderItemId]
+        return updated
+      })
+
+      message.success('Đã lưu ghi chú', 1.5)
+    } catch (err) {
+      console.error('Failed to save note:', err)
+      message.error('Lưu ghi chú thất bại!')
+
+      // Keep editing state but remove saving flag
+      setEditingNotes(prev => ({
+        ...prev,
+        [orderItemId]: { isEditing: true, isSaving: false }
+      }))
+    }
+  }
+
   // ================= Cart Actions =================
 
-  const handleNotifyKitchen = () => {
-    message.success('Đã gửi thông báo xuống bếp!')
-    // TODO: Implement API call to notify kitchen
+  // Print kitchen bill using iframe
+  const printKitchenBill = (order, table, items) => {
+    if (!order || !table || !items || items.length === 0) {
+      message.error('Không có thông tin đơn hàng để in!')
+      return
+    }
+
+    // Tạo iframe ẩn
+    const iframe = document.createElement('iframe')
+    iframe.style.position = 'fixed'
+    iframe.style.right = '0'
+    iframe.style.bottom = '0'
+    iframe.style.width = '0'
+    iframe.style.height = '0'
+    iframe.style.border = 'none'
+
+    document.body.appendChild(iframe)
+
+    const iframeDoc = iframe.contentWindow.document
+    iframeDoc.open()
+    iframeDoc.write(getKitchenBillHTML(order, table, items))
+    iframeDoc.close()
+
+    // Trigger print sau khi load xong
+    iframe.onload = () => {
+      setTimeout(() => {
+        iframe.contentWindow.focus()
+        iframe.contentWindow.print()
+
+        // Xóa iframe sau khi in
+        setTimeout(() => {
+          document.body.removeChild(iframe)
+        }, 1000)
+      }, 500)
+    }
+  }
+
+  // Generate HTML template cho kitchen bill
+  const getKitchenBillHTML = (order, table, items) => {
+    const now = new Date().toLocaleString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+
+    const totalItems = items.length
+    const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0)
+
+    return `
+      <!DOCTYPE html>
+      <html lang="vi">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Báo bếp - Bàn ${table.table_number}</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <style>
+            @page { 
+              size: 80mm auto; 
+              margin: 0; 
+            }
+            body { 
+              margin: 0;
+              padding: 0;
+              font-family: 'Courier New', monospace;
+            }
+            @media print {
+              body { 
+                width: 80mm;
+                margin: 0 auto;
+              }
+            }
+          </style>
+        </head>
+        <body class="bg-white p-4">
+          <!-- Header -->
+          <div class="text-center border-b-2 border-dashed border-gray-800 pb-3 mb-3">
+            <h1 class="text-2xl font-bold mb-1">🍽️ NHÀ HÀNG</h1>
+            <h2 class="text-xl font-bold">PHIẾU BÁO BẾP</h2>
+          </div>
+
+          <!-- Order Info -->
+          <div class="space-y-2 mb-3 text-sm">
+            <div class="flex justify-between items-center">
+              <span class="font-semibold">Bàn:</span>
+              <span class="text-xl font-bold">${table.table_number}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="font-semibold">Đơn hàng:</span>
+              <span class="font-mono">#${order.order_id}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="font-semibold">Thời gian:</span>
+              <span>${now}</span>
+            </div>
+          </div>
+
+          <!-- Items List -->
+          <div class="space-y-3 mb-3">
+            ${items.map(item => `
+              <div class="border-b border-gray-300 pb-3">
+                <div class="flex justify-between items-start mb-1">
+                  <div class="font-bold text-base flex-1 pr-2">${item.name}</div>
+                  <div class="text-2xl font-bold whitespace-nowrap">x${item.quantity}</div>
+                </div>
+                ${item.note ? `
+                  <div class="text-sm italic text-gray-600 mt-2 pl-3 border-l-2 border-orange-400">
+                    📝 ${item.note}
+                  </div>
+                ` : ''}
+              </div>
+            `).join('')}
+          </div>
+
+          <!-- Footer -->
+          <div class="border-t-2 border-dashed border-gray-800 pt-3 text-center text-sm">
+            <div class="mb-2">━━━━━━━━━━━━━━━━━━━━</div>
+            <div class="font-bold">
+              Tổng: ${totalItems} món - ${totalQuantity} phần
+            </div>
+            <div class="mt-3 text-xs text-gray-600">
+              In lúc: ${now}
+            </div>
+          </div>
+        </body>
+      </html>
+    `
+  }
+
+  const handleNotifyKitchen = async () => {
+    const order = getTableOrder(selectedTable)
+
+    if (!order) {
+      message.warning('Không tìm thấy đơn hàng!')
+      return
+    }
+
+    // Kiểm tra trạng thái đơn hàng
+    if (order.status === 'IN_PROGRESS') {
+      message.info('Đơn hàng đã được xác nhận trước đó!')
+      // Vẫn cho phép in lại bill
+      printKitchenBill(order, selectedTable, currentOrderItems)
+      return
+    }
+
+    if (order.status !== 'NEW') {
+      message.warning('Chỉ có thể báo bếp cho đơn hàng mới!')
+      return
+    }
+
+    try {
+      setLoadingOrders(true)
+
+      // 1. Confirm order (NEW → IN_PROGRESS)
+      await axios.put(`${REACT_APP_API_URL}/staff/orders/${order.order_id}/confirm`)
+
+      message.success('Đã xác nhận đơn hàng!')
+
+      // 2. Print kitchen bill
+      printKitchenBill(order, selectedTable, currentOrderItems)
+
+      // 3. Update UI - chỉ update table hiện tại
+      await updateSingleTableOrders(selectedTable.id)
+    } catch (err) {
+      console.error('Failed to notify kitchen:', err)
+      const errorMsg = err.response?.data?.message || 'Gửi thông báo bếp thất bại!'
+      message.error(errorMsg)
+    } finally {
+      setLoadingOrders(false)
+    }
   }
 
   const handleCancelOrder = async () => {
@@ -1412,6 +1654,7 @@ const TablesPage = () => {
               onClick={() => {
                 setOrderPanelOpen(false)
                 setMenuModalOpen(false) // Đóng cả modal chọn món
+                setEditingNotes({}) // Clear editing notes
               }}
             />
           </div>
@@ -1466,62 +1709,54 @@ const TablesPage = () => {
                       <Card
                         key={uniqueKey}
                         size="small"
-                        style={{
-                          marginBottom: '10px',
-                          borderRadius: '8px',
-                          overflow: 'hidden'
-                        }}
-                        bodyStyle={{ padding: '10px' }}
+                        className="mb-2.5 rounded-lg overflow-hidden border border-[#f0f0f0] hover:border-[#d9d9d9] transition-all duration-200"
+                        bodyStyle={{ padding: '12px' }}
                       >
-                        <div style={{ display: 'flex', gap: '10px' }}>
+                        <div className="flex gap-3">
                           {/* Item Image */}
                           <img
                             src={item.image}
                             alt={item.name}
-                            style={{
-                              width: '70px',
-                              height: '70px',
-                              objectFit: 'cover',
-                              borderRadius: '6px',
-                              flexShrink: 0
-                            }}
+                            className="w-[70px] h-[70px] object-cover rounded-lg flex-shrink-0"
                             onError={(e) => {
                               e.target.src = 'https://via.placeholder.com/70x70.png?text=No+Image'
                             }}
                           />
 
                           {/* Item Info */}
-                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                          <div className="flex-1 flex flex-col justify-between">
                             <div>
-                              <Text strong style={{ fontSize: '14px', display: 'block' }}>
+                              <Text strong className="text-sm block mb-1">
                                 {item.name}
                               </Text>
-                              <Text type="secondary" style={{ fontSize: '12px' }}>
+                              <Text type="secondary" className="text-xs">
                                 {item.price?.toLocaleString('vi-VN')}đ
                               </Text>
                             </div>
 
                             {/* Quantity Controls */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div className="flex justify-between items-center mt-2">
                               <Space size="small">
                                 <Button
                                   size="small"
                                   icon={<MinusOutlined />}
                                   onClick={() => handleDecreaseQuantity(orderItemId)}
                                   disabled={item.quantity <= 1}
+                                  className="w-7 h-7 flex items-center justify-center rounded-md"
                                 />
-                                <Text strong style={{ fontSize: '13px', minWidth: '25px', textAlign: 'center' }}>
+                                <Text strong className="text-[13px] min-w-[25px] text-center">
                                   {item.quantity}
                                 </Text>
                                 <Button
                                   size="small"
                                   icon={<PlusOutlined />}
                                   onClick={() => handleIncreaseQuantity(orderItemId)}
+                                  className="w-7 h-7 flex items-center justify-center rounded-md"
                                 />
                               </Space>
 
                               <Space>
-                                <Text strong style={{ color: '#1890ff', fontSize: '14px' }}>
+                                <Text strong className="text-[#1890ff] text-sm">
                                   {(item.price * item.quantity)?.toLocaleString('vi-VN')}đ
                                 </Text>
                                 <Button
@@ -1529,9 +1764,79 @@ const TablesPage = () => {
                                   danger
                                   icon={<DeleteOutlined />}
                                   onClick={() => handleRemoveItem(orderItemId)}
+                                  className="w-7 h-7 flex items-center justify-center rounded-md"
                                 />
                               </Space>
                             </div>
+                          </div>
+                        </div>
+
+                        {/* Note Section - Japanese Design with Save Button */}
+                        <div className="mt-3 pt-3 border-t border-[#f0f0f0]">
+                          <div className="flex gap-2">
+                            <Input.TextArea
+                              id={`note-textarea-${orderItemId}`}
+                              placeholder="💬 Thêm ghi chú cho món ăn..."
+                              defaultValue={item.note || ''}
+                              onFocus={() => {
+                                // Đánh dấu đang editing - hiện nút Lưu/Hủy
+                                if (!editingNotes[orderItemId]) {
+                                  setEditingNotes(prev => ({
+                                    ...prev,
+                                    [orderItemId]: { isEditing: true, isSaving: false }
+                                  }))
+                                }
+                              }}
+                              autoSize={{ minRows: 1, maxRows: 3 }}
+                              className="text-[13px] leading-relaxed flex-1"
+                              style={{
+                                borderRadius: '6px',
+                                borderColor: editingNotes[orderItemId] ? '#1890ff' : '#e8e8e8',
+                                backgroundColor: '#fafafa',
+                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                              }}
+                            />
+                            {editingNotes[orderItemId] && (
+                              <Space size="small" className="self-start">
+                                <Button
+                                  size="small"
+                                  onClick={() => {
+                                    // Hủy thay đổi - reset input về giá trị ban đầu
+                                    const textarea = document.getElementById(`note-textarea-${orderItemId}`)
+                                    if (textarea) {
+                                      textarea.value = item.note || ''
+                                    }
+                                    // Xóa editing state
+                                    setEditingNotes(prev => {
+                                      const updated = { ...prev }
+                                      delete updated[orderItemId]
+                                      return updated
+                                    })
+                                  }}
+                                  className="h-7 px-3 rounded-md flex items-center justify-center"
+                                  style={{
+                                    fontSize: '12px',
+                                    fontWeight: 500
+                                  }}
+                                >
+                                  Hủy
+                                </Button>
+                                <Button
+                                  type="primary"
+                                  size="small"
+                                  loading={editingNotes[orderItemId]?.isSaving}
+                                  onClick={() => handleSaveNote(orderItemId, item)}
+                                  className="h-7 px-3 rounded-md bg-[#1890ff] hover:bg-[#40a9ff] flex items-center justify-center"
+                                  style={{
+                                    minWidth: '60px',
+                                    fontSize: '12px',
+                                    fontWeight: 500
+                                  }}
+                                >
+                                  {editingNotes[orderItemId]?.isSaving ? 'Đang lưu...' : 'Lưu'}
+                                </Button>
+                              </Space>
+                            )}
                           </div>
                         </div>
                       </Card>
@@ -2120,6 +2425,7 @@ const TablesPage = () => {
               onClose={() => {
                 setOrderPanelOpen(false)
                 setMenuModalOpen(false) // Đóng modal chọn món khi đóng order panel
+                setEditingNotes({}) // Clear editing notes
               }}
               closable={false}
               mask={true} // Hiển thị mask để có thể click outside
