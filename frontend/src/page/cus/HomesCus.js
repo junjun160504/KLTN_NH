@@ -11,7 +11,9 @@ import {
   Tag,
   Carousel,
   Modal,
-  message,
+  Input,
+  Form,
+  App,
 } from "antd";
 import {
   GiftOutlined,
@@ -19,6 +21,8 @@ import {
   WechatOutlined,
   ShoppingOutlined,
   EnvironmentFilled,
+  PhoneOutlined,
+  StarFilled,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useParams } from "react-router-dom";
@@ -29,17 +33,37 @@ const { Title, Text } = Typography;
 
 export default function HomecsPage() {
   const navigate = useNavigate();
+  const { modal, message } = App.useApp(); // ✅ Use App hook for modal and message
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const { tableId } = useParams();
-  console.log("Table ID from URL:", tableId);
+  // ✅ Loyalty Modal states
+  const [isLoyaltyModalVisible, setIsLoyaltyModalVisible] = useState(false);
+  const [isLoyaltyLoading, setIsLoyaltyLoading] = useState(false);
+  const [loyaltyCustomer, setLoyaltyCustomer] = useState(null); // ✅ Store customer info
+  const [form] = Form.useForm();
+
+  // ✅ Check if customer already registered on mount
   useEffect(() => {
-    if (tableId) {
-      // lưu tableId vào sessionStorage
-      sessionStorage.setItem("tableId", tableId);
+    const savedCustomer = localStorage.getItem('loyalty_customer');
+    if (savedCustomer) {
+      try {
+        setLoyaltyCustomer(JSON.parse(savedCustomer));
+      } catch (error) {
+        console.error('Error parsing loyalty customer:', error);
+        localStorage.removeItem('loyalty_customer');
+      }
     }
-  }, [tableId]);
+  }, []);
+
+  const { table_id } = useParams();
+  console.log("Table ID from URL:", table_id);
+  useEffect(() => {
+    if (table_id) {
+      // lưu table_id vào sessionStorage
+      sessionStorage.setItem("table_id", table_id);
+    }
+  }, [table_id]);
 
   // Gọi nhân viên
   const handleCallStaff = async () => {
@@ -63,18 +87,148 @@ export default function HomecsPage() {
       });
 
       if (response.status === 201) {
-        message.success("Đã gọi nhân viên thành công! Nhân viên sẽ tới ngay.");
+        message.success("Gọi nhân viên thành công!");
         setIsModalVisible(false);
       }
     } catch (error) {
       console.error("Error calling staff:", error);
       message.error(
-        error.response?.data?.error || "Có lỗi xảy ra khi gọi nhân viên. Vui lòng thử lại."
+        error.response?.data?.error || "Có lỗi xảy ra. Vui lòng thử lại sau."
       );
     } finally {
       setIsLoading(false);
     }
   };
+
+  // ✅ Handle Loyalty Registration
+  const handleLoyaltySubmit = async () => {
+    try {
+      // Validate form
+      const values = await form.validateFields();
+      const phone = values.phone.trim();
+
+      setIsLoyaltyLoading(true);
+
+      // Call API to register customer
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/customers`, {
+        phone: phone,
+      });
+
+      if (response.status === 201 || response.status === 200) {
+        const customerData = response.data.data;
+
+        // Save to localStorage for future use
+        const customerInfo = {
+          id: customerData.id,
+          phone: customerData.phone,
+          loyalty_points: customerData.loyalty_points || 0,
+        };
+        localStorage.setItem('loyalty_customer', JSON.stringify(customerInfo));
+        setLoyaltyCustomer(customerInfo); // ✅ Update state
+
+        message.success({
+          content: response.status === 201
+            ? 'Đăng ký thành công!'
+            : 'Số điện thoại đã được đăng ký!',
+          duration: 3,
+        });
+
+        // Close modal and reset form
+        setIsLoyaltyModalVisible(false);
+        form.resetFields();
+      }
+    } catch (error) {
+      console.error("Error registering loyalty:", error);
+
+      if (error.name === 'ValidationError') {
+        // Form validation error - handled by Ant Design
+        return;
+      }
+
+      message.error({
+        content: 'Có lỗi xảy ra. Vui lòng thử lại.',
+        duration: 3,
+      });
+    } finally {
+      setIsLoyaltyLoading(false);
+    }
+  };
+
+  // ✅ Handle clicking on Loyalty Card
+  const handleLoyaltyCardClick = async () => {
+    if (loyaltyCustomer) {
+      // Already registered - fetch latest info from API
+      try {
+        const response = await axios.get(
+          `${process.env.REACT_APP_API_URL}/customers/me/${loyaltyCustomer.phone}`
+        );
+
+        if (response.status === 200) {
+          const latestData = response.data.data;
+
+          // Update localStorage with latest data
+          const updatedCustomer = {
+            id: latestData.id,
+            phone: latestData.phone,
+            loyalty_points: latestData.points || 0,
+          };
+          localStorage.setItem('loyalty_customer', JSON.stringify(updatedCustomer));
+          setLoyaltyCustomer(updatedCustomer);
+
+          // Show info modal with latest data
+          modal.info({
+            title: (
+              <div className="flex items-center gap-2">
+                <StarFilled className="text-purple-500" />
+                <span>Thông tin tích điểm</span>
+              </div>
+            ),
+            icon: null,
+            content: (
+              <div className="mt-4">
+                <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg p-4 mb-3">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-gray-600 text-sm">Số điện thoại:</span>
+                    <span className="font-bold text-gray-800">{latestData.phone}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 text-sm">Điểm hiện tại:</span>
+                    <span className="font-bold text-purple-600 text-xl">
+                      {latestData.points || 0} 💎
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-yellow-50 rounded-lg p-3 border border-yellow-200">
+                  <p className="text-xs text-gray-600 m-0">
+                    💡 <strong>1000 điểm</strong> cho mỗi <strong>1000₫</strong> chi tiêu
+                  </p>
+                </div>
+              </div>
+            ),
+            okText: 'Đóng',
+            centered: true,
+            width: 400,
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching customer info:', error);
+
+        if (error.response?.status === 404) {
+          // Customer not found - clear localStorage and show registration
+          localStorage.removeItem('loyalty_customer');
+          setLoyaltyCustomer(null);
+          message.warning('Không tìm thấy thông tin tài khoản. Vui lòng đăng ký lại.');
+          setIsLoyaltyModalVisible(true);
+        } else {
+          message.error('Có lỗi xảy ra. Vui lòng thử lại.');
+        }
+      }
+    } else {
+      // Not registered yet - show registration modal
+      setIsLoyaltyModalVisible(true);
+    }
+  };
+
   // Tính chào theo giờ
   const hour = new Date().getHours();
   let greeting = "Chào buổi tối Quý khách";
@@ -207,7 +361,7 @@ export default function HomecsPage() {
                 justifyContent: "center",
                 minHeight: 140,
               }}
-              onClick={() => navigate("/cus/loyaltys")}
+              onClick={handleLoyaltyCardClick}
             >
               <div
                 style={{
@@ -418,6 +572,88 @@ export default function HomecsPage() {
             ✨ Nhân viên sẽ được thông báo và tới bàn của bạn ngay lập tức
           </div>
         </div>
+      </Modal>
+
+      {/* ========== LOYALTY POINTS MODAL - Simple Mobile-First Design ========== */}
+      <Modal
+        title={
+          <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
+              <StarFilled className="text-white text-lg" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-gray-800 m-0">Tích điểm thưởng</h3>
+              <p className="text-xs text-gray-500 m-0">Nhập SĐT để nhận ưu đãi</p>
+            </div>
+          </div>
+        }
+        open={isLoyaltyModalVisible}
+        onCancel={() => {
+          setIsLoyaltyModalVisible(false);
+          form.resetFields();
+        }}
+        footer={null}
+        width={420}
+        centered
+        className="japanese-modal"
+        destroyOnHidden
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleLoyaltySubmit}
+          className="mt-4"
+        >
+          {/* Phone Input */}
+          <Form.Item
+            name="phone"
+            rules={[
+              { required: true, message: 'Vui lòng nhập số điện thoại' },
+              {
+                pattern: /^(0[3|5|7|8|9])[0-9]{8}$/,
+                message: 'Số điện thoại không hợp lệ (VD: 0912345678)'
+              }
+            ]}
+          >
+            <Input
+              prefix={<PhoneOutlined className="text-purple-500" />}
+              placeholder="Nhập số điện thoại (10 số)"
+              size="large"
+              maxLength={10}
+              className="rounded-lg"
+            />
+          </Form.Item>
+
+          {/* Info Box */}
+          <div className="bg-purple-50 rounded-lg p-3 mb-4 border border-purple-100">
+            <p className="text-xs text-gray-600 m-0">
+              💎 <strong>1 điểm</strong> cho mỗi <strong>10.000₫</strong> chi tiêu
+            </p>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-2">
+            <Button
+              size="large"
+              onClick={() => {
+                setIsLoyaltyModalVisible(false);
+                form.resetFields();
+              }}
+              className="flex-1 rounded-lg"
+            >
+              Hủy
+            </Button>
+            <Button
+              type="primary"
+              size="large"
+              htmlType="submit"
+              loading={isLoyaltyLoading}
+              className="flex-1 rounded-lg bg-gradient-to-r from-purple-500 to-indigo-600 border-0"
+            >
+              Đăng ký
+            </Button>
+          </div>
+        </Form>
       </Modal>
     </Layout>
   );

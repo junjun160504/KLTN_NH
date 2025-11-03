@@ -44,7 +44,7 @@ class QRCodeUtils {
    */
   static generateQRUrl(tableId) {
     const sessionToken = this.generateSessionToken(tableId);
-    return `${this.BASE_URL}/menu?table=${tableId}&session=${sessionToken}`;
+    return `${this.BASE_URL}/?table=${tableId}&session=${sessionToken}`;
   }
 
   /**

@@ -5,17 +5,15 @@ import {
   Typography,
   Rate,
   Button,
-  message,
   Skeleton,
   Empty,
   Modal,
   Input,
   Tag,
+  App,
 } from "antd";
 import {
   ArrowLeftOutlined,
-  HeartOutlined,
-  HeartFilled,
   UserOutlined,
 } from "@ant-design/icons";
 import axios from "axios";
@@ -29,10 +27,22 @@ const { TextArea } = Input;
 
 const REACT_APP_API_URL = process.env.REACT_APP_API_URL;
 
+// Helper function: Mask phone number (show first 3 and last 3 digits)
+const maskPhone = (phone) => {
+  if (!phone || phone.length < 10) return null;
+  return `${phone.slice(0, 3)}xxxx${phone.slice(-3)}`;
+};
+
+// Helper function: Generate random customer ID
+const generateCustomerId = (reviewId) => {
+  return `Khách hàng #${String(reviewId).padStart(4, '0')}`;
+};
+
 export default function FoodDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const dispatch = useDispatch();
+  const { message } = App.useApp(); // ✅ Use App hook for message
 
   // Redux cart
   const order = useSelector((state) => state.cart.order);
@@ -41,11 +51,11 @@ export default function FoodDetailPage() {
   // State
   const [menuItem, setMenuItem] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isFavorite, setIsFavorite] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState("");
   const [showAddToCartModal, setShowAddToCartModal] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
   // Fetch menu item detail
   useEffect(() => {
@@ -66,7 +76,7 @@ export default function FoodDetailPage() {
 
     fetchMenuDetail();
     window.scrollTo(0, 0);
-  }, [id]);
+  }, [id, message]); // ✅ Add message to dependencies
 
   // Handle add to cart
   const handleAddToCart = () => {
@@ -105,19 +115,13 @@ export default function FoodDetailPage() {
     dispatch(addToCart(savedOrder));
 
     message.success({
-      content: `Đã thêm ${quantity}x ${menuItem.name} vào giỏ hàng!`,
+      content: `Đã thêm vào giỏ hàng!`,
       duration: 2,
     });
 
     setShowAddToCartModal(false);
     setQuantity(1);
     setNote("");
-  };
-
-  // Handle favorite toggle
-  const toggleFavorite = () => {
-    setIsFavorite(!isFavorite);
-    message.success(isFavorite ? "Đã bỏ yêu thích" : "Đã thêm vào yêu thích");
   };
 
   // Render loading skeleton
@@ -187,18 +191,7 @@ export default function FoodDetailPage() {
           Chi tiết món
         </Title>
 
-        <Button
-          type="text"
-          icon={
-            isFavorite ? (
-              <HeartFilled style={{ fontSize: 20, color: "#226533" }} />
-            ) : (
-              <HeartOutlined style={{ fontSize: 20, color: "#333" }} />
-            )
-          }
-          onClick={toggleFavorite}
-          style={{ width: 40, height: 40 }}
-        />
+        <div style={{ width: 40 }}></div>
       </div>
 
       {/* ========== CONTENT ========== */}
@@ -288,18 +281,24 @@ export default function FoodDetailPage() {
 
           {/* Description */}
           {menuItem.description && (
-            <Text
-              type="secondary"
-              style={{
-                display: "block",
-                marginBottom: 12,
-                fontSize: 14,
-                lineHeight: 1.6,
-                color: "#999",
-              }}
-            >
-              {menuItem.description}
-            </Text>
+            <div className="mb-3">
+              <p
+                className={`text-sm text-gray-600 text-justify leading-relaxed ${isDescriptionExpanded ? "" : "line-clamp-3"
+                  }`}
+              >
+                {menuItem.description}
+              </p>
+              {menuItem.description.length > 100 && (
+                <div className="flex justify-center mt-2">
+                  <button
+                    onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                    className="text-gray-500 focus:no-underline text-xs font-medium hover:underline border-none bg-transparent p-0"
+                  >
+                    {isDescriptionExpanded ? "Thu gọn" : "Xem thêm"}
+                  </button>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Stats Row: Rating & Reviews */}
@@ -353,7 +352,7 @@ export default function FoodDetailPage() {
                 fontWeight: 700,
               }}
             >
-              {menuItem.price.toLocaleString()}đ
+              {Number(menuItem.price).toLocaleString('vi-VN')}đ
             </Text>
 
             {/* Quantity Selector */}
@@ -467,7 +466,10 @@ export default function FoodDetailPage() {
                   </div>
                   <div style={{ flex: 1 }}>
                     <Text strong style={{ fontSize: 15, display: "block", marginBottom: 4 }}>
-                      Ẩn Danh
+                      {review.customer_phone
+                        ? maskPhone(review.customer_phone)
+                        : generateCustomerId(review.id)
+                      }
                     </Text>
                     <Rate
                       disabled
@@ -624,7 +626,7 @@ export default function FoodDetailPage() {
                   fontWeight: 700,
                 }}
               >
-                {menuItem.price.toLocaleString()}đ
+                {Number(menuItem.price).toLocaleString('vi-VN')}đ
               </Text>
             </div>
           </div>
@@ -742,7 +744,7 @@ export default function FoodDetailPage() {
                   fontWeight: 700,
                 }}
               >
-                {(menuItem.price * quantity).toLocaleString()}đ
+                {Number(menuItem.price * quantity).toLocaleString('vi-VN')}đ
               </Text>
             </div>
 

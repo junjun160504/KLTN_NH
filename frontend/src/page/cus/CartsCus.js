@@ -4,10 +4,10 @@ import {
   Layout,
   Typography,
   Button,
-  message,
   Checkbox,
   Modal,
   Input,
+  App,
 } from "antd";
 import {
   DeleteOutlined,
@@ -28,6 +28,7 @@ const { TextArea } = Input;
 const REACT_APP_API_URL = process.env.REACT_APP_API_URL; export default function CustomerCartPage() {
   const dispatch = useDispatch();
   const order = useSelector((state) => state.cart.order);
+  const { message } = App.useApp(); // ✅ Use App hook for message
 
   const [cart, setCart] = useState([]);
   const [editingNoteId, setEditingNoteId] = useState(null);
@@ -38,7 +39,7 @@ const REACT_APP_API_URL = process.env.REACT_APP_API_URL; export default function
       const updatedCart = order.foodOrderList.map((item) => ({
         id: item.id,
         name: item.name,
-        price: item.price,
+        price: Number(item.price),
         qty: item.quantity,
         img: item.image_url || "https://source.unsplash.com/80x80/?food",
         note: item.note || "",
@@ -62,7 +63,7 @@ const REACT_APP_API_URL = process.env.REACT_APP_API_URL; export default function
   // ✅ tổng tiền các món được chọn
   const totalPrice = cart
     .filter((i) => selectedItems.includes(i.id))
-    .reduce((sum, item) => sum + item.price * item.qty, 0);
+    .reduce((sum, item) => sum + Number(item.price) * item.qty, 0);
 
   // ✅ Cập nhật số lượng món
   const updateQty = (id, qty) => {
@@ -324,17 +325,18 @@ const REACT_APP_API_URL = process.env.REACT_APP_API_URL; export default function
                 style={{ flexShrink: 0 }}
               />
 
-              {/* Image */}
+              {/* Image - Clickable */}
               <img
                 src={item.img}
                 alt={item.name}
-                className="rounded-lg shadow-sm"
+                className="rounded-lg shadow-sm cursor-pointer hover:opacity-80 transition-opacity"
                 style={{
                   width: 70,
                   height: 70,
                   objectFit: "cover",
                   flexShrink: 0,
                 }}
+                onClick={() => navigate(`/food/${item.id}`)}
               />
 
               {/* Info */}
@@ -342,11 +344,13 @@ const REACT_APP_API_URL = process.env.REACT_APP_API_URL; export default function
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
                   <Text
                     strong
+                    className="cursor-pointer hover:text-[#226533] transition-colors"
                     style={{
                       fontSize: 14,
                       display: "block",
                       marginRight: 8,
                     }}
+                    onClick={() => navigate(`/food/${item.id}`)}
                   >
                     {item.name}
                   </Text>
@@ -364,7 +368,7 @@ const REACT_APP_API_URL = process.env.REACT_APP_API_URL; export default function
                   type="secondary"
                   style={{ fontSize: 12, display: "block", marginBottom: 6 }}
                 >
-                  {item.price.toLocaleString()}đ
+                  {Number(item.price).toLocaleString()}đ
                 </Text>
 
                 {/* Quantity Controls */}
@@ -448,7 +452,7 @@ const REACT_APP_API_URL = process.env.REACT_APP_API_URL; export default function
                       fontWeight: 700,
                     }}
                   >
-                    {(item.price * item.qty).toLocaleString()}đ
+                    {(Number(item.price) * item.qty).toLocaleString()}đ
                   </Text>
                 </div>
 
@@ -574,9 +578,6 @@ const REACT_APP_API_URL = process.env.REACT_APP_API_URL; export default function
                 ({totalSelectedQty} món)
               </Text>
             </div>
-            <Text type="secondary" style={{ fontSize: 11 }}>
-              Đã chọn: {selectedItems.length}/{cart.length} món
-            </Text>
           </div>
 
           {/* Right: Order Button */}

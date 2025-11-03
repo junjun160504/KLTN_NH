@@ -1,6 +1,95 @@
 import { query } from "../config/db.js";
 import QRCodeUtils from "../utils/qrCodeUtils.js";
 
+/**
+ * Validate existing session (for localStorage restore)
+ * Check if session is still valid (ACTIVE, not expired, table still exists)
+ */
+export async function validateSession(sessionId) {
+    try {
+        // Get session with table info
+        const [session] = await query(`
+            SELECT 
+                qs.*,
+                t.table_number,
+                t.is_active as table_is_active
+            FROM qr_sessions qs
+            JOIN tables t ON qs.table_id = t.id
+            WHERE qs.id = ?
+        `, [sessionId]);
+
+        if (!session) {
+            return {
+                valid: false,
+                reason: 'SESSION_NOT_FOUND',
+                message: 'Session không tồn tại'
+            };
+        }
+
+        // Check session status
+        if (session.status !== 'ACTIVE') {
+            return {
+                valid: false,
+                reason: 'SESSION_COMPLETED',
+                message: 'Session đã kết thúc (khách đã thanh toán)',
+                shouldClear: true // Frontend nên xóa localStorage
+            };
+        }
+
+        // Check table still active
+        if (!session.table_is_active) {
+            return {
+                valid: false,
+                reason: 'TABLE_INACTIVE',
+                message: 'Bàn không còn hoạt động',
+                shouldClear: true
+            };
+        }
+
+        // Check expiration (if expired_at exists)
+        if (session.expired_at) {
+            const now = new Date();
+            const expiredAt = new Date(session.expired_at);
+
+            if (now > expiredAt) {
+                // Auto close expired session
+                await query(
+                    "UPDATE qr_sessions SET status = 'COMPLETED' WHERE id = ?",
+                    [sessionId]
+                );
+
+                return {
+                    valid: false,
+                    reason: 'SESSION_EXPIRED',
+                    message: 'Session đã hết hạn',
+                    shouldClear: true
+                };
+            }
+        }
+
+        // Session is valid
+        return {
+            valid: true,
+            session: {
+                id: session.id,
+                table_id: session.table_id,
+                table_number: session.table_number,
+                status: session.status,
+                created_at: session.created_at,
+                expired_at: session.expired_at
+            }
+        };
+
+    } catch (error) {
+        console.error('validateSession error:', error);
+        return {
+            valid: false,
+            reason: 'VALIDATION_ERROR',
+            message: 'Lỗi khi validate session'
+        };
+    }
+}
+
 // Quét QR và mở session mới với validation
 export async function startSession({ table_id, customer_id, session_token }) {
     // Validate table exists
@@ -19,15 +108,20 @@ export async function startSession({ table_id, customer_id, session_token }) {
     const [active] = await query("SELECT * FROM qr_sessions WHERE table_id = ? AND status = 'ACTIVE'", [table_id]);
     if (active) return active; // return session hiện tại
 
+    // Calculate expiration time (24 hours from now)
+    const SESSION_DURATION_HOURS = process.env.QR_SESSION_DURATION_HOURS || 24;
+
     const result = await query(
-        "INSERT INTO qr_sessions (table_id, customer_id, status) VALUES (?, ?, 'ACTIVE')",
-        [table_id, customer_id ?? null]
+        `INSERT INTO qr_sessions (table_id, customer_id, status, expired_at) 
+         VALUES (?, ?, 'ACTIVE', DATE_ADD(NOW(), INTERVAL ? HOUR))`,
+        [table_id, customer_id ?? null, SESSION_DURATION_HOURS]
     );
     return {
         id: result.insertId,
         table_id,
         table_number: table.table_number,
-        status: "ACTIVE"
+        status: "ACTIVE",
+        expired_at: new Date(Date.now() + SESSION_DURATION_HOURS * 60 * 60 * 1000)
     };
 }
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import CustomerFooterNav from "../../components/CustomerFooterNav";
 import QRProcessingStatus from "../../components/QRProcessingStatus";
@@ -12,7 +12,7 @@ import {
   Card,
   Row,
   Col,
-  notification
+  App
 } from "antd";
 import { SearchOutlined, PlusOutlined } from "@ant-design/icons";
 import axios from "axios";
@@ -45,84 +45,103 @@ export default function CustomerMenuPage() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { session } = useSession();
+  const { message } = App.useApp(); // ✅ Use hook instead of static method
 
   // QR Handler cho auto-processing QR parameters
   const { isProcessing, qrError } = useQRHandler({
     redirectPath: '/cus/homes',
     autoRedirect: false, // Stay on menu page after QR processing
     onSuccess: (sessionData) => {
-      notification.success({
-        message: 'QR Code thành công!',
-        description: `Chào mừng đến ${sessionData.table_number}`,
-        duration: 3
-      });
+      message.success(`Chào mừng đến ${sessionData.table_number}`, 3);
     },
     onError: (error) => {
-      notification.error({
-        message: 'Lỗi QR Code',
-        description: error.message || 'Không thể xử lý QR Code',
-        duration: 5
+      message.error({
+        content: 'Lỗi QR Code',
+        duration: 4
       });
     }
   });
 
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchText, setSearchText] = useState("");
-  const [foods, setFoods] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [foods, setFoods] = useState(() => {
+    // ✅ Initialize from sessionStorage if available
+    const cachedFoods = sessionStorage.getItem('menu_foods_cache');
+    return cachedFoods ? JSON.parse(cachedFoods) : [];
+  });
+  const [categories, setCategories] = useState(() => {
+    // ✅ Initialize from sessionStorage if available
+    const cachedCategories = sessionStorage.getItem('menu_categories_cache');
+    return cachedCategories ? JSON.parse(cachedCategories) : [];
+  });
   const [loading, setLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false); // State để track scroll
-  // GET items
-  async function callApiMenuCus(url) {
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  // ✅ GET items - Wrapped in useCallback to prevent re-creation
+  const callApiMenuCus = useCallback(async (url, skipCache = false, isBackground = false) => {
     try {
-      setLoading(true);
+      // Only show loading skeleton if not background fetch
+      if (!isBackground) {
+        setLoading(true);
+      }
       const response = await axios.get(url);
       console.log("API GET menu/cus/menus", response.data);
-      setFoods(response.data.data);
+      const foodsData = response.data.data;
+
+      // ✅ Smart comparison: Only update state if data changed
+      const cachedFoods = sessionStorage.getItem('menu_foods_cache');
+      const hasDataChanged = !cachedFoods || JSON.stringify(foodsData) !== cachedFoods;
+
+      if (hasDataChanged) {
+        console.log('🔄 Menu data changed, updating state');
+        setFoods(foodsData);
+
+        // Cache only "all items" (not search results)
+        if (!skipCache && url.includes('/menus/all')) {
+          sessionStorage.setItem('menu_foods_cache', JSON.stringify(foodsData));
+          sessionStorage.setItem('menu_cache_timestamp', Date.now().toString());
+        }
+      } else {
+        console.log('✅ Menu data unchanged, skipping re-render');
+        // Still update timestamp to keep cache fresh
+        if (!skipCache && url.includes('/menus/all')) {
+          sessionStorage.setItem('menu_cache_timestamp', Date.now().toString());
+        }
+      }
     } catch (err) {
       console.error("API GET error:", err);
-      setFoods([]); // Set empty array on error
+      setFoods([]);
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  // GET categories
-  async function callApiMenuCategoriesCus(url) {
+  // ✅ GET categories - Wrapped in useCallback
+  const callApiMenuCategoriesCus = useCallback(async (url, isBackground = false) => {
     try {
       const response = await axios.get(url);
       console.log("API GET menu/cus/menus/categories:", response.data);
-      setCategories(response.data.data);
+      const categoriesData = response.data.data;
+
+      // ✅ Smart comparison: Only update state if data changed
+      const cachedCategories = sessionStorage.getItem('menu_categories_cache');
+      const hasDataChanged = !cachedCategories || JSON.stringify(categoriesData) !== cachedCategories;
+
+      if (hasDataChanged) {
+        console.log('🔄 Categories data changed, updating state');
+        setCategories(categoriesData);
+        sessionStorage.setItem('menu_categories_cache', JSON.stringify(categoriesData));
+      } else {
+        console.log('✅ Categories data unchanged, skipping re-render');
+      }
     } catch (err) {
       console.error("API GET error:", err);
     }
-  }
+  }, []);
 
-  // Search with debounce
-  useEffect(() => {
-    const delayDebounce = setTimeout(() => {
-      if (searchText.trim() !== "") {
-        setIsSearching(true);
-        setSelectedCategory("all"); // Reset category when searching
-        callApiMenuCus(
-          `${REACT_APP_API_URL}/menu/cus/menus/${encodeURIComponent(searchText.trim())}`
-        );
-      } else {
-        // Khi xóa search text, trở về hiển thị tất cả hoặc category đã chọn
-        setIsSearching(false);
-        if (selectedCategory === "all") {
-          callApiMenuCus(`${REACT_APP_API_URL}/menu/cus/menus/all`);
-        } else {
-          callApiMenuByCategory(selectedCategory);
-        }
-      }
-    }, 500); // Debounce 500ms
-
-    return () => clearTimeout(delayDebounce);
-  }, [searchText]);
-  //GET items by category
-  async function callApiMenuByCategory(id) {
+  // ✅ GET items by category - Wrapped in useCallback
+  const callApiMenuByCategory = useCallback(async (id) => {
     try {
       setLoading(true);
       setSearchText(""); // Clear search when selecting category
@@ -135,23 +154,89 @@ export default function CustomerMenuPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  // Load all items when category is "all"
-  async function loadAllItems() {
+  // ✅ Search with debounce - Use useRef for latest selectedCategory
+  const selectedCategoryRef = useRef(selectedCategory);
+  useEffect(() => {
+    selectedCategoryRef.current = selectedCategory;
+  }, [selectedCategory]);
+
+  // Search with debounce
+  useEffect(() => {
+    const delayDebounce = setTimeout(() => {
+      if (searchText.trim() !== "") {
+        setIsSearching(true);
+        setSelectedCategory("all"); // Reset category when searching
+        callApiMenuCus(
+          `${REACT_APP_API_URL}/menu/cus/menus/${encodeURIComponent(searchText.trim())}`,
+          true // ✅ Skip cache for search results
+        );
+      } else {
+        // Khi xóa search text, trở về hiển thị tất cả hoặc category đã chọn
+        setIsSearching(false);
+        const currentCategory = selectedCategoryRef.current;
+        if (currentCategory === "all") {
+          // ✅ Load from cache if available
+          const cachedFoods = sessionStorage.getItem('menu_foods_cache');
+          if (cachedFoods) {
+            setFoods(JSON.parse(cachedFoods));
+          } else {
+            callApiMenuCus(`${REACT_APP_API_URL}/menu/cus/menus/all`);
+          }
+        } else {
+          callApiMenuByCategory(currentCategory);
+        }
+      }
+    }, 500); // Debounce 500ms
+
+    return () => clearTimeout(delayDebounce);
+  }, [searchText, callApiMenuCus, callApiMenuByCategory]);
+
+  // ✅ Load all items when category is "all" - Wrapped in useCallback
+  const loadAllItems = useCallback(async () => {
     try {
       setLoading(true);
       setSearchText(""); // Clear search
       setIsSearching(false);
-      await callApiMenuCus(`${REACT_APP_API_URL}/menu/cus/menus/all`);
+      await callApiMenuCus(`${REACT_APP_API_URL}/menu/cus/menus/all`, true); // Skip cache for manual refresh
     } catch (err) {
       console.error("Load all items error:", err);
     }
-  }
-  useEffect(() => {
-    callApiMenuCus(`${REACT_APP_API_URL}/menu/cus/menus/all`);
-    callApiMenuCategoriesCus(`${REACT_APP_API_URL}/menu/cus/menus/categories`);
+  }, [callApiMenuCus]);
+
+  // ✅ Check if cache is valid (less than 5 minutes old)
+  const isCacheValid = useCallback(() => {
+    const timestamp = sessionStorage.getItem('menu_cache_timestamp');
+    if (!timestamp) return false;
+
+    const cacheAge = Date.now() - parseInt(timestamp);
+    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+    return cacheAge < CACHE_DURATION;
   }, []);
+
+  // ✅ Initial load - Always fetch to check for updates, but use cache for instant display
+  useEffect(() => {
+    const cachedFoods = sessionStorage.getItem('menu_foods_cache');
+    const cachedCategories = sessionStorage.getItem('menu_categories_cache');
+
+    // Strategy:
+    // 1. If cache exists, display it immediately (instant UX)
+    // 2. Always call API in background to check for updates
+    // 3. Only re-render if data actually changed (smart comparison in API functions)
+
+    if (cachedFoods && cachedCategories && isCacheValid()) {
+      console.log('✅ Displaying cached data, checking for updates in background...');
+      // Cache already loaded via state initialization
+      // Now silently check for updates (isBackground = true -> no loading skeleton)
+      callApiMenuCus(`${REACT_APP_API_URL}/menu/cus/menus/all`, false, true);
+      callApiMenuCategoriesCus(`${REACT_APP_API_URL}/menu/cus/menus/categories`, true);
+    } else {
+      console.log('🔄 No valid cache, fetching fresh data with loading');
+      callApiMenuCus(`${REACT_APP_API_URL}/menu/cus/menus/all`, false, false);
+      callApiMenuCategoriesCus(`${REACT_APP_API_URL}/menu/cus/menus/categories`, false);
+    }
+  }, [callApiMenuCus, callApiMenuCategoriesCus, isCacheValid]);
 
   // Track scroll để làm sticky header
   useEffect(() => {
@@ -181,10 +266,9 @@ export default function CustomerMenuPage() {
     const tableId = session?.table_id;
 
     if (!tableId) {
-      notification.error({
-        message: 'Lỗi',
-        description: 'Vui lòng quét QR Code trước khi đặt món',
-        duration: 3
+      message.warning({
+        content: 'Vui lòng quét QR trước khi đặt món',
+        duration: 3,
       });
       return;
     }
@@ -207,12 +291,7 @@ export default function CustomerMenuPage() {
     // Cập nhật Redux state
     dispatch(addToCart(order));
 
-    // Thông báo thành công
-    notification.success({
-      message: 'Thêm vào giỏ hàng',
-      description: `Đã thêm ${food.name} vào giỏ hàng`,
-      duration: 2
-    });
+    message.success(`Đã thêm vào giỏ hàng`, 2)
   }
   return (
     <Layout style={{ minHeight: "100vh", background: "#fafafa" }}>

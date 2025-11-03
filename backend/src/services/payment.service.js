@@ -17,7 +17,7 @@ export async function payOrder({ order_id, method, print_bill }) {
 
     // ✅ Kiểm tra đơn hàng tồn tại và chưa thanh toán
     const [orders] = await pool.query(
-      "SELECT id, total_price, status FROM orders WHERE id = ? AND status != 'PAID'",
+      "SELECT o.id, o.total_price, o.status, o.qr_session_id FROM orders o WHERE o.id = ? AND o.status != 'PAID'",
       [order_id]
     );
 
@@ -27,6 +27,7 @@ export async function payOrder({ order_id, method, print_bill }) {
 
     const order = orders[0];
     const amount = Number(order.total_price);
+    const qr_session_id = order.qr_session_id; // ✅ Lấy qr_session_id để gửi notification
 
     // ✅ Kiểm tra đã có payment pending cho order này chưa
     const [existingPayments] = await pool.query(
@@ -132,7 +133,8 @@ export async function payOrder({ order_id, method, print_bill }) {
       payment_status: method === "CASH" ? "PAID" : "PENDING",
       order_status: method === "CASH" ? "PAID" : "PENDING_PAYMENT",
       print_bill: !!print_bill,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      qr_session_id: qr_session_id // ✅ Thêm qr_session_id để controller gửi notification
     };
 
     // Add QR data if generated
@@ -219,7 +221,8 @@ export async function confirmPayment({ qr_session_id, transaction_code, amount, 
         transaction_code,
         amount: payment.amount,
         confirmed_at: new Date().toISOString(),
-        message: "Xác nhận thanh toán thành công"
+        message: "Xác nhận thanh toán thành công",
+        qr_session_id: qr_session_id // ✅ Thêm để controller gửi notification
       };
 
     } else {
@@ -250,7 +253,8 @@ export async function confirmPayment({ qr_session_id, transaction_code, amount, 
         transaction_code,
         amount: payment.amount,
         confirmed_at: new Date().toISOString(),
-        message: "Thanh toán thất bại, đơn hàng được khôi phục"
+        message: "Thanh toán thất bại, đơn hàng được khôi phục",
+        qr_session_id: qr_session_id // ✅ Thêm để controller gửi notification
       };
     }
 

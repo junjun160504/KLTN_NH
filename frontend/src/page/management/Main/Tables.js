@@ -6,7 +6,6 @@ import {
   Typography,
   Input,
   Tag,
-  message,
   Drawer,
   Form,
   Select,
@@ -18,7 +17,8 @@ import {
   Modal,
   Menu,
   Row,
-  Col
+  Col,
+  App,
 } from 'antd'
 import {
   PlusOutlined,
@@ -30,7 +30,8 @@ import {
   DollarOutlined,
   MoreOutlined,
   MinusOutlined,
-  BellOutlined
+  BellOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons'
 import axios from 'axios'
 import AppHeader from '../../../components/AppHeader'
@@ -133,6 +134,7 @@ const hideScrollbarStyle = `
 const TablesPage = () => {
   // Use useModal hook for Modal.confirm
   const [modal, contextHolder] = Modal.useModal()
+  const { message } = App.useApp() // Use App hook for message
 
   const [collapsed, setCollapsed] = useState(false)
   const [pageTitle] = useState('Quản lý bàn')
@@ -148,6 +150,8 @@ const TablesPage = () => {
   const [editDrawerOpen, setEditDrawerOpen] = useState(false)
   const [editForm] = Form.useForm()
   const [editingTable, setEditingTable] = useState(null)
+  const [regeneratingQR, setRegeneratingQR] = useState(false) // ✅ Loading state for QR regeneration
+  const [newQRUrl, setNewQRUrl] = useState(null) // ✅ Store new QR URL after regeneration
 
   // Order panel state
   const [orderPanelOpen, setOrderPanelOpen] = useState(false)
@@ -228,12 +232,18 @@ const TablesPage = () => {
   async function handleDeleteTable(id) {
     try {
       await axios.delete(`${REACT_APP_API_URL}/tables/${id}`);
-      message.success("Xóa bàn thành công");
+      message.success({
+        content: "Xóa bàn thành công!",
+        duration: 2,
+      });
       fetchTables();
     } catch (err) {
       console.error("API DELETE error:", err);
-      const errorMsg = err.response?.data?.message || "Xóa bàn thất bại";
-      message.error(errorMsg);
+      const errorMsg = err.response?.data?.message || "Xóa bàn thất bại!";
+      message.error({
+        content: `${errorMsg}`,
+        duration: 3,
+      });
     }
   }
 
@@ -244,14 +254,20 @@ const TablesPage = () => {
       await axios.post(`${REACT_APP_API_URL}/tables`, {
         table_number: values.table_number,
       });
-      message.success("Thêm bàn mới thành công! QR code đã được tạo tự động.");
+      message.success({
+        content: "Thêm bàn mới thành công! QR code đã được tạo tự động.",
+        duration: 3,
+      });
       setDrawerOpen(false);
       addForm.resetFields();
       fetchTables();
     } catch (err) {
       if (err?.errorFields) return;
       const errorMsg = err.response?.data?.message || "Thêm bàn mới thất bại!";
-      message.error(errorMsg);
+      message.error({
+        content: `${errorMsg}`,
+        duration: 3,
+      });
     }
   };
 
@@ -259,6 +275,7 @@ const TablesPage = () => {
   const openEditDrawer = (table, e) => {
     if (e) e.stopPropagation() // Prevent table card click
     setEditingTable(table)
+    setNewQRUrl(null) // ✅ Reset new QR URL
     editForm.setFieldsValue({
       table_number: table.table_number,
       is_active: table.is_active
@@ -266,22 +283,74 @@ const TablesPage = () => {
     setEditDrawerOpen(true)
   }
 
+  // ✅ Tạo lại QR Code
+  const handleRegenerateQR = async () => {
+    try {
+      setRegeneratingQR(true)
+
+      const response = await axios.put(`${REACT_APP_API_URL}/tables/${editingTable.id}`, {
+        table_number: editingTable.table_number,
+        is_active: editingTable.is_active,
+        regenerate_qr: true
+      })
+
+      // Update new QR URL from response
+      if (response.data?.data?.qr_code_url) {
+        setNewQRUrl(response.data.data.qr_code_url)
+        message.success({
+          content: '✅ Tạo lại QR Code thành công!',
+          duration: 3,
+        })
+
+        // Update editingTable with new QR
+        setEditingTable({
+          ...editingTable,
+          qr_code_url: response.data.data.qr_code_url
+        })
+
+        // Refresh tables list
+        fetchTables()
+      }
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || 'Tạo lại QR Code thất bại!'
+      message.error({
+        content: `❌ ${errorMsg}`,
+        duration: 3,
+      })
+    } finally {
+      setRegeneratingQR(false)
+    }
+  }
+
   // Sửa bàn
   const handleEditTable = async () => {
     try {
       const values = await editForm.validateFields()
-      await axios.put(`${REACT_APP_API_URL}/tables/${editingTable.id}`, {
+
+      // Prepare update data (without regenerate_qr, use button instead)
+      const updateData = {
         table_number: values.table_number,
-        is_active: values.is_active
+        is_active: values.is_active,
+      }
+
+      await axios.put(`${REACT_APP_API_URL}/tables/${editingTable.id}`, updateData)
+
+      message.success({
+        content: '✅ Cập nhật bàn thành công!',
+        duration: 2,
       })
-      message.success('Cập nhật bàn thành công!')
+
       setEditDrawerOpen(false)
       editForm.resetFields()
+      setNewQRUrl(null) // ✅ Reset new QR URL
       fetchTables()
     } catch (err) {
       if (err?.errorFields) return
       const errorMsg = err.response?.data?.message || 'Cập nhật bàn thất bại!'
-      message.error(errorMsg)
+      message.error({
+        content: `❌ ${errorMsg}`,
+        duration: 3,
+      })
     }
   }
 
@@ -399,44 +468,6 @@ const TablesPage = () => {
     })
   }
 
-  // const handleCreateOrder = async () => {
-  //   if (!selectedTable || cartItems.length === 0) {
-  //     message.warning('Vui lòng chọn món trước khi tạo đơn')
-  //     return
-  //   }
-
-  //   try {
-  //     setLoadingMenu(true)
-  //     const orderData = {
-  //       table_id: selectedTable.id,
-  //       items: cartItems.map(item => ({
-  //         menu_item_id: item.id,
-  //         quantity: item.quantity,
-  //         note: item.note || ''
-  //       }))
-  //     }
-
-  //     await axios.post(`${REACT_APP_API_URL}/orders/admin/create`, orderData)
-  //     message.success('Tạo đơn hàng thành công!')
-
-  //     // Reset state
-  //     setMenuModalOpen(false)
-  //     setCartItems([])
-  //     setSelectedCategory('all')
-  //     fetchTables() // Refresh tables
-
-  //     // Refresh orders - force update vì vừa tạo order mới
-  //     if (selectedTable) {
-  //       fetchOrdersByTable(selectedTable.id, true)
-  //     }
-  //   } catch (err) {
-  //     console.error('Failed to create order:', err)
-  //     const errorMsg = err.response?.data?.message || 'Tạo đơn hàng thất bại!'
-  //     message.error(errorMsg)
-  //   } finally {
-  //     setLoadingMenu(false)
-  //   }
-  // }
 
   // ================= Table Card Actions =================
   const handleTableClick = (table) => {
@@ -1523,7 +1554,10 @@ const TablesPage = () => {
       <Badge.Ribbon
         text={status === 'inactive' ? 'Tạm ngừng' : null}
         color="red"
-        style={{ display: status === 'inactive' ? 'block' : 'none' }}
+        placement="start" // ✅ Hiển thị bên trái thay vì bên phải
+        style={{
+          display: status === 'inactive' ? 'block' : 'none',
+        }}
       >
         <Card
           hoverable={status !== 'inactive'}
@@ -1559,8 +1593,8 @@ const TablesPage = () => {
                 position: 'absolute',
                 top: 8,
                 right: 8,
-                zIndex: 10,
-                color: '#666'
+                zIndex: 10, // ✅ Đủ để hiển thị trên Card content
+                color: '#666',
               }}
             />
           </Dropdown>
@@ -2044,15 +2078,9 @@ const TablesPage = () => {
                     onChange={(val) => setStatusFilter(val)}
                   >
                     <Option value="all">Tất cả</Option>
-                    <Option value="available">
-                      <Tag color="default">Trống</Tag>
-                    </Option>
-                    <Option value="occupied">
-                      <Tag color="green">Đang sử dụng</Tag>
-                    </Option>
-                    <Option value="inactive">
-                      <Tag color="red">Tạm ngừng</Tag>
-                    </Option>
+                    <Option value="available">Trống</Option>
+                    <Option value="occupied">Đang sử dụng</Option>
+                    <Option value="inactive">Tạm ngừng</Option>
                   </Select>
                 </Space>
 
@@ -2246,18 +2274,38 @@ const TablesPage = () => {
                   </Select>
                 </Form.Item>
                 {editingTable?.qr_code_url && (
-                  <Form.Item label="QR Code hiện tại">
-                    <div style={{ textAlign: 'center' }}>
-                      <img
-                        src={`${replaceUrlServer(REACT_APP_API_URL)}${editingTable.qr_code_url}`}
-                        alt="Current QR"
-                        style={{ width: 180, height: 180, border: '1px solid #d9d9d9', borderRadius: 8 }}
-                      />
-                      <div style={{ marginTop: 8, color: '#666', fontSize: 12 }}>
-                        QR Code cho bàn {editingTable.table_number}
+                  <>
+                    <Form.Item label="QR Code">
+                      <div className="flex flex-col items-center gap-4">
+                        {/* QR Code Image */}
+                        <div className="relative">
+                          <img
+                            src={`${replaceUrlServer(REACT_APP_API_URL)}${newQRUrl || editingTable.qr_code_url}`}
+                            alt="Current QR"
+                            className="w-48 h-48 border-2 border-gray-300 rounded-lg shadow-sm"
+                          />
+                          {newQRUrl && (
+                            <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                              Mới
+                            </div>
+                          )}
+                        </div>
+
+
+
+                        {/* Regenerate Button */}
+                        <Button
+                          type="default"
+                          loading={regeneratingQR}
+                          onClick={handleRegenerateQR}
+                        >
+                          {regeneratingQR ? 'Đang tạo QR mới...' : 'Tạo lại QR Code'}
+                        </Button>
+
+
                       </div>
-                    </div>
-                  </Form.Item>
+                    </Form.Item>
+                  </>
                 )}
               </Form>
             </Drawer>

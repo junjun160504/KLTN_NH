@@ -8,8 +8,8 @@ import {
   List,
   Avatar,
   Modal,
-  message,
   Tag,
+  App,
 } from "antd";
 import { ArrowLeftOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
@@ -20,6 +20,7 @@ const { TextArea } = Input;
 
 export default function CustomerReviewAllPage() {
   const navigate = useNavigate();
+  const { message } = App.useApp(); // ✅ Use App hook for message
 
   // ✅ Demo món ăn
   const [foods, setFoods] = useState([

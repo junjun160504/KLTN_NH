@@ -28,6 +28,7 @@
 
 /* Custom components với Tailwind */
 @layer components {
+
   .btn-primary-gradient {
     @apply bg-gradient-to-r from-primary-600 to-primary-500 text-white font-semibold rounded-xl px-6 py-3 transition-all duration-300 transform hover:scale-105 hover:shadow-brand-lg;
   }
@@ -361,4 +362,12 @@
     box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
   }
 
+}
+
+.ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+  background-color: #f3f4f6 !important;
+}
+
+.ant-select-item-option-selected:not(.ant-select-item-option-disabled):hover {
+  background-color: #e5e7eb !important;
 }

@@ -34,13 +34,49 @@ export async function createTable({ table_number }) {
     }
 }
 
-export async function updateTable(id, { table_number, is_active }) {
-    await query("UPDATE tables SET table_number=?, is_active=? WHERE id=?", [
-        table_number,
-        is_active,
-        id,
-    ]);
-    return { id, table_number, is_active };
+export async function updateTable(id, { table_number, is_active, regenerate_qr }) {
+    try {
+        // Step 1: Update basic table info
+        await query("UPDATE tables SET table_number=?, is_active=? WHERE id=?", [
+            table_number,
+            is_active,
+            id,
+        ]);
+
+        // Step 2: Check if QR code regeneration is requested
+        if (regenerate_qr === true) {
+            // Generate new QR code
+            const qrResult = await QRCodeUtils.generateTableQR(id);
+
+            // Update table with new QR code URL
+            await query(
+                "UPDATE tables SET qr_code_url = ? WHERE id = ?",
+                [qrResult.imagePath, id]
+            );
+
+            return {
+                id,
+                table_number,
+                is_active,
+                qr_code_url: qrResult.imagePath,
+                qr_url: qrResult.qrUrl,
+                session_token: qrResult.sessionToken,
+                regenerated_at: qrResult.generatedAt,
+                message: "Table updated and QR code regenerated successfully"
+            };
+        }
+
+        // Return updated table info without QR regeneration
+        return {
+            id,
+            table_number,
+            is_active,
+            message: "Table updated successfully"
+        };
+    } catch (error) {
+        console.error("Error updating table:", error);
+        throw new Error(`Failed to update table: ${error.message}`);
+    }
 }
 
 export async function deleteTable(id) {
