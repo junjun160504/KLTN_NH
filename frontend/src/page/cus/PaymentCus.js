@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
     Layout,
     Typography,
     Button,
-    message,
     Modal,
+    Spin,
+    App,
 } from "antd";
 import {
     ArrowLeftOutlined,
@@ -46,6 +47,7 @@ const formatPrice = (price) => {
 export default function PaymentPage() {
     const navigate = useNavigate();
     const location = useLocation();
+    const { message } = App.useApp(); // ✅ Use App hook for message
 
     // Nhận data từ BillsCus page
     const { totalPrice: initialTotal = 0, unpaidOrders = [] } = location.state || {};
@@ -60,8 +62,74 @@ export default function PaymentPage() {
     const [qrData, setQrData] = useState(null);
     const [qrLoading, setQrLoading] = useState(false);
 
-    // Mock data - Điểm tích lũy của khách hàng (sau này lấy từ API)
-    const customerPoints = 200; // 200 điểm = 200đ
+    // ✅ Loyalty Points State - Fetch from API
+    const [customerPoints, setCustomerPoints] = useState(0);
+    const [loadingPoints, setLoadingPoints] = useState(true);
+
+    // ✅ Fetch customer loyalty points on mount
+    useEffect(() => {
+        const fetchCustomerPoints = async () => {
+            try {
+                setLoadingPoints(true);
+
+                // Get customer info from localStorage
+                const savedCustomer = localStorage.getItem('loyalty_customer');
+                if (!savedCustomer) {
+                    console.log('No loyalty customer found in localStorage');
+                    setCustomerPoints(0);
+                    setLoadingPoints(false);
+                    return;
+                }
+
+                const customer = JSON.parse(savedCustomer);
+                const phone = customer.phone;
+
+                if (!phone) {
+                    console.log('No phone number found');
+                    setCustomerPoints(0);
+                    setLoadingPoints(false);
+                    return;
+                }
+
+                // Call API to get latest points
+                const response = await axios.get(
+                    `${REACT_APP_API_URL}/customers/me/${phone}`
+                );
+
+                if (response.status === 200) {
+                    const latestData = response.data.data;
+                    const points = latestData.points || 0;
+
+                    // Update state
+                    setCustomerPoints(points);
+
+                    // Update localStorage with latest data
+                    localStorage.setItem('loyalty_customer', JSON.stringify({
+                        id: latestData.id,
+                        phone: latestData.phone,
+                        loyalty_points: points,
+                    }));
+
+                    console.log(`✅ Customer points loaded: ${points} điểm`);
+                }
+            } catch (error) {
+                console.error('Error fetching customer points:', error);
+
+                if (error.response?.status === 404) {
+                    console.log('Customer not found - clearing localStorage');
+                    localStorage.removeItem('loyalty_customer');
+                    setCustomerPoints(0);
+                } else {
+                    message.warning('Không thể tải điểm tích lũy!');
+                    setCustomerPoints(0);
+                }
+            } finally {
+                setLoadingPoints(false);
+            }
+        };
+
+        fetchCustomerPoints();
+    }, [message]); // ✅ Add message to dependencies
 
     // Tính toán
     const totalAmount = initialTotal;
@@ -87,16 +155,16 @@ export default function PaymentPage() {
             label: 'Chuyển khoản',
             icon: <BankOutlined style={{ fontSize: 24, color: '#1890ff' }} />,
         },
-        {
-            key: 'QR',
-            label: 'Quét QR',
-            icon: <QrcodeOutlined style={{ fontSize: 24, color: '#722ed1' }} />,
-        },
-        {
-            key: 'CARD',
-            label: 'Quẹt thẻ',
-            icon: <CreditCardOutlined style={{ fontSize: 24, color: '#fa8c16' }} />,
-        },
+        // {
+        //     key: 'QR',
+        //     label: 'Quét QR',
+        //     icon: <QrcodeOutlined style={{ fontSize: 24, color: '#722ed1' }} />,
+        // },
+        // {
+        //     key: 'CARD',
+        //     label: 'Quẹt thẻ',
+        //     icon: <CreditCardOutlined style={{ fontSize: 24, color: '#fa8c16' }} />,
+        // },
     ];
 
     // Xử lý thanh toán
@@ -119,7 +187,7 @@ export default function PaymentPage() {
 
         } catch (error) {
             console.error("Payment error:", error);
-            message.error("Thanh toán thất bại: " + (error.response?.data?.message || error.message));
+            message.error("Thanh toán thất bại!");
         } finally {
             setLoading(false);
         }
@@ -161,7 +229,7 @@ export default function PaymentPage() {
 
             // Thông báo thành công
             message.success({
-                content: "Đã gửi yêu cầu thanh toán! Vui lòng đợi nhân viên đến bàn.",
+                content: "Đã gửi yêu cầu thanh toán!",
                 duration: 3
             });
 
@@ -205,11 +273,11 @@ export default function PaymentPage() {
                         console.log("QR data set successfully:", response.data.data.qr_data);
                     } else {
                         console.error("QR data not found in response");
-                        message.error("Không nhận được thông tin QR từ server");
+                        message.error("Không tìm được thông tin QR");
                     }
                 } catch (error) {
                     console.error("API call error:", error);
-                    message.error("Lỗi khi tạo mã QR: " + (error.response?.data?.message || error.message));
+                    message.error("Lỗi khi tạo mã QR");
                 } finally {
                     setQrLoading(false);
                 }
@@ -280,13 +348,7 @@ export default function PaymentPage() {
     // Đóng modal QR
     const handleCloseQRModal = () => {
         setQrModalVisible(false);
-        // Quay về trang bills
-        navigate('/cus/bills', {
-            state: {
-                paymentRequested: true,
-                paymentMethod: paymentMethod
-            }
-        });
+        // ✅ Giữ nguyên trang PaymentCus, không navigate
     };
 
     return (
@@ -372,57 +434,69 @@ export default function PaymentPage() {
                             borderBottom: "1px solid #f0f0f0",
                         }}
                     >
-                        <div>
-                            <Text style={{ fontSize: 14, color: "#333", display: "block" }}>
-                                Dùng {formatPrice(customerPoints)} điểm
-                            </Text>
-                            <Text style={{ fontSize: 12, color: "#999" }}>
-                                Giảm {formatPrice(maxPointsCanUse)}đ
-                            </Text>
-                        </div>
+                        {loadingPoints ? (
+                            <Spin size="small" tip="Đang tải điểm..." />
+                        ) : customerPoints > 0 ? (
+                            <>
+                                <div>
+                                    <Text style={{ fontSize: 14, color: "#333", display: "block" }}>
+                                        Dùng {formatPrice(customerPoints)} điểm
+                                    </Text>
+                                    <Text style={{ fontSize: 12, color: "#999" }}>
+                                        Giảm {formatPrice(maxPointsCanUse)}đ
+                                    </Text>
+                                </div>
 
-                        {/* Toggle Switch */}
-                        <label
-                            style={{
-                                position: "relative",
-                                display: "inline-block",
-                                width: 44,
-                                height: 24,
-                                cursor: "pointer",
-                            }}
-                        >
-                            <input
-                                type="checkbox"
-                                checked={usePoints}
-                                onChange={(e) => setUsePoints(e.target.checked)}
-                                style={{ opacity: 0, width: 0, height: 0 }}
-                            />
-                            <span
-                                style={{
-                                    position: "absolute",
-                                    top: 0,
-                                    left: 0,
-                                    right: 0,
-                                    bottom: 0,
-                                    backgroundColor: usePoints ? "#226533" : "#d9d9d9",
-                                    borderRadius: 24,
-                                    transition: "0.3s",
-                                }}
-                            >
-                                <span
+                                {/* Toggle Switch */}
+                                <label
                                     style={{
-                                        position: "absolute",
-                                        height: 18,
-                                        width: 18,
-                                        left: usePoints ? 23 : 3,
-                                        bottom: 3,
-                                        backgroundColor: "white",
-                                        borderRadius: "50%",
-                                        transition: "0.3s",
+                                        position: "relative",
+                                        display: "inline-block",
+                                        width: 44,
+                                        height: 24,
+                                        cursor: "pointer",
                                     }}
-                                />
-                            </span>
-                        </label>
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={usePoints}
+                                        onChange={(e) => setUsePoints(e.target.checked)}
+                                        style={{ opacity: 0, width: 0, height: 0 }}
+                                    />
+                                    <span
+                                        style={{
+                                            position: "absolute",
+                                            top: 0,
+                                            left: 0,
+                                            right: 0,
+                                            bottom: 0,
+                                            backgroundColor: usePoints ? "#226533" : "#d9d9d9",
+                                            borderRadius: 24,
+                                            transition: "0.3s",
+                                        }}
+                                    >
+                                        <span
+                                            style={{
+                                                position: "absolute",
+                                                height: 18,
+                                                width: 18,
+                                                left: usePoints ? 23 : 3,
+                                                bottom: 3,
+                                                backgroundColor: "white",
+                                                borderRadius: "50%",
+                                                transition: "0.3s",
+                                            }}
+                                        />
+                                    </span>
+                                </label>
+                            </>
+                        ) : (
+                            <div style={{ width: '100%' }}>
+                                <Text style={{ fontSize: 13, color: "#999", fontStyle: "italic" }}>
+                                    💡 Bạn chưa có điểm tích lũy. Đăng ký ngay để nhận ưu đãi!
+                                </Text>
+                            </div>
+                        )}
                     </div>
 
                     {/* Số tiền thanh toán - Hiển thị đơn giản */}
@@ -568,13 +642,13 @@ export default function PaymentPage() {
                         borderRadius: 16,
                         overflow: 'hidden',
                         boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15)',
+                    },
+                    mask: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                        backdropFilter: 'blur(4px)',
                     }
                 }}
-                maskStyle={{
-                    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                    backdropFilter: 'blur(4px)',
-                }}
-                destroyOnClose
+                destroyOnHidden
             >
 
                 {qrLoading ? (
