@@ -26,9 +26,20 @@ io.on('connection', (socket) => {
 
     // Handle user joining specific room based on role and ID
     socket.on('join', (data) => {
-        const { userId, userType } = data; // userId = admin_id, userType = 'STAFF' or 'CUSTOMER'
+        const { userId, userType, qrSessionId } = data;
 
-        if (userId && userType) {
+        // CUSTOMER join với qrSessionId
+        if (userType === 'CUSTOMER' && qrSessionId) {
+            const room = `QR_SESSION_${qrSessionId}`;
+            socket.join(room);
+            console.log(`👤 Customer joined room: ${room} (socket: ${socket.id})`);
+
+            // Also join the general CUSTOMER room
+            socket.join('CUSTOMER');
+            console.log(`👥 Customer also joined general room: CUSTOMER`);
+        }
+        // STAFF/ADMIN join với userId
+        else if (userId && userType) {
             const room = `${userType}_${userId}`;
             socket.join(room);
             console.log(`👤 User ${userId} (${userType}) joined room: ${room}`);
@@ -41,8 +52,17 @@ io.on('connection', (socket) => {
 
     // Handle leaving room
     socket.on('leave', (data) => {
-        const { userId, userType } = data;
-        if (userId && userType) {
+        const { userId, userType, qrSessionId } = data;
+
+        // CUSTOMER leave với qrSessionId
+        if (userType === 'CUSTOMER' && qrSessionId) {
+            const room = `QR_SESSION_${qrSessionId}`;
+            socket.leave(room);
+            socket.leave('CUSTOMER');
+            console.log(`👋 Customer left rooms: ${room}, CUSTOMER`);
+        }
+        // STAFF/ADMIN leave với userId
+        else if (userId && userType) {
             const room = `${userType}_${userId}`;
             socket.leave(room);
             socket.leave(userType);

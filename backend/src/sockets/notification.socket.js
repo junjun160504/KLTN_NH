@@ -60,11 +60,7 @@ export function emitToType(targetType, notification) {
 
         io.to(targetType).emit('notification', notification);
 
-        console.log(`📤 Notification sent to all ${targetType}`, {
-            id: notification.id,
-            type: notification.type,
-            title: notification.title
-        });
+
     } catch (error) {
         console.error(`❌ Error emitting notification to ${targetType}:`, error.message);
     }
@@ -96,11 +92,7 @@ export function emitToAll(notification) {
 
         io.emit('notification', notification);
 
-        console.log(`📤 Notification broadcast to ALL clients`, {
-            id: notification.id,
-            type: notification.type,
-            title: notification.title
-        });
+
     } catch (error) {
         console.error('❌ Error broadcasting notification:', error.message);
     }
@@ -146,7 +138,6 @@ export function emitReadStatus(notificationId, targetType, targetId) {
             timestamp: new Date().toISOString()
         });
 
-        console.log(`📤 Read status emitted to ${room} for notification #${notificationId}`);
     } catch (error) {
         console.error('❌ Error emitting read status:', error.message);
     }
@@ -168,7 +159,6 @@ export function emitDelete(notificationId, targetType, targetId) {
             timestamp: new Date().toISOString()
         });
 
-        console.log(`📤 Delete event emitted to ${room} for notification #${notificationId}`);
     } catch (error) {
         console.error('❌ Error emitting delete event:', error.message);
     }

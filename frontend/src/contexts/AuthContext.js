@@ -20,7 +20,6 @@ export const AuthProvider = ({ children }) => {
 
                     if (isValid) {
                         setUser(savedUser);
-                        console.log('✅ Auth restored from storage:', savedUser.username);
                     } else {
                         console.warn('⚠️ Invalid token, logging out');
                         authService.logout();
@@ -39,10 +38,8 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (credentials) => {
         try {
-            console.log('🔐 Attempting login:', credentials.username);
             const data = await authService.login(credentials);
             setUser(data.user);
-            console.log('✅ Login successful, user set:', data.user.username);
             return data;
         } catch (error) {
             console.error('❌ Login failed in context:', error);
@@ -51,7 +48,6 @@ export const AuthProvider = ({ children }) => {
     };
 
     const logout = () => {
-        console.log('🚪 Logout called in context');
         authService.logout();
         setUser(null);
     };

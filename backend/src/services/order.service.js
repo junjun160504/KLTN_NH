@@ -757,7 +757,6 @@ export async function removeItemFromOrder(orderId, itemId) {
       await connection.query(`DELETE FROM orders WHERE id = ?`, [orderId]);
       await connection.commit();
 
-      console.log(`✅ Order #${orderId} deleted (no items left)`);
       return { orderId, deleted: true, message: "Order deleted (no items left)" };
     }
 
@@ -796,7 +795,6 @@ export async function removeItemFromOrder(orderId, itemId) {
       //     remainingItems: itemCount
       //   },
       // });
-      console.log(`📤 Notification sent: Removed item from order #${orderId}`);
     } catch (notifError) {
       console.error('⚠️ Failed to send notification:', notifError);
     }
@@ -872,7 +870,6 @@ export async function updateOrderItemQuantity(orderId, itemId, quantity) {
         await connection.query(`DELETE FROM orders WHERE id = ?`, [orderId]);
         await connection.commit();
 
-        console.log(`✅ Order #${orderId} deleted (quantity set to 0, no items left)`);
         return { orderId, deleted: true, message: "Order deleted (no items left)" };
       }
     } else {
@@ -934,7 +931,6 @@ export async function updateOrderItemQuantity(orderId, itemId, quantity) {
       //     newQuantity: quantity
       //   },
       // });
-      console.log(`📤 Notification sent: Updated item quantity in order #${orderId}`);
     } catch (notifError) {
       console.error('⚠️ Failed to send notification:', notifError);
     }
@@ -1009,7 +1005,6 @@ export async function cancelOrder(orderId, reason = null) {
           cancelReason: reason
         },
       });
-      console.log(`📤 Notification sent: Order #${orderId} cancelled`);
     } catch (notifError) {
       console.error('⚠️ Failed to send notification:', notifError);
     }

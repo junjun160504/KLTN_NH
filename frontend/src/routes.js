@@ -25,6 +25,7 @@ import FoodDetailcsPage from "./page/cus/FoodDetailsCus";
 
 // Import AdminLayout and ProtectedAdminRoute
 import AdminLayout from "./layouts/AdminLayout";
+import CustomerLayout from "./layouts/CustomerLayout";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 
 const routes = [
@@ -132,46 +133,46 @@ const routes = [
     ),
   },
 
-  // Customer routes (không cần AdminLayout)
+  // Customer routes (wrapped với CustomerLayout để nhận notification)
   {
     path: "/cus/homes",
-    element: <HomecsPage />,
+    element: <CustomerLayout><HomecsPage /></CustomerLayout>,
   },
   {
     path: "/cus/menus",
-    element: <MenucsPage />,
+    element: <CustomerLayout><MenucsPage /></CustomerLayout>,
   },
   {
     path: "/cus/carts",
-    element: <CartcsPage />,
+    element: <CustomerLayout><CartcsPage /></CustomerLayout>,
   },
   {
     path: "/cus/bills",
-    element: <BillcsPage />,
+    element: <CustomerLayout><BillcsPage /></CustomerLayout>,
   },
   {
     path: "/cus/payment",
-    element: <PaymentcsPage />,
+    element: <CustomerLayout><PaymentcsPage /></CustomerLayout>,
   },
   {
     path: "/cus/chatbot",
-    element: <ChatbotcsPage />,
+    element: <CustomerLayout><ChatbotcsPage /></CustomerLayout>,
   },
   {
     path: "/cus/reviews",
-    element: <ReviewcsPage />,
+    element: <CustomerLayout><ReviewcsPage /></CustomerLayout>,
   },
   {
     path: "/cus/foodreviews",
-    element: <FoodReviewcsPage />,
+    element: <CustomerLayout><FoodReviewcsPage /></CustomerLayout>,
   },
   {
     path: "/cus/loyaltys",
-    element: <LoyaltycsPage />,
+    element: <CustomerLayout><LoyaltycsPage /></CustomerLayout>,
   },
   {
     path: "/cus/fooddetails/:id",
-    element: <FoodDetailcsPage />,
+    element: <CustomerLayout><FoodDetailcsPage /></CustomerLayout>,
   }
 ];
 

@@ -405,12 +405,19 @@ export async function getMenuItemDetail(itemId) {
       [itemId]
     );
 
-    // 3. Get recent reviews (10 most recent)
+    // 3. Get recent reviews (10 most recent) with customer info
     const [recentReviews] = await connection.query(
-      `SELECT id, rating, comment, created_at
-       FROM menu_reviews
-       WHERE item_id = ?
-       ORDER BY created_at DESC
+      `SELECT 
+        mr.id, 
+        mr.rating, 
+        mr.comment, 
+        mr.created_at,
+        c.phone as customer_phone
+       FROM menu_reviews mr
+       LEFT JOIN qr_sessions qs ON mr.qr_session_id = qs.id
+       LEFT JOIN customers c ON mr.customer_id = c.id
+       WHERE mr.item_id = ?
+       ORDER BY mr.created_at DESC
        LIMIT 10`,
       [itemId]
     );
@@ -584,7 +591,6 @@ export async function generateExcelTemplate() {
  */
 export async function importCategoriesFromExcel(fileBuffer, options = {}) {
   const { updateExisting = false, skipDuplicate = false } = options;
-  console.log("importCategoriesFromExcel options:", updateExisting, skipDuplicate);
 
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(fileBuffer);

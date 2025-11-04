@@ -34,7 +34,6 @@ export async function getAllEmployees(filters = {}) {
         sql += ' ORDER BY created_at DESC';
 
         const employees = await query(sql);
-        console.log('employees:', employees);
         return employees;
     } catch (error) {
         console.error('Error in getAllEmployees:', error);
