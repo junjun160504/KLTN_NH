@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import AppHeader from '../../../components/AppHeader'
 import AppSidebar from '../../../components/AppSidebar'
+import CustomDateRangePicker from '../../../components/CustomDateRangePicker'
 import {
   Layout,
   Button,
@@ -26,7 +27,6 @@ import vi_VN from "antd/lib/locale/vi_VN";
 import {
   SearchOutlined,
   FilterOutlined,
-  FileExcelOutlined,
   ShoppingCartOutlined,
   ClockCircleOutlined,
   CheckCircleOutlined,
@@ -38,10 +38,12 @@ import {
   SaveOutlined,
   EyeOutlined
 } from '@ant-design/icons'
-import * as XLSX from 'xlsx'
-import { saveAs } from 'file-saver'
 import dayjs from 'dayjs'
+import isBetween from 'dayjs/plugin/isBetween'
 import axios from 'axios'
+
+// Extend dayjs với isBetween plugin
+dayjs.extend(isBetween)
 
 const REACT_APP_API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api'
 
@@ -54,14 +56,12 @@ const STATUS_MAP = {
   EN_TO_VI: {
     NEW: 'Chờ xác nhận',
     IN_PROGRESS: 'Đang phục vụ',
-    DONE: 'Hoàn tất',
     PAID: 'Đã thanh toán',
     CANCELLED: 'Đã hủy'
   },
   VI_TO_EN: {
     'Chờ xác nhận': 'NEW',
     'Đang phục vụ': 'IN_PROGRESS',
-    'Hoàn tất': 'DONE',
     'Đã thanh toán': 'PAID',
     'Đã hủy': 'CANCELLED'
   }
@@ -75,13 +75,7 @@ const STATUS_COLORS = {
   CANCELLED: 'red'
 }
 
-const STATUS_ICONS = {
-  NEW: <ClockCircleOutlined />,
-  IN_PROGRESS: <ShoppingCartOutlined />,
-  DONE: <CheckCircleOutlined />,
-  PAID: <CheckCircleOutlined />,
-  CANCELLED: <ClockCircleOutlined />
-}
+// Icons are defined inline where needed to keep design explicit
 
 function OrderPage() {
   // Use useModal hook instead of App.useApp()
@@ -89,15 +83,16 @@ function OrderPage() {
 
   const [collapsed, setCollapsed] = useState(false)
   const [pageTitle] = useState('Đơn hàng')
-  const [modalExport, setModalExport] = useState(false)
   const [filterStatus, setFilterStatus] = useState('ALL')
-  const [filterTime, setFilterTime] = useState('today')
   const [searchText, setSearchText] = useState('')
   const [loading, setLoading] = useState(false)
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [orders, setOrders] = useState([])
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [modalThanhToan, setModalThanhToan] = useState({ open: false, order: null })
+
+  // Custom date range for filtering
+  const [dateRange, setDateRange] = useState(null)
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -126,8 +121,8 @@ function OrderPage() {
           tableNumber: order.table_number,
           phone: order.customer_phone || '-',
           point: order.loyalty_points_used || 0,
-          totalAmount: order.total_amount || 0,
-          total: `${(order.total_amount || 0).toLocaleString('vi-VN')}đ`,
+          totalAmount: order.total_price || 0,
+          total: `${Number(order.total_price || 0).toLocaleString('vi-VN')}đ`,
           status: order.status,
           statusVI: STATUS_MAP.EN_TO_VI[order.status] || order.status,
           createdAt: order.created_at || dayjs().toISOString(),
@@ -449,22 +444,39 @@ function OrderPage() {
   // Reset về trang 1 khi thay đổi filters
   useEffect(() => {
     setCurrentPage(1)
-  }, [filterStatus, filterTime, searchText])
+  }, [filterStatus, dateRange, searchText])
 
   // ==================== COMPUTED VALUES (useMemo) ====================
 
   const filteredOrders = useMemo(() => {
+    console.log('=== FILTER DEBUG ===');
+    console.log('dateRange:', dateRange);
+    if (dateRange && dateRange.length === 2) {
+      console.log('Start:', dateRange[0].format('DD/MM/YYYY HH:mm:ss'));
+      console.log('End:', dateRange[1].format('DD/MM/YYYY HH:mm:ss'));
+    }
+    console.log('filterStatus:', filterStatus);
+    console.log('orders count:', orders.length);
+
     return orders.filter((o) => {
       const statusMatch = filterStatus === 'ALL' ? true : o.status === filterStatus
 
+      // Date range filter logic with time precision
       let timeMatch = true
-      const created = dayjs(o.createdAt)
-      if (filterTime === 'today') {
-        timeMatch = created.isSame(dayjs(), 'day')
-      } else if (filterTime === '7days') {
-        timeMatch = created.isAfter(dayjs().subtract(7, 'day').startOf('day'))
-      } else if (filterTime === '30days') {
-        timeMatch = created.isAfter(dayjs().subtract(30, 'day').startOf('day'))
+      if (dateRange && dateRange.length === 2) {
+        const [start, end] = dateRange
+        const created = dayjs(o.createdAt)
+        timeMatch = created.isBetween(start, end, null, '[]') // inclusive both sides
+
+        if (o.code === orders[0]?.code) { // Log first order for debugging
+          console.log('---');
+          console.log('Sample order:', o.code);
+          console.log('Created:', created.format('DD/MM/YYYY HH:mm:ss'));
+          console.log('Start:', start.format('DD/MM/YYYY HH:mm:ss'));
+          console.log('End:', end.format('DD/MM/YYYY HH:mm:ss'));
+          console.log('Match:', timeMatch);
+          console.log('---');
+        }
       }
 
       const search = searchText.trim().toLowerCase()
@@ -477,7 +489,7 @@ function OrderPage() {
 
       return statusMatch && timeMatch && searchMatch
     })
-  }, [orders, filterStatus, filterTime, searchText])
+  }, [orders, filterStatus, dateRange, searchText])
 
   const statistics = useMemo(() => {
     const totalOrders = orders.length
@@ -486,7 +498,7 @@ function OrderPage() {
     const completedOrders = orders.filter(o => o.status === 'PAID').length
     const revenue = orders
       .filter(o => o.status === 'PAID')
-      .reduce((sum, o) => sum + o.totalAmount, 0)
+      .reduce((sum, o) => sum + Number(o.totalAmount), 0)
 
     return {
       totalOrders,
@@ -502,10 +514,8 @@ function OrderPage() {
   const StatusBadge = ({ status }) => {
     const statusVI = STATUS_MAP.EN_TO_VI[status] || status
     const color = STATUS_COLORS[status] || 'default'
-    const icon = STATUS_ICONS[status]
-
     return (
-      <Tag color={color} icon={icon}>
+      <Tag color={color}>
         {statusVI}
       </Tag>
     )
@@ -518,7 +528,8 @@ function OrderPage() {
       title: 'Mã đơn',
       dataIndex: 'code',
       key: 'code',
-      width: '10%',
+      width: '11%',
+      align: 'left',
       sorter: (a, b) => (a.code || '').localeCompare(b.code || '', 'vi'),
       render: (code) => <span className='font-semibold text-blue-600'>{code}</span>
     },
@@ -526,7 +537,8 @@ function OrderPage() {
       title: 'Bàn',
       dataIndex: 'table',
       key: 'table',
-      width: '8%',
+      width: '10%',
+      align: 'left',
       sorter: (a, b) => (parseInt(a.tableNumber) || 0) - (parseInt(b.tableNumber) || 0),
       render: (text) => <span className='font-medium'>{text}</span>
     },
@@ -534,6 +546,7 @@ function OrderPage() {
       title: 'Số điện thoại',
       dataIndex: 'phone',
       key: 'phone',
+      align: 'left',
       width: '12%'
     },
     {
@@ -551,7 +564,7 @@ function OrderPage() {
       dataIndex: 'total',
       key: 'total',
       width: '12%',
-      align: 'right',
+      align: 'center',
       sorter: (a, b) => (a.totalAmount || 0) - (b.totalAmount || 0),
       render: (text) => (
         <span className='font-bold' style={{ color: '#226533' }}>
@@ -563,8 +576,8 @@ function OrderPage() {
       title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
-      width: '12%',
-      align: 'center',
+      width: '14%',
+      align: 'left',
       render: (status) => <StatusBadge status={status} />
     },
     {
@@ -583,7 +596,7 @@ function OrderPage() {
     {
       title: 'Thao tác',
       key: 'action',
-      width: '20%',
+      width: '14%',
       align: 'center',
       render: (_, record) => (
         <Space size='small' wrap>
@@ -670,29 +683,6 @@ function OrderPage() {
       }
     })
   }, [handleUpdateStatus, modal])
-
-  const handleExportExcel = useCallback(() => {
-    const data = filteredOrders.map((o) => ({
-      'Mã đơn': o.code,
-      Bàn: o.table,
-      SĐT: o.phone,
-      Điểm: o.point,
-      'Tổng tiền': o.total,
-      'Trạng thái': o.statusVI,
-      'Thời gian': dayjs(o.createdAt).format('DD/MM/YYYY HH:mm')
-    }))
-
-    const worksheet = XLSX.utils.json_to_sheet(data)
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Đơn hàng')
-
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })
-    const blob = new Blob([excelBuffer], { type: 'application/octet-stream' })
-    saveAs(blob, `don_hang_${dayjs().format('DDMMYYYY')}.xlsx`)
-
-    message.success('Xuất file Excel thành công!')
-    setModalExport(false)
-  }, [filteredOrders])
 
   // Hủy đơn hàng
   const handleCancelOrder = useCallback((order) => {
@@ -944,29 +934,17 @@ function OrderPage() {
                       <Option value='ALL'>Tất cả trạng thái</Option>
                       <Option value='NEW'>Chờ xác nhận</Option>
                       <Option value='IN_PROGRESS'>Đang phục vụ</Option>
-                      <Option value='DONE'>Hoàn tất</Option>
+
                       <Option value='PAID'>Đã thanh toán</Option>
                       <Option value='CANCELLED'>Đã hủy</Option>
                     </Select>
-                    <Select
-                      value={filterTime}
-                      onChange={setFilterTime}
-                      className='w-36'
-                    >
-                      <Option value='all'>Tất cả</Option>
-                      <Option value='today'>Hôm nay</Option>
-                      <Option value='7days'>7 ngày qua</Option>
-                      <Option value='30days'>30 ngày qua</Option>
-                    </Select>
                   </Space>
-                  <Button
-                    type='primary'
-                    icon={<FileExcelOutlined />}
-                    onClick={() => setModalExport(true)}
-                    className='bg-green-600 hover:bg-green-700'
-                  >
-                    Xuất Excel
-                  </Button>
+
+                  {/* Custom date range picker - Positioned at far right */}
+                  <CustomDateRangePicker
+                    value={dateRange}
+                    onChange={setDateRange}
+                  />
                 </Space>
               </Card>
 
@@ -974,7 +952,7 @@ function OrderPage() {
               <ConfigProvider locale={vi_VN}>
                 <div className="bg-white rounded-xl shadow-xl overflow-hidden border border-gray-100">
                   <Table
-                    key={`table-${filterStatus}-${filterTime}-${searchText}-${currentPage}`}
+                    key={`table-${filterStatus}-${dateRange?.[0]?.format('YYYYMMDD') || ''}-${dateRange?.[1]?.format('YYYYMMDD') || ''}-${searchText}-${currentPage}`}
                     rowKey='id'
                     loading={loading}
                     columns={columns}
@@ -1256,18 +1234,6 @@ function OrderPage() {
                 </>
               ) : null}
             </Drawer>
-
-            {/* Modal Export */}
-            <Modal
-              title='Xuất danh sách đơn hàng'
-              open={modalExport}
-              onOk={handleExportExcel}
-              onCancel={() => setModalExport(false)}
-              okText='Xuất Excel'
-              cancelText='Hủy'
-            >
-              <p>Bạn có muốn xuất {filteredOrders.length} đơn hàng ra file Excel?</p>
-            </Modal>
 
             {/* Modal Thanh toán */}
             <Modal

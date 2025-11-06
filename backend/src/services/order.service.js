@@ -1,5 +1,27 @@
 import { pool, query } from "../config/db.js";
 import * as notificationService from "./notification.service.js";
+import { closeSession } from "./qrSession.service.js";
+
+/**
+ * =====================================================
+ * ORDER CREATION LOGIC
+ * =====================================================
+ * 
+ * RULE: Chỉ REUSE order khi status = NEW
+ * 
+ * Logic:
+ * - Nếu có order với status = NEW → THÊM MÓN vào order đó
+ * - Nếu order đã IN_PROGRESS/DONE/PAID/CANCELLED → TẠO ORDER MỚI
+ * 
+ * Lợi ích:
+ * ✅ Kitchen workflow rõ ràng (mỗi order = 1 batch)
+ * ✅ Audit trail chi tiết (track từng lần đặt)
+ * ✅ Flexibility cao (cancel/modify từng order riêng)
+ * ✅ Tận dụng QR_SESSION để aggregate nhiều orders
+ * 
+ * See: ORDER_LOGIC.md cho documentation đầy đủ
+ * =====================================================
+ */
 
 /**
  * Admin tạo order cho khách hàng (order tại quầy)
@@ -71,11 +93,13 @@ export async function createOrderByAdmin({ table_id, items, admin_id, customer_p
       qrSessionId = sessionResult.insertId;
     }
 
-    // 4. Check if there's already an active order for this session
+    // 4. Check if there's an order with status NEW for this session
+    // Logic: Only reuse order if status is NEW (not yet confirmed)
+    // If order is IN_PROGRESS or other status -> Create new order
     const [[existingOrder]] = await connection.query(
       `SELECT * FROM orders 
        WHERE qr_session_id = ? 
-       AND status IN ('NEW', 'IN_PROGRESS')
+       AND status = 'NEW'
        ORDER BY created_at DESC 
        LIMIT 1`,
       [qrSessionId]
@@ -85,7 +109,7 @@ export async function createOrderByAdmin({ table_id, items, admin_id, customer_p
     let isNewOrder = false;
 
     if (existingOrder) {
-      // Reuse existing active order
+      // Reuse existing NEW order
       orderId = existingOrder.id;
       isNewOrder = false;
 
@@ -97,9 +121,9 @@ export async function createOrderByAdmin({ table_id, items, admin_id, customer_p
         );
       }
 
-      console.log(`✅ [ADMIN] Adding items to existing order #${orderId}`);
+      console.log(`✅ [ADMIN] Adding items to existing NEW order #${orderId}`);
     } else {
-      // Create new order
+      // Create new order (no NEW order found)
       const [orderResult] = await connection.query(
         "INSERT INTO orders (qr_session_id, admin_id, status) VALUES (?, ?, 'NEW')",
         [qrSessionId, admin_id || null]
@@ -223,13 +247,13 @@ export async function createOrder({ qr_session_id, items }) {
       throw new Error("QR session not found or inactive");
     }
 
-    // 2. Check if there's already an active order for this session
-    // Only reuse orders with status NEW or IN_PROGRESS
-    // If order is PAID, DONE, or CANCELLED -> Create new order
+    // 2. Check if there's an order with status NEW for this session
+    // Logic: Only reuse order if status is NEW (not yet confirmed by staff)
+    // If order is IN_PROGRESS, DONE, PAID, or CANCELLED -> Create new order
     const [[existingOrder]] = await connection.query(
       `SELECT * FROM orders 
        WHERE qr_session_id = ? 
-       AND status IN ('NEW', 'IN_PROGRESS')
+       AND status = 'NEW'
        ORDER BY created_at DESC 
        LIMIT 1`,
       [qr_session_id]
@@ -239,19 +263,19 @@ export async function createOrder({ qr_session_id, items }) {
     let isNewOrder = false;
 
     if (existingOrder) {
-      // 2a. Reuse existing active order
+      // 2a. Reuse existing NEW order (not yet confirmed)
       orderId = existingOrder.id;
       isNewOrder = false;
-      console.log(`✅ Adding items to existing order #${orderId} (status: ${existingOrder.status})`);
+      console.log(`✅ Adding items to existing NEW order #${orderId}`);
     } else {
-      // 2b. Create new order (no active order found, or previous order was PAID/DONE/CANCELLED)
+      // 2b. Create new order (no NEW order found, previous order was confirmed/completed)
       const [orderResult] = await connection.query(
         "INSERT INTO orders (qr_session_id, status) VALUES (?, 'NEW')",
         [qr_session_id]
       );
       orderId = orderResult.insertId;
       isNewOrder = true;
-      console.log(`✅ Created new order #${orderId}`);
+      console.log(`✅ Created new order #${orderId} (previous order was not NEW or doesn't exist)`);
     }
 
     // 3. Validate menu items and prepare batch insert data
@@ -382,12 +406,14 @@ export async function createOrder({ qr_session_id, items }) {
 }
 
 // Thêm món vào đơn (hỗ trợ thêm 1 hoặc nhiều items)
+// Logic: Chỉ cho phép thêm món khi order đang ở trạng thái NEW hoặc IN_PROGRESS
 export async function addItem(orderId, itemsData) {
   const connection = await pool.getConnection();
   await connection.beginTransaction();
 
   try {
     // 1. Validate order exists and can be modified
+    // Allow adding items to NEW and IN_PROGRESS orders
     const [[order]] = await connection.query(
       `SELECT * FROM orders 
        WHERE id = ? AND status IN ('NEW', 'IN_PROGRESS')`,
@@ -693,7 +719,30 @@ export async function updateStatus(orderId, status) {
   const valid = ["NEW", "IN_PROGRESS", "DONE", "PAID", "CANCELLED"];
   if (!valid.includes(status)) throw new Error("Invalid order status");
 
+  // Lấy thông tin order trước khi update
+  const [[order]] = await pool.query(
+    "SELECT id, qr_session_id FROM orders WHERE id = ?",
+    [orderId]
+  );
+
+  if (!order) {
+    throw new Error("Order not found");
+  }
+
+  // Update order status
   await pool.query("UPDATE orders SET status = ? WHERE id = ?", [status, orderId]);
+
+  // ✅ Nếu status = PAID và có qr_session_id → Đóng session
+  if (status === 'PAID' && order.qr_session_id) {
+    try {
+      await closeSession(order.qr_session_id);
+      console.log(`✅ Session ${order.qr_session_id} closed after order #${orderId} marked as PAID`);
+    } catch (error) {
+      console.error(`⚠️ Failed to close session ${order.qr_session_id}:`, error);
+      // Không throw error vì order status đã update thành công
+    }
+  }
+
   return { orderId, status };
 }
 

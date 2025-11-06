@@ -1,5 +1,6 @@
 import { pool, query } from "../config/db.js";
 import { buildVietQR } from "../utils/vietqr.js";
+import { closeSession } from "./qrSession.service.js";
 
 // 1. Thanh toán
 export async function payOrder({ order_id, method, print_bill }) {
@@ -212,6 +213,17 @@ export async function confirmPayment({ qr_session_id, transaction_code, amount, 
          WHERE id = ?`,
         [payment.order_id]
       );
+
+      // ✅ Đóng qr_session khi admin xác nhận thanh toán thành công
+      if (qr_session_id) {
+        try {
+          await closeSession(qr_session_id);
+          console.log(`✅ Session ${qr_session_id} closed after payment confirmation`);
+        } catch (error) {
+          console.error(`⚠️ Failed to close session ${qr_session_id}:`, error);
+          // Không throw error vì thanh toán đã thành công
+        }
+      }
 
       return {
         payment_id: payment.id,
