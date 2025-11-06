@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import AppHeader from '../../../components/AppHeader'
 import AppSidebar from '../../../components/AppSidebar'
 import CustomDateRangePicker from '../../../components/CustomDateRangePicker'
+import { useOrdersPolling } from '../../../hooks/useOrdersPolling'
 import {
   Layout,
   Button,
@@ -23,7 +24,7 @@ import {
   Pagination,
   ConfigProvider
 } from 'antd'
-import vi_VN from "antd/lib/locale/vi_VN";
+import vi_VN from 'antd/lib/locale/vi_VN'
 import {
   SearchOutlined,
   FilterOutlined,
@@ -78,21 +79,21 @@ const STATUS_COLORS = {
 // Icons are defined inline where needed to keep design explicit
 
 function OrderPage() {
-  // Use useModal hook instead of App.useApp()
   const [modal, contextHolder] = Modal.useModal()
 
   const [collapsed, setCollapsed] = useState(false)
   const [pageTitle] = useState('Đơn hàng')
   const [filterStatus, setFilterStatus] = useState('ALL')
   const [searchText, setSearchText] = useState('')
-  const [loading, setLoading] = useState(false)
   const [loadingDetail, setLoadingDetail] = useState(false)
-  const [orders, setOrders] = useState([])
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [modalThanhToan, setModalThanhToan] = useState({ open: false, order: null })
 
-  // Custom date range for filtering
-  const [dateRange, setDateRange] = useState(null)
+  // Custom date range for filtering - Default to today (00:00:00 - 23:59:59)
+  const [dateRange, setDateRange] = useState([
+    dayjs().startOf('day'),
+    dayjs().endOf('day')
+  ])
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -103,48 +104,32 @@ function OrderPage() {
   const [editingQuantity, setEditingQuantity] = useState({})
   const [updatingItemId, setUpdatingItemId] = useState(null)
 
+  // ==================== POLLING HOOK ====================
+  // Use polling hook for real-time order updates (replaces manual fetchOrders)
+  const { orders: pollingOrders, loading, refresh: refreshOrders } = useOrdersPolling(5000, true)
+
+  // Transform polling data to UI format with useMemo
+  const orders = useMemo(() => {
+    return pollingOrders.map((order) => ({
+      key: order.id.toString(),
+      id: order.id,
+      code: `#PN${String(order.id).padStart(5, '0')}`,
+      table: order.table_number ? `Bàn ${order.table_number}` : 'N/A',
+      tableNumber: order.table_number,
+      phone: order.customer_phone || '-',
+      point: order.loyalty_points_used || 0,
+      totalAmount: Number(order.total_amount) || 0, // Ensure it's a number
+      total: `${Number(order.total_amount || 0).toLocaleString('vi-VN')}đ`,
+      status: order.status,
+      statusVI: STATUS_MAP.EN_TO_VI[order.status] || order.status,
+      createdAt: order.created_at || dayjs().toISOString(),
+      items: order.items || [],
+      note: order.note || order.notes || '',
+      rawData: order
+    }))
+  }, [pollingOrders])
+
   // ==================== API FUNCTIONS ====================
-
-  const fetchOrders = useCallback(async () => {
-    try {
-      setLoading(true)
-      const response = await axios.get(`${REACT_APP_API_URL}/orders`)
-
-      if (response.data.status === 200) {
-        const fetchedOrders = response.data.data || []
-
-        const transformedOrders = fetchedOrders.map((order) => ({
-          key: order.id.toString(),
-          id: order.id,
-          code: `#PN${String(order.id).padStart(5, '0')}`,
-          table: order.table_number ? `Bàn ${order.table_number}` : 'N/A',
-          tableNumber: order.table_number,
-          phone: order.customer_phone || '-',
-          point: order.loyalty_points_used || 0,
-          totalAmount: order.total_price || 0,
-          total: `${Number(order.total_price || 0).toLocaleString('vi-VN')}đ`,
-          status: order.status,
-          statusVI: STATUS_MAP.EN_TO_VI[order.status] || order.status,
-          createdAt: order.created_at || dayjs().toISOString(),
-          items: order.items || [],
-          note: order.note || '',
-          rawData: order
-        }))
-
-        setOrders(transformedOrders)
-      }
-    } catch (error) {
-      console.error('[Orders] Fetch error:', error)
-
-      if (error.response?.status === 404) {
-        setOrders([])
-      } else {
-        message.error('Không thể tải danh sách đơn hàng')
-      }
-    } finally {
-      setLoading(false)
-    }
-  }, [])
 
   // Generate HTML template cho kitchen bill (MUST BE BEFORE printKitchenBill)
   const getKitchenBillHTML = useCallback((order, items) => {
@@ -287,7 +272,7 @@ function OrderPage() {
 
       if (response.data.status === 200) {
         message.success('Cập nhật trạng thái thành công!')
-        await fetchOrders()
+        refreshOrders()
         return true
       }
     } catch (error) {
@@ -295,7 +280,7 @@ function OrderPage() {
       message.error('Không thể cập nhật trạng thái đơn hàng')
       return false
     }
-  }, [fetchOrders])
+  }, [refreshOrders])
 
   // Fetch chi tiết đơn hàng theo ID
   const fetchOrderDetails = useCallback(async (orderId) => {
@@ -368,7 +353,7 @@ function OrderPage() {
 
       if (response.data.status === 200) {
         message.success('Hủy đơn hàng thành công!')
-        await fetchOrders()
+        refreshOrders()
         // Refresh detail nếu đang xem
         if (selectedOrder && selectedOrder.id === orderId) {
           setSelectedOrder(null)
@@ -381,7 +366,7 @@ function OrderPage() {
       message.error(errorMsg)
       return false
     }
-  }, [fetchOrders, selectedOrder])
+  }, [refreshOrders, selectedOrder])
 
   // Cập nhật số lượng món trong đơn
   const updateItemQuantityAPI = useCallback(async (orderId, orderItemId, quantity) => {
@@ -395,7 +380,7 @@ function OrderPage() {
       if (response.data.status === 200) {
         message.success('Cập nhật số lượng thành công!')
         await fetchOrderDetails(orderId)
-        await fetchOrders()
+        refreshOrders()
         return true
       }
     } catch (error) {
@@ -406,7 +391,7 @@ function OrderPage() {
     } finally {
       setUpdatingItemId(null)
     }
-  }, [fetchOrderDetails, fetchOrders])
+  }, [fetchOrderDetails, refreshOrders])
 
   // Xóa món khỏi đơn
   const removeItemAPI = useCallback(async (orderId, orderItemId) => {
@@ -426,7 +411,7 @@ function OrderPage() {
           await fetchOrderDetails(orderId)
         }
 
-        await fetchOrders()
+        refreshOrders()
         return true
       }
     } catch (error) {
@@ -435,11 +420,9 @@ function OrderPage() {
       message.error(errorMsg)
       return false
     }
-  }, [fetchOrderDetails, fetchOrders])
+  }, [fetchOrderDetails, refreshOrders])
 
-  useEffect(() => {
-    fetchOrders()
-  }, [fetchOrders])
+  // No need for useEffect - polling hook handles it automatically
 
   // Reset về trang 1 khi thay đổi filters
   useEffect(() => {

@@ -151,10 +151,18 @@ export const authService = {
         axios.interceptors.response.use(
             (response) => response,
             (error) => {
+                // ⚠️ CHỈ redirect khi là lỗi 401 từ authenticated request
+                // KHÔNG redirect nếu là login request thất bại
                 if (error.response?.status === 401) {
-                    // Token expired or invalid
-                    authService.logout();
-                    window.location.href = '/main/login';
+                    const isLoginRequest = error.config?.url?.includes('/admin/login');
+
+                    // Nếu KHÔNG phải login request → nghĩa là token expired
+                    if (!isLoginRequest) {
+                        console.warn('⚠️ Token expired or invalid, redirecting to login...');
+                        authService.logout();
+                        window.location.href = '/main/login';
+                    }
+                    // Nếu là login request → để Login component xử lý error
                 }
                 return Promise.reject(error);
             }

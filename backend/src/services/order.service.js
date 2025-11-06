@@ -677,7 +677,7 @@ export async function getOrdersBySessionId(qr_session_id) {
   return orders;
 }
 
-// Lấy đơn hàng theo table_id
+// Lấy đơn hàng theo table_id (CHỈ LẤY ORDERS CỦA QR SESSION ACTIVE)
 export async function getOrdersByTableId(table_id) {
   const [orders] = await pool.query(
     `SELECT 
@@ -691,6 +691,8 @@ export async function getOrdersByTableId(table_id) {
     JOIN tables t ON qs.table_id = t.id
     LEFT JOIN order_items oi ON o.id = oi.order_id
     WHERE t.id = ?
+      AND qs.status = 'ACTIVE'
+      AND o.status IN ('NEW', 'IN_PROGRESS', 'DONE')
     GROUP BY o.id
     ORDER BY o.created_at DESC`,
     [table_id]

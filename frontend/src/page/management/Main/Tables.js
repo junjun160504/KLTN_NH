@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Layout,
   Button,
@@ -31,11 +31,11 @@ import {
   MoreOutlined,
   MinusOutlined,
   BellOutlined,
-  ReloadOutlined,
 } from '@ant-design/icons'
 import axios from 'axios'
 import AppHeader from '../../../components/AppHeader'
 import AppSidebar from '../../../components/AppSidebar'
+import { useTablesPolling } from '../../../hooks/useTablesPolling'
 
 const { Content } = Layout
 const { Text, Title } = Typography
@@ -138,8 +138,20 @@ const TablesPage = () => {
 
   const [collapsed, setCollapsed] = useState(false)
   const [pageTitle] = useState('Quản lý bàn')
-  const [tables, setTables] = useState([])
-  const [loading, setLoading] = useState(false)
+
+  // Use polling hook for tables and orders
+  const {
+    tables: pollingTables,
+    allTablesOrders: pollingAllTablesOrders,
+    loading: pollingLoading,
+    refresh: refreshTables,
+    updateSingleTableOrders
+  } = useTablesPolling(5000, true)
+
+  // Transform polling data
+  const tables = useMemo(() => pollingTables, [pollingTables])
+  const allTablesOrders = useMemo(() => pollingAllTablesOrders, [pollingAllTablesOrders])
+  const loading = pollingLoading
 
   const [searchText, setSearchText] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -150,19 +162,17 @@ const TablesPage = () => {
   const [editDrawerOpen, setEditDrawerOpen] = useState(false)
   const [editForm] = Form.useForm()
   const [editingTable, setEditingTable] = useState(null)
-  const [regeneratingQR, setRegeneratingQR] = useState(false) // ✅ Loading state for QR regeneration
-  const [newQRUrl, setNewQRUrl] = useState(null) // ✅ Store new QR URL after regeneration
+  const [regeneratingQR, setRegeneratingQR] = useState(false)
+  const [newQRUrl, setNewQRUrl] = useState(null)
 
   // Order panel state
   const [orderPanelOpen, setOrderPanelOpen] = useState(false)
   const [selectedTable, setSelectedTable] = useState(null)
   const [currentOrderItems, setCurrentOrderItems] = useState([])
-  const [tableOrders, setTableOrders] = useState([]) // Lưu orders của bàn đang chọn
   const [loadingOrders, setLoadingOrders] = useState(false)
-  const [allTablesOrders, setAllTablesOrders] = useState({}) // Lưu orders của tất cả bàn {table_id: [orders]}
 
   // Note editing state - track which notes have been modified
-  const [editingNotes, setEditingNotes] = useState({}) // { [orderItemId]: { value: string, originalValue: string, isSaving: boolean } }
+  const [editingNotes, setEditingNotes] = useState({})
 
   // Menu selection state
   const [menuModalOpen, setMenuModalOpen] = useState(false)
@@ -170,73 +180,19 @@ const TablesPage = () => {
   const [menuItems, setMenuItems] = useState([])
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [loadingMenu, setLoadingMenu] = useState(false)
-  const [addingItem, setAddingItem] = useState(false) // Loading state khi thêm món
+  const [addingItem, setAddingItem] = useState(false)
 
   // ================= API =================
-  async function fetchTables() {
-    try {
-      setLoading(true);
-      const res = await axios.get(`${REACT_APP_API_URL}/tables`);
-      const tablesData = res.data.data || [];
-      setTables(tablesData);
-
-      // Fetch orders cho tất cả các bàn
-      const ordersMap = {};
-      await Promise.all(
-        tablesData.map(async (table) => {
-          try {
-            const orderRes = await axios.get(`${REACT_APP_API_URL}/orders/table/${table.id}`);
-            if (orderRes.data && orderRes.data.data) {
-              // Filter: Chỉ lấy orders active (không hiển thị CANCELLED)
-              const activeOrders = orderRes.data.data.filter(
-                order => order.status !== 'CANCELLED' && order.status !== 'PAID'
-              );
-              ordersMap[table.id] = activeOrders;
-            }
-          } catch (err) {
-            console.error(`Failed to fetch orders for table ${table.id}:`, err);
-            ordersMap[table.id] = [];
-          }
-        })
-      );
-      setAllTablesOrders(ordersMap);
-    } catch (err) {
-      console.error("API GET error:", err);
-      message.error("Không tải được danh sách bàn");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Update single table orders (optimize performance)
-  async function updateSingleTableOrders(tableId) {
-    try {
-      const orderRes = await axios.get(`${REACT_APP_API_URL}/orders/table/${tableId}`);
-      if (orderRes.data && orderRes.data.data) {
-        // Filter: Chỉ lấy orders active
-        const activeOrders = orderRes.data.data.filter(
-          order => order.status !== 'CANCELLED' && order.status !== 'PAID'
-        );
-
-        // Chỉ update state cho table này
-        setAllTablesOrders(prev => ({
-          ...prev,
-          [tableId]: activeOrders
-        }));
-      }
-    } catch (err) {
-      console.error(`Failed to update orders for table ${tableId}:`, err);
-    }
-  }
+  // No need for fetchTables - polling hook handles it automatically
 
   async function handleDeleteTable(id) {
     try {
-      await axios.delete(`${REACT_APP_API_URL}/tables/${id}`);
+      await axios.delete(`${REACT_APP_API_URL}/tables/${id}`)
       message.success({
-        content: "Xóa bàn thành công!",
+        content: 'Xóa bàn thành công!',
         duration: 2,
-      });
-      fetchTables();
+      })
+      refreshTables()
     } catch (err) {
       console.error("API DELETE error:", err);
       const errorMsg = err.response?.data?.message || "Xóa bàn thất bại!";
@@ -255,15 +211,15 @@ const TablesPage = () => {
         table_number: values.table_number,
       });
       message.success({
-        content: "Thêm bàn mới thành công! QR code đã được tạo tự động.",
+        content: 'Thêm bàn mới thành công! QR code đã được tạo tự động.',
         duration: 3,
-      });
-      setDrawerOpen(false);
-      addForm.resetFields();
-      fetchTables();
+      })
+      setDrawerOpen(false)
+      addForm.resetFields()
+      refreshTables()
     } catch (err) {
-      if (err?.errorFields) return;
-      const errorMsg = err.response?.data?.message || "Thêm bàn mới thất bại!";
+      if (err?.errorFields) return
+      const errorMsg = err.response?.data?.message || 'Thêm bàn mới thất bại!'
       message.error({
         content: `${errorMsg}`,
         duration: 3,
@@ -309,7 +265,7 @@ const TablesPage = () => {
         })
 
         // Refresh tables list
-        fetchTables()
+        refreshTables()
       }
     } catch (err) {
       const errorMsg = err.response?.data?.message || 'Tạo lại QR Code thất bại!'
@@ -342,8 +298,8 @@ const TablesPage = () => {
 
       setEditDrawerOpen(false)
       editForm.resetFields()
-      setNewQRUrl(null) // ✅ Reset new QR URL
-      fetchTables()
+      setNewQRUrl(null)
+      refreshTables()
     } catch (err) {
       if (err?.errorFields) return
       const errorMsg = err.response?.data?.message || 'Cập nhật bàn thất bại!'
@@ -405,17 +361,14 @@ const TablesPage = () => {
       const response = await axios.get(`${REACT_APP_API_URL}/orders/table/${tableId}`)
 
       if (response.data && response.data.data) {
-        // Filter: Chỉ lấy orders KHÔNG bị CANCELLED (bỏ qua đơn đã hủy)
-        const activeOrders = response.data.data.filter(
-          order => order.status !== 'CANCELLED' && order.status !== 'PAID'
-        )
-
+        // ✅ Backend đã filter orders của ACTIVE session, không cần filter thêm ở đây
+        const orders = response.data.data
 
         // Nếu có orders, load items của order đầu tiên (hoặc combine tất cả items)
         let newItems = []
-        if (activeOrders.length > 0) {
-          // Combine tất cả items từ các orders active
-          newItems = activeOrders.flatMap(order =>
+        if (orders.length > 0) {
+          // Combine tất cả items từ các orders
+          newItems = orders.flatMap(order =>
             (order.items || []).map(item => ({
               id: item.menu_item_id || item.id, // menu_item_id để hiển thị
               order_item_id: item.id, // order_item.id để update/delete
@@ -423,7 +376,7 @@ const TablesPage = () => {
               quantity: item.quantity,
               price: item.unit_price,
               image: item.image_url || item.image || 'https://via.placeholder.com/70',
-              note: item.note || '', // Thêm note field
+              note: item.note || '',
               order_id: order.id,
               order_status: order.status
             }))
@@ -434,23 +387,20 @@ const TablesPage = () => {
         const hasChanges = forceUpdate || !areOrderItemsEqual(currentOrderItems, newItems)
 
         if (hasChanges) {
-          setTableOrders(activeOrders)
           setCurrentOrderItems(newItems)
-        } else {
         }
       }
     } catch (err) {
       console.error('Failed to fetch orders:', err)
       message.error('Không thể tải thông tin đơn hàng')
-      setTableOrders([])
       setCurrentOrderItems([])
     } finally {
       setLoadingOrders(false)
     }
   }
 
-  // Helper function to compare order items
-  const areOrderItemsEqual = (oldItems, newItems) => {
+  // Helper function to compare order items (wrapped in useCallback)
+  const areOrderItemsEqual = useCallback((oldItems, newItems) => {
     if (oldItems.length !== newItems.length) return false
 
     // Sort by order_item_id for consistent comparison
@@ -466,7 +416,7 @@ const TablesPage = () => {
         oldItem.order_status === newItem.order_status
       )
     })
-  }
+  }, [])
 
 
   // ================= Table Card Actions =================
@@ -722,8 +672,6 @@ const TablesPage = () => {
       )
     )
 
-
-
     try {
       // Gọi API để sync với backend
       await axios.put(
@@ -731,23 +679,14 @@ const TablesPage = () => {
         { quantity: newQuantity }
       )
 
-      // Update allTablesOrders để table status hiển thị đúng
-      setAllTablesOrders(prev => {
-        const tableOrders = prev[selectedTable.id] || []
-        const updatedOrders = tableOrders.map(order => {
-          if (order.id === item.order_id) {
-            const updatedItems = (order.items || []).map(orderItem =>
-              orderItem.id === orderItemId
-                ? { ...orderItem, quantity: newQuantity }
-                : orderItem
-            )
-            const newTotal = updatedItems.reduce((sum, i) => sum + (i.unit_price * i.quantity), 0)
-            return { ...order, items: updatedItems, total_price: newTotal }
-          }
-          return order
-        })
-        return { ...prev, [selectedTable.id]: updatedOrders }
+      // Success message
+      message.success({
+        content: `Đã tăng số lượng "${item.name}" lên ${newQuantity}`,
+        duration: 2,
       })
+
+      // Refresh orders for this table to update status
+      await updateSingleTableOrders(selectedTable.id)
     } catch (err) {
       console.error('Failed to increase quantity:', err)
       const errorMsg = err.response?.data?.message || 'Cập nhật số lượng thất bại!'
@@ -796,23 +735,14 @@ const TablesPage = () => {
         { quantity: newQuantity }
       )
 
-      // Update allTablesOrders
-      setAllTablesOrders(prev => {
-        const tableOrders = prev[selectedTable.id] || []
-        const updatedOrders = tableOrders.map(order => {
-          if (order.id === item.order_id) {
-            const updatedItems = (order.items || []).map(orderItem =>
-              orderItem.id === orderItemId
-                ? { ...orderItem, quantity: newQuantity }
-                : orderItem
-            )
-            const newTotal = updatedItems.reduce((sum, i) => sum + (i.unit_price * i.quantity), 0)
-            return { ...order, items: updatedItems, total_price: newTotal }
-          }
-          return order
-        })
-        return { ...prev, [selectedTable.id]: updatedOrders }
+      // Success message
+      message.success({
+        content: `Đã giảm số lượng "${item.name}" xuống ${newQuantity}`,
+        duration: 2,
       })
+
+      // Refresh orders for this table
+      await updateSingleTableOrders(selectedTable.id)
     } catch (err) {
       console.error('Failed to decrease quantity:', err)
       const errorMsg = err.response?.data?.message || 'Cập nhật số lượng thất bại!'
@@ -852,30 +782,21 @@ const TablesPage = () => {
         `${REACT_APP_API_URL}/orders/${item.order_id}/items/${orderItemId}`
       )
 
-      // Update allTablesOrders
-      setAllTablesOrders(prev => {
-        const tableOrders = prev[selectedTable.id] || []
-
-        // Nếu là item cuối cùng hoặc order bị xóa, remove order khỏi list
-        if (isLastItem || response.data?.data?.deleted || response.data?.message?.includes('deleted')) {
-          const updatedOrders = tableOrders.filter(order => order.id !== item.order_id)
-          return { ...prev, [selectedTable.id]: updatedOrders }
-        }
-
-        // Nếu không, chỉ remove item khỏi order
-        const updatedOrders = tableOrders.map(order => {
-          if (order.id === item.order_id) {
-            const updatedItems = (order.items || []).filter(orderItem => orderItem.id !== orderItemId)
-            const newTotal = updatedItems.reduce((sum, i) => sum + (i.unit_price * i.quantity), 0)
-            return { ...order, items: updatedItems, total_price: newTotal }
-          }
-          return order
-        })
-        return { ...prev, [selectedTable.id]: updatedOrders }
+      // Success message
+      message.success({
+        content: `🗑️ Đã xóa "${item.name}" khỏi đơn hàng`,
+        duration: 2,
       })
+
+      // Refresh orders for this table
+      await updateSingleTableOrders(selectedTable.id)
 
       // Nếu xóa món cuối cùng, đóng panel
       if (isLastItem || response.data?.data?.deleted || response.data?.message?.includes('deleted')) {
+        message.info({
+          content: '📋 Đơn hàng đã được xóa do không còn món nào',
+          duration: 3,
+        })
         setSelectedTable(null)
         setOrderPanelOpen(false)
       }
@@ -912,6 +833,10 @@ const TablesPage = () => {
           return
         }
         await handleIncreaseQuantity(existingItem.order_item_id)
+        message.success({
+          content: `➕ Đã tăng số lượng "${menuItem.name}"`,
+          duration: 2,
+        })
       } else {
         // Nếu món chưa có, tạo order mới với item này
         const orderData = {
@@ -948,29 +873,14 @@ const TablesPage = () => {
 
         setCurrentOrderItems(prev => [...prev, newItem])
 
-        // Update allTablesOrders để table card hiển thị đúng
-        setAllTablesOrders(prev => {
-          const tableOrders = prev[selectedTable.id] || []
-          // Kiểm tra order đã tồn tại chưa
-          const existingOrderIndex = tableOrders.findIndex(o => o.id === newOrder.id)
-
-          if (existingOrderIndex >= 0) {
-            // Order đã tồn tại, update items và total
-            const updatedOrders = [...tableOrders]
-            updatedOrders[existingOrderIndex] = {
-              ...updatedOrders[existingOrderIndex],
-              items: [...(updatedOrders[existingOrderIndex].items || []), newOrderItem],
-              total_price: (updatedOrders[existingOrderIndex].total_price || 0) + (menuItem.price * 1)
-            }
-            return { ...prev, [selectedTable.id]: updatedOrders }
-          } else {
-            // Order mới, thêm vào list
-            return {
-              ...prev,
-              [selectedTable.id]: [...tableOrders, newOrder]
-            }
-          }
+        // Success message
+        message.success({
+          content: `✅ Đã thêm "${menuItem.name}" vào đơn hàng`,
+          duration: 2,
         })
+
+        // Refresh orders for this table
+        await updateSingleTableOrders(selectedTable.id)
       }
     } catch (err) {
       console.error('Failed to add item:', err)
@@ -1437,12 +1347,71 @@ const TablesPage = () => {
 
   // ================= Effect =================
   useEffect(() => {
-    fetchTables();
-    // Fetch menu categories và items 1 lần khi component mount
-    fetchCategories();
-    fetchMenuItems();
+    // No need to fetch tables - polling hook handles it automatically
+    // Just fetch menu categories and items once on mount
+    fetchCategories()
+    fetchMenuItems()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [])
+
+  // ✅ Auto-refresh orders khi modal đang mở và có thay đổi từ polling
+  useEffect(() => {
+    if (!orderPanelOpen || !selectedTable) return
+
+    // Lấy orders mới từ polling data
+    const newOrders = allTablesOrders[selectedTable.id] || []
+
+    // Transform orders thành items format
+    const newItems = newOrders.flatMap(order =>
+      (order.items || []).map(item => ({
+        id: item.menu_item_id || item.id,
+        order_item_id: item.id,
+        name: item.name || item.menu_item_name,
+        quantity: item.quantity,
+        price: item.unit_price,
+        image: item.image_url || item.image || 'https://via.placeholder.com/70',
+        note: item.note || '',
+        order_id: order.id,
+        order_status: order.status
+      }))
+    )
+
+    // So sánh với current items
+    const hasChanges = !areOrderItemsEqual(currentOrderItems, newItems)
+
+    if (hasChanges) {
+      // Phát hiện có thay đổi
+      const oldCount = currentOrderItems.length
+      const newCount = newItems.length
+
+      // Update UI
+      setCurrentOrderItems(newItems)
+
+      // // Thông báo dựa vào loại thay đổi
+      // if (newCount > oldCount) {
+      //   const addedCount = newCount - oldCount
+      //   message.info({
+      //     content: `🆕 Có ${addedCount} món mới được thêm vào đơn hàng!`,
+      //     duration: 3,
+      //     key: 'order-update' // Prevent duplicate messages
+      //   })
+      // } else if (newCount < oldCount) {
+      //   const removedCount = oldCount - newCount
+      //   message.warning({
+      //     content: `🗑️ Đã xóa ${removedCount} món khỏi đơn hàng`,
+      //     duration: 3,
+      //     key: 'order-update'
+      //   })
+      // } else {
+      //   // Số lượng item không đổi nhưng có thay đổi quantity hoặc status
+      //   message.info({
+      //     content: '🔄 Đơn hàng đã được cập nhật',
+      //     duration: 2,
+      //     key: 'order-update'
+      //   })
+      // }
+    }
+  }, [allTablesOrders, orderPanelOpen, selectedTable, currentOrderItems, areOrderItemsEqual, message])
 
   // ================= Filter logic =================
   const filteredTables = tables.filter((t) => {
