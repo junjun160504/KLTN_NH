@@ -415,7 +415,7 @@ export async function getMenuItemDetail(itemId) {
         c.phone as customer_phone
        FROM menu_reviews mr
        LEFT JOIN qr_sessions qs ON mr.qr_session_id = qs.id
-       LEFT JOIN customers c ON mr.customer_id = c.id
+       LEFT JOIN customers c ON qs.customer_id = c.id
        WHERE mr.item_id = ?
        ORDER BY mr.created_at DESC
        LIMIT 10`,
