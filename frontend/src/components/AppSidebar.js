@@ -73,14 +73,14 @@ const AppSidebar = ({ collapsed, currentPageKey, setPageTitle }) => {
             { key: 'tables', icon: <TableOutlined />, label: 'Bàn' },
             { key: "orders", icon: <ShoppingCartOutlined />, label: "Đơn hàng" },
             {
-              key: "menus",
+              key: "products",
               icon: <WindowsOutlined />,
               label: "Sản phẩm",
               children: [
                 { key: "menus", icon: <CoffeeOutlined />, label: "Thực đơn" },
                 { key: "categorys", icon: <CoffeeOutlined />, label: "Danh mục" }
               ],
-              onTitleClick: () => toggleSubmenu("menus", "categorys"),
+              onTitleClick: () => toggleSubmenu("products"),
             },
             { key: "customers", icon: <UserOutlined />, label: "Khách hàng" },
             { key: "staffs", icon: <TeamOutlined />, label: "Nhân viên" },

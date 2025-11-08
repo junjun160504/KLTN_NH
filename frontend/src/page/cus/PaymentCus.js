@@ -12,7 +12,6 @@ import {
     DollarOutlined,
     BankOutlined,
     QrcodeOutlined,
-    CreditCardOutlined,
     DownloadOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -61,6 +60,9 @@ export default function PaymentPage() {
     const [qrModalVisible, setQrModalVisible] = useState(false);
     const [qrData, setQrData] = useState(null);
     const [qrLoading, setQrLoading] = useState(false);
+
+    // ✅ Waiting for Confirmation Modal State
+    const [waitingModalVisible, setWaitingModalVisible] = useState(false);
 
     // ✅ Loyalty Points State - Fetch from API
     const [customerPoints, setCustomerPoints] = useState(0);
@@ -227,24 +229,30 @@ export default function PaymentPage() {
             // Gửi request tạo notification
             await axios.post(`${REACT_APP_API_URL}/notifications`, notificationData);
 
+            // ✅ Hiển thị modal đang chờ xác nhận
+            setWaitingModalVisible(true);
+
             // Thông báo thành công
             message.success({
                 content: "Đã gửi yêu cầu thanh toán!",
-                duration: 3
+                duration: 2
             });
 
-            // Quay về trang bills sau 2 giây
+            // TODO: Implement polling hoặc WebSocket để check payment status
+            // Tạm thời dùng timeout để demo
             setTimeout(() => {
+                setWaitingModalVisible(false);
                 navigate('/cus/bills', {
                     state: {
                         paymentRequested: true,
                         paymentMethod: 'CASH'
                     }
                 });
-            }, 2000);
+            }, 5000); // 5 giây demo, thực tế sẽ dùng WebSocket
 
         } catch (error) {
             console.error("Cash payment notification error:", error);
+            setWaitingModalVisible(false);
             throw error;
         }
     };
@@ -619,6 +627,46 @@ export default function PaymentPage() {
                     Hoàn thành
                 </Button>
             </div>
+
+            {/* ========================================
+                WAITING OVERLAY - Japanese Minimalism
+                ======================================== */}
+            {waitingModalVisible && (
+                <div
+                    className="fixed inset-0 z-[9999] bg-white/60 backdrop-blur-[2px] flex items-center justify-center"
+                    style={{
+                        animation: 'fadeIn 0.2s ease-out'
+                    }}
+                >
+                    <div className="text-center px-6 max-w-xs">
+                        {/* Single Spin - Ant Design */}
+                        <Spin
+                            size="large"
+                            style={{
+                                fontSize: 48,
+                            }}
+                        />
+
+                        {/* Minimalist Text */}
+                        <div className="mt-8 space-y-2">
+                            <p className="text-base font-medium text-gray-800 tracking-wide">
+                                Đang xử lý
+                            </p>
+                            <p className="text-xs text-gray-600 leading-relaxed">
+                                Đang chờ xác nhận từ nhân viên
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Minimal CSS */}
+                    <style jsx>{`
+                        @keyframes fadeIn {
+                            from { opacity: 0; }
+                            to { opacity: 1; }
+                        }
+                    `}</style>
+                </div>
+            )}
 
             {/* QR Code Modal - Modern Design */}
             <Modal

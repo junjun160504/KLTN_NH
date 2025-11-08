@@ -52,7 +52,7 @@ export default function CustomerMenuPage() {
     redirectPath: '/cus/homes',
     autoRedirect: false, // Stay on menu page after QR processing
     onSuccess: (sessionData) => {
-      message.success(`Chào mừng đến ${sessionData.table_number}`, 3);
+      message.success(`Chào mừng đến nhà hàng Phương Nam`);
     },
     onError: (error) => {
       message.error({
