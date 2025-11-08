@@ -27,6 +27,30 @@ CREATE TABLE qr_sessions (
     FOREIGN KEY (customer_id) REFERENCES customers(idcustomers) ON DELETE SET NULL
 );
 
+-- Migration: Add session expiration to qr_sessions table
+-- Date: October 26, 2025
+
+-- Add expired_at column
+ALTER TABLE qr_sessions 
+ADD COLUMN expired_at TIMESTAMP NULL DEFAULT NULL AFTER status;
+
+-- Add index for performance
+CREATE INDEX idx_qr_sessions_status_expired 
+ON qr_sessions(status, expired_at);
+
+-- Update existing ACTIVE sessions to expire in 24 hours
+UPDATE qr_sessions 
+SET expired_at = DATE_ADD(created_at, INTERVAL 24 HOUR)
+WHERE status = 'ACTIVE' AND expired_at IS NULL;
+
+-- Note: 
+-- - expired_at = NULL nghĩa là session không bao giờ expire (cho testing)
+-- - expired_at != NULL nghĩa là session sẽ expire sau X giờ
+
+
+
+
+
 -- Bảng danh mục món ăn
 CREATE TABLE menu_categories (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -200,6 +224,9 @@ CREATE TABLE employees (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     deleted_at TIMESTAMP NULL DEFAULT NULL
 );
+
+alter table employees
+add column updated_at timestamp default null on update CURRENT_TIMESTAMP;
 
 
 CREATE TABLE notifications (

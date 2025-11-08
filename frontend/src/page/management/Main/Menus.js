@@ -7,7 +7,6 @@ import {
   Input,
   Select,
   Tag,
-  message,
   Popconfirm,
   Form,
   Image,
@@ -18,6 +17,7 @@ import {
   Upload,
   InputNumber,
   Switch,
+  App,
 } from "antd";
 
 import vi_VN from "antd/lib/locale/vi_VN";
@@ -40,6 +40,7 @@ const REACT_APP_API_URL = process.env.REACT_APP_API_URL;
 
 
 const MenuPage = () => {
+  const { message } = App.useApp(); // ✅ Use App hook for message
   const [collapsed, setCollapsed] = useState(false);
   const [pageTitle] = useState("Quản lý thực đơn");
 
@@ -94,15 +95,18 @@ const MenuPage = () => {
     } catch (err) {
       console.error("API GET error:", err);
       const errorMsg = categoryId === "all"
-        ? "Không tải được món ăn"
-        : "Không tải được món ăn của danh mục này";
-      message.error(errorMsg);
+        ? "Không thể tải danh sách món ăn"
+        : "Không thể tải món ăn của danh mục này";
+      message.error({
+        content: errorMsg,
+        duration: 3,
+      });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [message]);
 
-  async function fetchCategories() {
+  const fetchCategories = useCallback(async () => {
     try {
       const res = await axios.get(
         `${REACT_APP_API_URL}/menu/cus/menus/categories`
@@ -111,9 +115,12 @@ const MenuPage = () => {
       setCategories(res.data.data || []);
     } catch (err) {
       console.error("API GET error:", err);
-      message.error("Không tải được danh mục");
+      message.error({
+        content: "Không thể tải danh mục",
+        duration: 3,
+      });
     }
-  }
+  }, [message]);
 
   async function handleDeleteFood(id) {
     try {
@@ -123,13 +130,19 @@ const MenuPage = () => {
       setAllFoods(prev => prev.filter(item => item.id !== id));
       setFoods(prev => prev.filter(item => item.id !== id));
 
-      message.success("Xóa món ăn thành công");
+      message.success({
+        content: "Xóa món ăn thành công",
+        duration: 3,
+      });
 
       // Không cần fetchFoods() nữa vì đã update state
       // Giữ nguyên trang hiện tại (currentPage không thay đổi)
     } catch (err) {
       console.error("API DELETE error:", err);
-      message.error("Xóa món ăn thất bại");
+      message.error({
+        content: "Xóa món ăn thất bại",
+        duration: 3,
+      });
     }
   }
 
@@ -144,13 +157,19 @@ const MenuPage = () => {
         image_url: values.image_url || "",
         is_available: values.is_available ? 1 : 0, // Convert boolean to 0/1 for API
       });
-      message.success("Thêm món mới thành công!");
+      message.success({
+        content: "Thêm món ăn thành công",
+        duration: 3,
+      });
       setDrawerOpen(false);
       addForm.resetFields();
       fetchFoods(activeCategory); // Refresh với category hiện tại
     } catch (err) {
       if (err?.errorFields) return; // Lỗi validate
-      message.error("Thêm món mới thất bại!");
+      message.error({
+        content: "Thêm món ăn thất bại",
+        duration: 3,
+      });
     }
   };
 
@@ -186,13 +205,19 @@ const MenuPage = () => {
         image_url: values.image_url || "",
         is_available: values.is_available,
       });
-      message.success("Cập nhật món thành công!");
+      message.success({
+        content: "Cập nhật món ăn thành công",
+        duration: 3,
+      });
       setEditDrawerOpen(false);
       editForm.resetFields();
       fetchFoods(activeCategory); // Refresh với category hiện tại
     } catch (err) {
       if (err?.errorFields) return;
-      message.error("Cập nhật món thất bại!");
+      message.error({
+        content: "Cập nhật món ăn thất bại",
+        duration: 3,
+      });
     }
   };
 
@@ -200,8 +225,7 @@ const MenuPage = () => {
   useEffect(() => {
     fetchCategories();
     fetchFoods("all");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchFoods, fetchCategories]);
 
   // Effect để fetch lại khi chuyển category
   useEffect(() => {
@@ -244,20 +268,33 @@ const MenuPage = () => {
 
   // ======= Xử lý xuất Excel =======
   const handleExportExcel = () => {
-    // Chuyển dữ liệu hiện tại thành sheet
-    const exportData = foods.map((item) => ({
-      "Tên món": item.name,
-      "Giá": item.price,
-      "Danh mục": item.categories && item.categories.length > 0
-        ? item.categories.map(cat => cat.name).join(", ")
-        : "Chưa phân loại",
-      "Trạng thái": item.is_available === 1 ? "Đang bán" : "Ngừng bán",
-      "Mô tả": item.description,
-    }));
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "ThucDon");
-    XLSX.writeFile(wb, "thuc_don.xlsx");
+    try {
+      // Chuyển dữ liệu hiện tại thành sheet
+      const exportData = foods.map((item) => ({
+        "Tên món": item.name,
+        "Giá": item.price,
+        "Danh mục": item.categories && item.categories.length > 0
+          ? item.categories.map(cat => cat.name).join(", ")
+          : "Chưa phân loại",
+        "Trạng thái": item.is_available === 1 ? "Đang bán" : "Ngừng bán",
+        "Mô tả": item.description,
+      }));
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "ThucDon");
+      XLSX.writeFile(wb, "thuc_don.xlsx");
+
+      message.success({
+        content: "Xuất file Excel thành công",
+        duration: 3,
+      });
+    } catch (err) {
+      console.error("Export Excel error:", err);
+      message.error({
+        content: "Xuất file Excel thất bại",
+        duration: 3,
+      });
+    }
   };
 
 
@@ -538,7 +575,7 @@ const MenuPage = () => {
                 columns={columns}
                 dataSource={foods.slice((currentPage - 1) * pageSize, currentPage * pageSize)}
                 loading={loading}
-                rowKey={(record, index) => `row-${activeCategory}-${currentPage}-${index}-${record.id}`}
+                rowKey={(record) => `row-${record.id}`}
                 pagination={false}
                 bordered={false}
                 scroll={{ y: 600 }}
@@ -613,7 +650,7 @@ const MenuPage = () => {
             footer={null}
             centered
             className="japanese-modal"
-            destroyOnClose
+            destroyOnHidden
           >
             <Form
               form={addForm}
@@ -823,7 +860,7 @@ const MenuPage = () => {
             footer={null}
             centered
             className="japanese-modal"
-            destroyOnClose
+            destroyOnHidden
           >
             <Form
               form={editForm}
@@ -1036,7 +1073,7 @@ const MenuPage = () => {
             footer={null}
             centered
             className="japanese-modal"
-            destroyOnClose
+            destroyOnHidden
           >
             <div className="mt-6 space-y-6">
               {/* Download Template Section */}
@@ -1067,10 +1104,16 @@ const MenuPage = () => {
                           document.body.appendChild(link);
                           link.click();
                           link.remove();
-                          message.success('Tải file mẫu thành công!');
+                          message.success({
+                            content: "Tải file mẫu thành công",
+                            duration: 3,
+                          });
                         } catch (err) {
                           console.error('Download error:', err);
-                          message.error('Không thể tải file mẫu!');
+                          message.error({
+                            content: "Không thể tải file mẫu",
+                            duration: 3,
+                          });
                         }
                       }}
                     >
@@ -1192,7 +1235,10 @@ const MenuPage = () => {
                   disabled={!uploadedFile}
                   onClick={async () => {
                     if (!uploadedFile) {
-                      message.warning('Vui lòng chọn file để import!');
+                      message.warning({
+                        content: "Vui lòng chọn file để import",
+                        duration: 3,
+                      });
                       return;
                     }
 
@@ -1220,15 +1266,15 @@ const MenuPage = () => {
 
                       // Hiển thị kết quả chi tiết
                       if (results.failed > 0) {
-                        message.warning(
-                          `Import hoàn tất: ${results.success} thành công, ${results.failed} lỗi. ` +
-                          `(Tạo mới: ${results.created}, Cập nhật: ${results.updated}, Bỏ qua: ${results.skipped})`
-                        );
+                        message.warning({
+                          content: `Import hoàn tất: ${results.success} thành công, ${results.failed} lỗi (Tạo mới: ${results.created}, Cập nhật: ${results.updated}, Bỏ qua: ${results.skipped})`,
+                          duration: 5,
+                        });
                       } else {
-                        message.success(
-                          `Import thành công ${results.success} món! ` +
-                          `(Tạo mới: ${results.created}, Cập nhật: ${results.updated}, Bỏ qua: ${results.skipped})`
-                        );
+                        message.success({
+                          content: `Import thành công ${results.success} món ăn (Tạo mới: ${results.created}, Cập nhật: ${results.updated}, Bỏ qua: ${results.skipped})`,
+                          duration: 5,
+                        });
                       }
 
                       // Đóng modal và refresh danh sách
@@ -1239,8 +1285,11 @@ const MenuPage = () => {
                       fetchFoods(activeCategory);
                     } catch (err) {
                       console.error("Import error:", err);
-                      const errorMsg = err.response?.data?.message || 'Import thất bại! Kiểm tra file Excel.';
-                      message.error(errorMsg);
+                      const errorMsg = err.response?.data?.message || 'Import thất bại. Vui lòng kiểm tra file Excel';
+                      message.error({
+                        content: errorMsg,
+                        duration: 4,
+                      });
                     } finally {
                       setImporting(false);
                     }

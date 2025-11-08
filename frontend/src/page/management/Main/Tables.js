@@ -231,7 +231,7 @@ const TablesPage = () => {
   const openEditDrawer = (table, e) => {
     if (e) e.stopPropagation() // Prevent table card click
     setEditingTable(table)
-    setNewQRUrl(null) // ✅ Reset new QR URL
+    setNewQRUrl(null)
     editForm.setFieldsValue({
       table_number: table.table_number,
       is_active: table.is_active
@@ -239,7 +239,7 @@ const TablesPage = () => {
     setEditDrawerOpen(true)
   }
 
-  // ✅ Tạo lại QR Code
+  // Tạo lại QR Code
   const handleRegenerateQR = async () => {
     try {
       setRegeneratingQR(true)
@@ -254,7 +254,7 @@ const TablesPage = () => {
       if (response.data?.data?.qr_code_url) {
         setNewQRUrl(response.data.data.qr_code_url)
         message.success({
-          content: '✅ Tạo lại QR Code thành công!',
+          content: 'Tạo lại QR Code thành công!',
           duration: 3,
         })
 
@@ -292,7 +292,7 @@ const TablesPage = () => {
       await axios.put(`${REACT_APP_API_URL}/tables/${editingTable.id}`, updateData)
 
       message.success({
-        content: '✅ Cập nhật bàn thành công!',
+        content: 'Cập nhật bàn thành công!',
         duration: 2,
       })
 
@@ -361,7 +361,7 @@ const TablesPage = () => {
       const response = await axios.get(`${REACT_APP_API_URL}/orders/table/${tableId}`)
 
       if (response.data && response.data.data) {
-        // ✅ Backend đã filter orders của ACTIVE session, không cần filter thêm ở đây
+        // Backend đã filter orders của ACTIVE session, không cần filter thêm ở đây
         const orders = response.data.data
 
         // Nếu có orders, load items của order đầu tiên (hoặc combine tất cả items)
@@ -833,10 +833,6 @@ const TablesPage = () => {
           return
         }
         await handleIncreaseQuantity(existingItem.order_item_id)
-        message.success({
-          content: `➕ Đã tăng số lượng "${menuItem.name}"`,
-          duration: 2,
-        })
       } else {
         // Nếu món chưa có, tạo order mới với item này
         const orderData = {
@@ -875,7 +871,7 @@ const TablesPage = () => {
 
         // Success message
         message.success({
-          content: `✅ Đã thêm "${menuItem.name}" vào đơn hàng`,
+          content: `Đã thêm món ăn vào đơn hàng`,
           duration: 2,
         })
 
@@ -1354,7 +1350,7 @@ const TablesPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ✅ Auto-refresh orders khi modal đang mở và có thay đổi từ polling
+  // Auto-refresh orders khi modal đang mở và có thay đổi từ polling
   useEffect(() => {
     if (!orderPanelOpen || !selectedTable) return
 
@@ -1523,7 +1519,7 @@ const TablesPage = () => {
       <Badge.Ribbon
         text={status === 'inactive' ? 'Tạm ngừng' : null}
         color="red"
-        placement="start" // ✅ Hiển thị bên trái thay vì bên phải
+        placement="start" // Hiển thị bên trái thay vì bên phải
         style={{
           display: status === 'inactive' ? 'block' : 'none',
         }}
@@ -1960,7 +1956,7 @@ const TablesPage = () => {
                   onClick={handleNotifyKitchen}
                   style={{ flex: 1 }}
                 >
-                  Báo bếp
+                  Xác nhận & báo bếp
                 </Button>
                 <Button
                   size="medium"
