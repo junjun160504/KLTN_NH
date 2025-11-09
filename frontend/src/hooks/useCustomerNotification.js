@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { message } from 'antd';
+import { App } from 'antd';
 import notificationService from '../services/notificationService';
 
 /**
@@ -18,6 +18,9 @@ const useCustomerNotification = (options = {}) => {
     } = options;
 
     const listenerRef = useRef(null);
+
+    // ✅ Sử dụng App.useApp() INSIDE component để lấy message instance đúng
+    const { message } = App.useApp();
 
     useEffect(() => {
         // Lấy qrSessionId từ localStorage (được set khi quét QR)
@@ -44,12 +47,6 @@ const useCustomerNotification = (options = {}) => {
         }
 
         console.log('🔔 Initializing customer notification listener with qrSessionId:', qrSessionId);
-
-        // Configure message
-        message.config({
-            duration: duration,
-            maxCount: maxCount,
-        });
 
         // Listener callback - Hiển thị theo type
         const handleNotification = (notification) => {
@@ -96,7 +93,7 @@ const useCustomerNotification = (options = {}) => {
                 listenerRef.current(); // Unsubscribe
             }
         };
-    }, [showToast, duration, maxCount]);
+    }, [showToast, duration, maxCount, message]);
 };
 
 export default useCustomerNotification;

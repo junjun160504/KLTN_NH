@@ -29,13 +29,16 @@ import {
   ShoppingCartOutlined,
   DollarOutlined,
   MoreOutlined,
-  MinusOutlined,
   BellOutlined,
 } from '@ant-design/icons'
 import axios from 'axios'
 import AppHeader from '../../../components/AppHeader'
 import AppSidebar from '../../../components/AppSidebar'
 import { useTablesPolling } from '../../../hooks/useTablesPolling'
+import OrderList from '../../../components/management/OrderList'
+import { Switch } from 'antd'
+import { useAuth } from '../../../contexts/AuthContext'
+import { printInvoice } from '../../../components/InvoicePrinter'
 
 const { Content } = Layout
 const { Text, Title } = Typography
@@ -135,6 +138,7 @@ const TablesPage = () => {
   // Use useModal hook for Modal.confirm
   const [modal, contextHolder] = Modal.useModal()
   const { message } = App.useApp() // Use App hook for message
+  const { user } = useAuth() // Get current logged-in admin
 
   const [collapsed, setCollapsed] = useState(false)
   const [pageTitle] = useState('Quản lý bàn')
@@ -181,6 +185,9 @@ const TablesPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [loadingMenu, setLoadingMenu] = useState(false)
   const [addingItem, setAddingItem] = useState(false)
+
+  // Print invoice state
+  const [shouldPrintInvoice, setShouldPrintInvoice] = useState(true)
 
   // ================= API =================
   // No need for fetchTables - polling hook handles it automatically
@@ -1013,73 +1020,194 @@ const TablesPage = () => {
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>Báo bếp - Bàn ${table.table_number}</title>
-          <script src="https://cdn.tailwindcss.com"></script>
           <style>
             @page { 
               size: 80mm auto; 
               margin: 0; 
             }
+            
             body { 
               margin: 0;
               padding: 0;
               font-family: 'Courier New', monospace;
+              font-size: 14px;
+              line-height: 1.4;
             }
+            
             @media print {
               body { 
                 width: 80mm;
                 margin: 0 auto;
               }
             }
+
+            .container {
+              padding: 12px;
+              background: white;
+            }
+
+            /* Header */
+            .header {
+              text-align: center;
+              border-bottom: 2px dashed #000;
+              padding-bottom: 10px;
+              margin-bottom: 10px;
+            }
+
+            .header h1 {
+              font-size: 22px;
+              font-weight: 800;
+              margin: 0 0 4px 0;
+            }
+
+            .header h2 {
+              font-size: 18px;
+              font-weight: 800;
+              margin: 0;
+            }
+
+            /* Order Info */
+            .order-info {
+              margin-bottom: 10px;
+            }
+
+            .info-row {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin: 6px 0;
+              font-size: 13px;
+            }
+
+            .info-label {
+              font-weight: 700;
+            }
+
+            .info-value {
+              font-weight: 700;
+            }
+
+            .table-number {
+              font-size: 20px;
+              font-weight: 800;
+            }
+
+            /* Items List */
+            .items-list {
+              margin-bottom: 10px;
+            }
+
+            .item {
+              border-bottom: 1px solid #ccc;
+              padding-bottom: 10px;
+              margin-bottom: 10px;
+            }
+
+            .item-header {
+              display: flex;
+              justify-content: space-between;
+              align-items: start;
+              margin-bottom: 4px;
+            }
+
+            .item-name {
+              font-weight: 800;
+              font-size: 15px;
+              flex: 1;
+              padding-right: 8px;
+            }
+
+            .item-quantity {
+              font-size: 24px;
+              font-weight: 800;
+              white-space: nowrap;
+            }
+
+            .item-note {
+              font-size: 13px;
+              font-style: italic;
+              color: #555;
+              margin-top: 6px;
+              padding-left: 10px;
+              border-left: 3px solid #ff9800;
+              font-weight: 600;
+            }
+
+            /* Footer */
+            .footer {
+              border-top: 2px dashed #000;
+              padding-top: 10px;
+              text-align: center;
+            }
+
+            .divider {
+              margin-bottom: 8px;
+              font-weight: 600;
+            }
+
+            .total {
+              font-weight: 800;
+              font-size: 15px;
+              margin-bottom: 10px;
+            }
+
+            .print-time {
+              font-size: 12px;
+              color: #666;
+              font-weight: 600;
+            }
           </style>
         </head>
-        <body class="bg-white p-4">
-          <!-- Header -->
-          <div class="text-center border-b-2 border-dashed border-gray-800 pb-3 mb-3">
-            <h1 class="text-2xl font-bold mb-1">🍽️ NHÀ HÀNG</h1>
-            <h2 class="text-xl font-bold">PHIẾU BÁO BẾP</h2>
-          </div>
+        <body>
+          <div class="container">
+            <!-- Header -->
+            <div class="header">
+              <h1>🍽️ NHÀ HÀNG PHƯƠNG NAM</h1>
+              <h2>PHIẾU BÁO BẾP</h2>
+            </div>
 
-          <!-- Order Info -->
-          <div class="space-y-2 mb-3 text-sm">
-            <div class="flex justify-between items-center">
-              <span class="font-semibold">Bàn:</span>
-              <span class="text-xl font-bold">${table.table_number}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="font-semibold">Đơn hàng:</span>
-              <span class="font-mono">#${order.order_id}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="font-semibold">Thời gian:</span>
-              <span>${now}</span>
-            </div>
-          </div>
-
-          <!-- Items List -->
-          <div class="space-y-3 mb-3">
-            ${items.map(item => `
-              <div class="border-b border-gray-300 pb-3">
-                <div class="flex justify-between items-start mb-1">
-                  <div class="font-bold text-base flex-1 pr-2">${item.name}</div>
-                  <div class="text-2xl font-bold whitespace-nowrap">x${item.quantity}</div>
-                </div>
-                ${item.note ? `
-                  <div class="text-sm italic text-gray-600 mt-2 pl-3 border-l-2 border-orange-400">
-                    📝 ${item.note}
-                  </div>
-                ` : ''}
+            <!-- Order Info -->
+            <div class="order-info">
+              <div class="info-row">
+                <span class="info-label">Bàn:</span>
+                <span class="table-number">${table.table_number}</span>
               </div>
-            `).join('')}
-          </div>
-
-          <!-- Footer -->
-          <div class="border-t-2 border-dashed border-gray-800 pt-3 text-center text-sm">
-            <div class="mb-2">━━━━━━━━━━━━━━━━━━━━</div>
-            <div class="font-bold">
-              Tổng: ${totalItems} món - ${totalQuantity} phần
+              <div class="info-row">
+                <span class="info-label">Đơn hàng:</span>
+                <span class="info-value">#${order.id}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Thời gian:</span>
+                <span class="info-value">${now}</span>
+              </div>
             </div>
-            <div class="mt-3 text-xs text-gray-600">
-              In lúc: ${now}
+
+            <!-- Items List -->
+            <div class="items-list">
+              ${items.map(item => `
+                <div class="item">
+                  <div class="item-header">
+                    <div class="item-name">${item.name || item.menu_item_name}</div>
+                    <div class="item-quantity">x${item.quantity}</div>
+                  </div>
+                  ${item.note ? `
+                    <div class="item-note">
+                      📝 ${item.note}
+                    </div>
+                  ` : ''}
+                </div>
+              `).join('')}
+            </div>
+
+            <!-- Footer -->
+            <div class="footer">
+              <div class="divider">━━━━━━━━━━━━━━━━━━━━</div>
+              <div class="total">
+                Tổng: ${totalItems} món - ${totalQuantity} phần
+              </div>
+              <div class="print-time">
+                In lúc: ${now}
+              </div>
             </div>
           </div>
         </body>
@@ -1087,61 +1215,38 @@ const TablesPage = () => {
     `
   }
 
-  const handleNotifyKitchen = async () => {
-    const order = getTableOrder(selectedTable)
-
-    if (!order) {
-      message.warning('Không tìm thấy đơn hàng!')
-      return
-    }
-
-    // Kiểm tra trạng thái đơn hàng
-    if (order.status === 'IN_PROGRESS') {
-      message.info('Đơn hàng đã được xác nhận trước đó!')
-      // Vẫn cho phép in lại bill
-      printKitchenBill(order, selectedTable, currentOrderItems)
-      return
-    }
-
-    if (order.status !== 'NEW') {
-      message.warning('Chỉ có thể báo bếp cho đơn hàng mới!')
-      return
-    }
-
+  // Confirm a single order (for NEW status)
+  const handleConfirmOrder = async (orderId) => {
     try {
       setLoadingOrders(true)
 
-      // 1. Confirm order (NEW → IN_PROGRESS)
-      await axios.put(`${REACT_APP_API_URL}/staff/orders/${order.order_id}/confirm`)
+      await axios.put(`${REACT_APP_API_URL}/staff/orders/${orderId}/confirm`)
 
       message.success('Đã xác nhận đơn hàng!')
 
-      // 2. Print kitchen bill
-      printKitchenBill(order, selectedTable, currentOrderItems)
+      // Get order details for printing
+      const orders = allTablesOrders[selectedTable.id] || []
+      const order = orders.find(o => o.id === orderId)
+      if (order) {
+        printKitchenBill(order, selectedTable, order.items || [])
+      }
 
-      // 3. Update UI - chỉ update table hiện tại
+      // Update table data
       await updateSingleTableOrders(selectedTable.id)
     } catch (err) {
-      console.error('Failed to notify kitchen:', err)
-      const errorMsg = err.response?.data?.message || 'Gửi thông báo bếp thất bại!'
+      console.error('Failed to confirm order:', err)
+      const errorMsg = err.response?.data?.message || 'Xác nhận đơn hàng thất bại!'
       message.error(errorMsg)
     } finally {
       setLoadingOrders(false)
     }
   }
 
-  const handleCancelOrder = async () => {
-    const order = getTableOrder(selectedTable)
-
-    if (!order) {
-      message.warning('Không tìm thấy đơn hàng!')
-      return
-    }
-
-    // Show confirmation modal
+  // Cancel a single order
+  const handleCancelSingleOrder = async (orderId) => {
     modal.confirm({
       title: 'Xác nhận hủy đơn hàng',
-      content: `Bạn có chắc chắn muốn hủy đơn hàng #${order.order_id} của bàn ${selectedTable.table_number}?`,
+      content: `Bạn có chắc chắn muốn hủy đơn hàng #${orderId}?`,
       okText: 'Hủy đơn',
       okType: 'danger',
       cancelText: 'Quay lại',
@@ -1149,20 +1254,13 @@ const TablesPage = () => {
         try {
           setLoadingOrders(true)
 
-          await axios.put(`${REACT_APP_API_URL}/orders/${order.order_id}/cancel`, {
+          await axios.put(`${REACT_APP_API_URL}/orders/${orderId}/cancel`, {
             reason: 'Admin hủy đơn từ quản lý bàn'
           })
 
           message.success('Đã hủy đơn hàng thành công!')
 
-          // Chỉ update table hiện tại thay vì fetch tất cả
           await updateSingleTableOrders(selectedTable.id)
-
-          // Close order panel if no more orders
-          const updatedOrders = allTablesOrders[selectedTable.id] || []
-          if (updatedOrders.length === 0) {
-            setOrderPanelOpen(false)
-          }
         } catch (err) {
           console.error('Failed to cancel order:', err)
           const errorMsg = err.response?.data?.message || 'Hủy đơn hàng thất bại!'
@@ -1174,23 +1272,35 @@ const TablesPage = () => {
     })
   }
 
-  const handlePayment = async () => {
-    const order = getTableOrder(selectedTable)
 
-    if (!order) {
+  const handlePayment = async () => {
+    // Get all orders from polling data
+    const orders = allTablesOrders[selectedTable.id] || []
+
+    if (orders.length === 0) {
       message.warning('Không tìm thấy đơn hàng!')
       return
     }
 
-    const total = calculateTotal()
-    const itemCount = currentOrderItems.length
+    // Calculate statistics
+    const totalItems = currentOrderItems.length
     const totalQuantity = currentOrderItems.reduce((sum, item) => sum + item.quantity, 0)
+
+    // Separate orders by status
+    const confirmedOrders = orders.filter(o => o.status === 'IN_PROGRESS' || o.status === 'DONE')
+    const newOrders = orders.filter(o => o.status === 'NEW')
+
+    // Calculate total for confirmed orders only
+    const totalAmount = confirmedOrders.reduce((sum, order) => sum + Number(order.total_price || 0), 0)
+
+    // Get session info
+    const sessionId = orders[0]?.qr_session_id
 
     // Show confirmation modal with Japanese design (Tailwind CSS)
     modal.confirm({
       title: null,
       icon: null,
-      width: 420,
+      width: 460,
       centered: true,
       content: (
         <div className="py-2">
@@ -1209,7 +1319,7 @@ const TablesPage = () => {
 
           {/* Order Info Card */}
           <div className="bg-[#fafafa] rounded-xl p-4 mb-5 border border-[#f0f0f0]">
-            {/* Table & Order ID */}
+            {/* Table & Session ID */}
             <div className="flex justify-between items-center mb-3 pb-3 border-b border-[#f0f0f0]">
               <div className="flex-1">
                 <div className="text-xs text-[#8c8c8c] mb-1 font-medium">
@@ -1221,22 +1331,55 @@ const TablesPage = () => {
               </div>
               <div className="flex-1 text-right">
                 <div className="text-xs text-[#8c8c8c] mb-1 font-medium">
-                  Đơn hàng
+                  Phiên
                 </div>
                 <div className="text-[15px] font-semibold text-[#262626] font-mono">
-                  #{order.order_id}
+                  #{sessionId}
                 </div>
               </div>
             </div>
 
-            {/* Order Details */}
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-[13px] text-[#595959] font-medium">
-                Số lượng món
-              </span>
-              <span className="text-[13px] text-[#262626] font-semibold">
-                {itemCount} món ({totalQuantity} phần)
-              </span>
+            {/* Orders Summary */}
+            <div className="space-y-2 mb-3">
+              <div className="flex justify-between items-center">
+                <span className="text-[13px] text-[#595959] font-medium">
+                  Tổng đơn hàng
+                </span>
+                <span className="text-[13px] text-[#262626] font-semibold">
+                  {orders.length} đơn
+                </span>
+              </div>
+
+              {confirmedOrders.length > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-[13px] text-[#52c41a] font-medium">
+                    • Đã xác nhận
+                  </span>
+                  <span className="text-[13px] text-[#52c41a] font-semibold">
+                    {confirmedOrders.length} đơn
+                  </span>
+                </div>
+              )}
+
+              {newOrders.length > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-[13px] text-[#ff4d4f] font-medium">
+                    • Chưa xác nhận
+                  </span>
+                  <span className="text-[13px] text-[#ff4d4f] font-semibold">
+                    {newOrders.length} đơn
+                  </span>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center">
+                <span className="text-[13px] text-[#595959] font-medium">
+                  Số lượng món
+                </span>
+                <span className="text-[13px] text-[#262626] font-semibold">
+                  {totalItems} món ({totalQuantity} phần)
+                </span>
+              </div>
             </div>
 
             {/* Divider */}
@@ -1248,10 +1391,22 @@ const TablesPage = () => {
                 Tổng thanh toán
               </span>
               <div className="text-2xl font-bold text-[#52c41a] tracking-tight">
-                {Number(total)?.toLocaleString('vi-VN')}₫
+                {Number(totalAmount)?.toLocaleString('vi-VN')}₫
               </div>
             </div>
           </div>
+
+          {/* Warning about unconfirmed orders */}
+          {newOrders.length > 0 && (
+            <div className="bg-[#fff7e6] border border-[#ffd591] rounded-lg p-3 px-4 flex items-start gap-2.5 mb-3">
+              <span className="text-base leading-5">
+                ⚠️
+              </span>
+              <div className="flex-1 text-[13px] text-[#d46b08] leading-relaxed">
+                {newOrders.length} đơn chưa xác nhận sẽ tự động hủy khi thanh toán
+              </div>
+            </div>
+          )}
 
           {/* Confirmation Message */}
           <div className="bg-[#e6f4ff] border border-[#91caff] rounded-lg p-3 px-4 flex items-start gap-2.5">
@@ -1279,30 +1434,114 @@ const TablesPage = () => {
         try {
           setLoadingOrders(true)
 
-          await axios.put(`${REACT_APP_API_URL}/orders/${order.order_id}/status`, {
-            status: 'PAID'
+          // Get sessionId from first order (all orders share same session)
+          const orders = allTablesOrders[selectedTable.id] || []
+          if (orders.length === 0 || !orders[0].qr_session_id) {
+            message.error('Không tìm thấy phiên làm việc')
+            setLoadingOrders(false)
+            return
+          }
+
+          // Validate admin is logged in
+          if (!user?.id) {
+            message.error('Không tìm thấy thông tin admin. Vui lòng đăng nhập lại.')
+            setLoadingOrders(false)
+            return
+          }
+
+          const sessionId = orders[0].qr_session_id
+
+          // Call payment API
+          const response = await axios.post(`${REACT_APP_API_URL}/payment/admin`, {
+            sessionId,
+            adminId: user.id
           })
 
-          message.success('Đã cập nhật trạng thái thanh toán!')
+          if (response.data.status === 200) {
+            const result = response.data.data
 
-          // Chỉ update table hiện tại thay vì fetch tất cả
-          await updateSingleTableOrders(selectedTable.id)
+            // Show success message with details
+            message.success({
+              content: (
+                <div>
+                  <div style={{ fontWeight: 'bold', marginBottom: 4 }}>
+                    Thanh toán thành công!
+                  </div>
+                </div>
+              ),
+              duration: 5
+            })
 
-          // Close order panel
-          setOrderPanelOpen(false)
+            // ✅ Print invoice if shouldPrintInvoice is true
+            if (shouldPrintInvoice) {
+              try {
+                // Calculate confirmed total from orders
+                const orders = allTablesOrders[selectedTable.id] || [];
+                const confirmedOrders = orders.filter(o => o.status === 'IN_PROGRESS' || o.status === 'DONE');
+                const confirmedTotal = confirmedOrders.reduce((sum, order) => sum + Number(order.total_price || 0), 0);
+
+                // Prepare invoice data
+                const invoiceData = {
+                  sessionId: sessionId,
+                  tableNumber: selectedTable.table_number,
+                  items: currentOrderItems
+                    .filter(item => item.order_status === 'IN_PROGRESS' || item.order_status === 'DONE')
+                    .map(item => ({
+                      name: item.name,
+                      quantity: item.quantity,
+                      price: item.price,
+                    })),
+                  totalAmount: confirmedTotal,
+                  discount: 0, // Có thể thêm logic giảm giá nếu cần
+                  tax: 0,
+                  serviceFee: 0,
+                  finalAmount: confirmedTotal,
+                  paymentTime: new Date().toLocaleString('vi-VN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                  }),
+                  staffName: user?.name || user?.username || 'Nhân viên'
+                };
+
+                // Print invoice
+                printInvoice(invoiceData);
+
+                message.info({
+                  content: '🖨️ Đang in hóa đơn...',
+                  duration: 2
+                });
+              } catch (printError) {
+                console.error('Print invoice error:', printError);
+                message.warning('Không thể in hóa đơn. Vui lòng thử lại.');
+              }
+            }
+
+            // Close order panel and refresh tables
+            setOrderPanelOpen(false)
+            setMenuModalOpen(false)
+            refreshTables()
+          } else {
+            message.error({
+              content: response.data.message || 'Thanh toán thất bại',
+              duration: 3
+            })
+          }
         } catch (err) {
-          console.error('Failed to update payment status:', err)
-          const errorMsg = err.response?.data?.message || 'Cập nhật trạng thái thất bại!'
-          message.error(errorMsg)
+          console.error('Payment error:', err)
+          const errorMsg = err.response?.data?.message || 'Có lỗi xảy ra khi thanh toán'
+          message.error({
+            content: `❌ ${errorMsg}`,
+            duration: 3
+          })
         } finally {
           setLoadingOrders(false)
         }
       }
     })
-  }
-
-  const calculateTotal = () => {
-    return currentOrderItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
   }
 
   // ================= Table Status Logic =================
@@ -1330,7 +1569,14 @@ const TablesPage = () => {
 
     // Tính tổng items và total từ tất cả orders
     const allItems = orders.flatMap(order => order.items || [])
-    const totalAmount = orders.reduce((sum, order) => sum + (order.total_price || 0), 0)
+
+    // Chỉ tính tổng cho orders đã xác nhận (IN_PROGRESS, DONE)
+    const totalAmount = orders.reduce((sum, order) => {
+      if (order.status === 'IN_PROGRESS' || order.status === 'DONE') {
+        return sum + Number(order.total_price || 0)
+      }
+      return sum
+    }, 0)
 
     return {
       order_id: firstOrder.id,
@@ -1376,38 +1622,10 @@ const TablesPage = () => {
     const hasChanges = !areOrderItemsEqual(currentOrderItems, newItems)
 
     if (hasChanges) {
-      // Phát hiện có thay đổi
-      const oldCount = currentOrderItems.length
-      const newCount = newItems.length
-
       // Update UI
       setCurrentOrderItems(newItems)
-
-      // // Thông báo dựa vào loại thay đổi
-      // if (newCount > oldCount) {
-      //   const addedCount = newCount - oldCount
-      //   message.info({
-      //     content: `🆕 Có ${addedCount} món mới được thêm vào đơn hàng!`,
-      //     duration: 3,
-      //     key: 'order-update' // Prevent duplicate messages
-      //   })
-      // } else if (newCount < oldCount) {
-      //   const removedCount = oldCount - newCount
-      //   message.warning({
-      //     content: `🗑️ Đã xóa ${removedCount} món khỏi đơn hàng`,
-      //     duration: 3,
-      //     key: 'order-update'
-      //   })
-      // } else {
-      //   // Số lượng item không đổi nhưng có thay đổi quantity hoặc status
-      //   message.info({
-      //     content: '🔄 Đơn hàng đã được cập nhật',
-      //     duration: 2,
-      //     key: 'order-update'
-      //   })
-      // }
     }
-  }, [allTablesOrders, orderPanelOpen, selectedTable, currentOrderItems, areOrderItemsEqual, message])
+  }, [allTablesOrders, orderPanelOpen, selectedTable, currentOrderItems, areOrderItemsEqual])
 
   // ================= Filter logic =================
   const filteredTables = tables.filter((t) => {
@@ -1430,8 +1648,8 @@ const TablesPage = () => {
   // ================= Order Status Tag =================
   const getOrderStatusTag = (status) => {
     const statusMap = {
-      NEW: { text: 'Chờ xác nhận', color: 'orange' },
-      IN_PROGRESS: { text: 'Đang chế biến', color: 'blue' },
+      NEW: { text: 'Chờ xác nhận', color: 'blue' },
+      IN_PROGRESS: { text: 'Đang phục vụ', color: 'orange' },
       DONE: { text: 'Hoàn thành', color: 'green' },
       PAID: { text: 'Đã thanh toán', color: 'success' }
     }
@@ -1599,8 +1817,24 @@ const TablesPage = () => {
   const OrderPanel = () => {
     if (!selectedTable) return null
 
-    const order = getTableOrder(selectedTable)
-    const total = calculateTotal()
+    // Get all orders from polling data
+    const orders = allTablesOrders[selectedTable.id] || []
+    console.log('Rendering OrderPanel with orders:', orders)
+
+    // Get session info from first order (all orders share same session)
+    const sessionInfo = orders.length > 0 ? {
+      id: orders[0].qr_session_id,
+      status: orders[0].session_status,
+      table_number: orders[0].table_number
+    } : null
+
+    // Calculate total for confirmed orders only (IN_PROGRESS, DONE)
+    const grandTotal = orders.reduce((sum, order) => {
+      if (order.status === 'IN_PROGRESS' || order.status === 'DONE') {
+        return sum + Number(order.total_price || 0)
+      }
+      return sum
+    }, 0)
 
     // Format created_at
     const formatDate = (dateStr) => {
@@ -1624,7 +1858,7 @@ const TablesPage = () => {
           flexDirection: 'column'
         }}
       >
-        {/* Header */}
+        {/* Header with Session Info */}
         <div
           style={{
             padding: '16px',
@@ -1639,11 +1873,15 @@ const TablesPage = () => {
                 <Title level={4} style={{ margin: 0, fontSize: '18px' }}>
                   Bàn {selectedTable.table_number}
                 </Title>
-                {order && getOrderStatusTag(order.status)}
+                {sessionInfo && (
+                  <Tag color={sessionInfo.status === 'ACTIVE' ? 'green' : 'default'}>
+                    {sessionInfo.status === 'ACTIVE' ? 'Đang hoạt động' : 'Đã đóng'}
+                  </Tag>
+                )}
               </div>
-              {order && (
+              {sessionInfo && (
                 <Text type="secondary" style={{ fontSize: '12px' }}>
-                  Đơn hàng #{order.order_id} • {formatDate(order.created_at)}
+                  Phiên #{sessionInfo.id} • {orders.length} đơn hàng
                 </Text>
               )}
             </div>
@@ -1652,197 +1890,53 @@ const TablesPage = () => {
               icon={<CloseOutlined />}
               onClick={() => {
                 setOrderPanelOpen(false)
-                setMenuModalOpen(false) // Đóng cả modal chọn món
-                setEditingNotes({}) // Clear editing notes
+                setMenuModalOpen(false)
+                setEditingNotes({})
               }}
             />
           </div>
 
-          {/* Add Item Button - Bottom Right */}
-          <Button
-            type="text"
-            icon={<PlusOutlined style={{ fontSize: '20px', fontWeight: 'bold' }} />}
-            onClick={() => {
-              setMenuModalOpen(true)
-              // Menu đã được fetch sẵn khi component mount
-            }}
-            style={{
-              position: 'absolute',
-              bottom: '-42px',
-              right: '16px',
-              color: '#226533',
-              padding: '4px 8px'
-            }}
-          />
+          {/* Add Item Button - Only show if there's at least one NEW order OR no orders */}
+          {(orders.length === 0 || orders.some(o => o.status === 'NEW')) && (
+            <Button
+              type="text"
+              icon={<PlusOutlined style={{ fontSize: '20px', fontWeight: 'bold' }} />}
+              onClick={() => {
+                setMenuModalOpen(true)
+              }}
+              style={{
+                position: 'absolute',
+                bottom: '-42px',
+                right: '16px',
+                color: '#226533',
+                padding: '4px 8px'
+              }}
+            />
+          )}
         </div>
 
-        {/* Order Content */}
+        {/* Order Content - List of Orders */}
         <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
           {loadingOrders ? (
             <div style={{ textAlign: 'center', padding: '40px' }}>
               <Text>Đang tải đơn hàng...</Text>
             </div>
-          ) : currentOrderItems.length > 0 ? (
+          ) : orders.length > 0 ? (
             <>
-              {/* Order Items */}
-              <div>
-                <Text strong style={{ fontSize: '14px' }}>
-                  Danh sách món ({currentOrderItems.length})
-                </Text>
-                <div style={{ marginTop: 12 }}>
-                  {currentOrderItems.map((item) => {
-                    // CRITICAL: order_item_id phải tồn tại và unique
-                    // Không được fallback về menu_item_id vì nhiều items có thể cùng menu_item_id
-                    const orderItemId = item.order_item_id
-
-                    if (!orderItemId) {
-                      console.error('Missing order_item_id for item:', item)
-                      return null // Skip rendering items without valid ID
-                    }
-
-                    // Key MUST be unique - use order_item_id (not menu_item_id)
-                    // Combining with order_id for extra safety
-                    const uniqueKey = `${item.order_id}-${orderItemId}`
-
-                    return (
-                      <Card
-                        key={uniqueKey}
-                        size="small"
-                        className="mb-2.5 rounded-lg overflow-hidden border border-[#f0f0f0] hover:border-[#d9d9d9] transition-all duration-200"
-                        bodyStyle={{ padding: '12px' }}
-                      >
-                        <div className="flex gap-3">
-                          {/* Item Image */}
-                          <img
-                            src={item.image}
-                            alt={item.name}
-                            className="w-[70px] h-[70px] object-cover rounded-lg flex-shrink-0"
-                            onError={(e) => {
-                              e.target.src = 'https://via.placeholder.com/70x70.png?text=No+Image'
-                            }}
-                          />
-
-                          {/* Item Info */}
-                          <div className="flex-1 flex flex-col justify-between">
-                            <div>
-                              <Text strong className="text-sm block mb-1">
-                                {item.name}
-                              </Text>
-                              <Text type="secondary" className="text-xs">
-                                {item.price?.toLocaleString('vi-VN')}đ
-                              </Text>
-                            </div>
-
-                            {/* Quantity Controls */}
-                            <div className="flex justify-between items-center mt-2">
-                              <Space size="small">
-                                <Button
-                                  size="small"
-                                  icon={<MinusOutlined />}
-                                  onClick={() => handleDecreaseQuantity(orderItemId)}
-                                  disabled={item.quantity <= 1}
-                                  className="w-7 h-7 flex items-center justify-center rounded-md"
-                                />
-                                <Text strong className="text-[13px] min-w-[25px] text-center">
-                                  {item.quantity}
-                                </Text>
-                                <Button
-                                  size="small"
-                                  icon={<PlusOutlined />}
-                                  onClick={() => handleIncreaseQuantity(orderItemId)}
-                                  className="w-7 h-7 flex items-center justify-center rounded-md"
-                                />
-                              </Space>
-
-                              <Space>
-                                <Text strong className="text-[#1890ff] text-sm">
-                                  {(item.price * item.quantity)?.toLocaleString('vi-VN')}đ
-                                </Text>
-                                <Button
-                                  size="small"
-                                  danger
-                                  icon={<DeleteOutlined />}
-                                  onClick={() => handleRemoveItem(orderItemId)}
-                                  className="w-7 h-7 flex items-center justify-center rounded-md"
-                                />
-                              </Space>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Note Section - Japanese Design with Save Button */}
-                        <div className="mt-3 pt-3 border-t border-[#f0f0f0]">
-                          <div className="flex gap-2">
-                            <Input.TextArea
-                              id={`note-textarea-${orderItemId}`}
-                              placeholder="💬 Thêm ghi chú cho món ăn..."
-                              defaultValue={item.note || ''}
-                              onFocus={() => {
-                                // Đánh dấu đang editing - hiện nút Lưu/Hủy
-                                if (!editingNotes[orderItemId]) {
-                                  setEditingNotes(prev => ({
-                                    ...prev,
-                                    [orderItemId]: { isEditing: true, isSaving: false }
-                                  }))
-                                }
-                              }}
-                              autoSize={{ minRows: 1, maxRows: 3 }}
-                              className="text-[13px] leading-relaxed flex-1"
-                              style={{
-                                borderRadius: '6px',
-                                borderColor: editingNotes[orderItemId] ? '#1890ff' : '#e8e8e8',
-                                backgroundColor: '#fafafa',
-                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                              }}
-                            />
-                            {editingNotes[orderItemId] && (
-                              <Space size="small" className="self-start">
-                                <Button
-                                  size="small"
-                                  onClick={() => {
-                                    // Hủy thay đổi - reset input về giá trị ban đầu
-                                    const textarea = document.getElementById(`note-textarea-${orderItemId}`)
-                                    if (textarea) {
-                                      textarea.value = item.note || ''
-                                    }
-                                    // Xóa editing state
-                                    setEditingNotes(prev => {
-                                      const updated = { ...prev }
-                                      delete updated[orderItemId]
-                                      return updated
-                                    })
-                                  }}
-                                  className="h-7 px-3 rounded-md flex items-center justify-center"
-                                  style={{
-                                    fontSize: '12px',
-                                    fontWeight: 500
-                                  }}
-                                >
-                                  Hủy
-                                </Button>
-                                <Button
-                                  type="primary"
-                                  size="small"
-                                  loading={editingNotes[orderItemId]?.isSaving}
-                                  onClick={() => handleSaveNote(orderItemId, item)}
-                                  className="h-7 px-3 rounded-md bg-[#1890ff] hover:bg-[#40a9ff] flex items-center justify-center"
-                                  style={{
-                                    minWidth: '60px',
-                                    fontSize: '12px',
-                                    fontWeight: 500
-                                  }}
-                                >
-                                  {editingNotes[orderItemId]?.isSaving ? 'Đang lưu...' : 'Lưu'}
-                                </Button>
-                              </Space>
-                            )}
-                          </div>
-                        </div>
-                      </Card>
-                    )
-                  })}
-                </div>
-              </div>
+              {/* Use OrderList component */}
+              <OrderList
+                orders={orders}
+                editingNotes={editingNotes}
+                setEditingNotes={setEditingNotes}
+                handleIncreaseQuantity={handleIncreaseQuantity}
+                handleDecreaseQuantity={handleDecreaseQuantity}
+                handleRemoveItem={handleRemoveItem}
+                handleSaveNote={handleSaveNote}
+                handleConfirmOrder={handleConfirmOrder}
+                handleCancelSingleOrder={handleCancelSingleOrder}
+                getOrderStatusTag={getOrderStatusTag}
+                formatDate={formatDate}
+              />
 
               <Divider />
             </>
@@ -1920,7 +2014,6 @@ const TablesPage = () => {
                 icon={<PlusOutlined />}
                 onClick={() => {
                   setMenuModalOpen(true)
-                  // Menu đã được fetch sẵn khi component mount
                 }}
                 style={{
                   height: '40px',
@@ -1929,7 +2022,6 @@ const TablesPage = () => {
                   paddingLeft: '28px',
                   paddingRight: '28px',
                   borderRadius: '12px'
-                  // textTransform: 'uppercase'
                 }}
               >
                 Thêm đơn hàng
@@ -1939,7 +2031,7 @@ const TablesPage = () => {
         </div>
 
         {/* Footer Actions */}
-        {currentOrderItems.length > 0 && (
+        {orders.length > 0 && orders.some(o => o.status !== 'NEW' && o.status !== 'CANCELLED') && (
           <div
             style={{
               padding: '20px',
@@ -1949,24 +2041,33 @@ const TablesPage = () => {
             }}
           >
             <Space direction="vertical" style={{ width: '100%' }} size="middle">
-              <Space style={{ width: '100%' }} size="middle">
-                <Button
-                  size="medium"
-                  icon={<BellOutlined />}
-                  onClick={handleNotifyKitchen}
-                  style={{ flex: 1 }}
-                >
-                  Xác nhận & báo bếp
-                </Button>
-                <Button
-                  size="medium"
-                  danger
-                  onClick={handleCancelOrder}
-                  style={{ flex: 1 }}
-                >
-                  Hủy đơn
-                </Button>
-              </Space>
+              {/* Print Invoice Switch */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '12px 16px',
+                  backgroundColor: '#f9f9f9',
+                  borderRadius: '8px',
+                  border: '1px solid #e8e8e8'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <PrinterOutlined style={{ fontSize: '16px', color: '#595959' }} />
+                  <Text style={{ fontSize: '14px', fontWeight: '500' }}>
+                    In hóa đơn
+                  </Text>
+                </div>
+                <Switch
+                  checked={shouldPrintInvoice}
+                  onChange={(checked) => setShouldPrintInvoice(checked)}
+                  checkedChildren="Có"
+                  unCheckedChildren="Không"
+                />
+              </div>
+
+              {/* Payment Button */}
               <Button
                 type="primary"
                 size="large"
@@ -1979,7 +2080,8 @@ const TablesPage = () => {
                   fontWeight: 'bold'
                 }}
               >
-                Thanh toán • {Number(total)?.toLocaleString('vi-VN')}đ
+                Thanh toán
+                {/* • {Number(grandTotal)?.toLocaleString('vi-VN')}đ */}
               </Button>
             </Space>
           </div>

@@ -4,7 +4,9 @@ import {
   callbackPayment,
   refundPayment,
   getPayment,
-  listPayments
+  listPayments,
+  paymentByAdmin,
+  notifyForUser
 } from "../controllers/payment.controller.js";
 
 const router = express.Router();
@@ -23,5 +25,10 @@ router.get("/:id", getPayment);
 
 // Danh sách giao dịch
 router.get("/", listPayments);
+
+// Payment by admin 
+router.post("/admin", paymentByAdmin);
+
+router.post("/noti", notifyForUser);
 
 export default router;

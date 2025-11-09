@@ -140,7 +140,6 @@ class NotificationService {
             console.log(`🔄 Calling listener #${index + 1}`);
             try {
                 listener(notification);
-                console.log(`✅ Listener #${index + 1} executed successfully`);
             } catch (error) {
                 console.error(`❌ Listener #${index + 1} error:`, error);
             }

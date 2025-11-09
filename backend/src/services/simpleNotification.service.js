@@ -17,6 +17,7 @@ import { io } from '../server.js';
  * @returns {Object} Result
  */
 export async function notifyUser(qrSessionId, notification) {
+    console.log('🔔 notifyUser called with:', { qrSessionId, notification });
     if (!io) {
         console.error('❌ Socket.IO not initialized');
         return { success: false, error: 'Socket.IO not initialized' };
@@ -93,7 +94,82 @@ export async function notifyAllUsers(notification) {
     };
 }
 
+/**
+ * Gửi thông báo thanh toán hoàn tất đến customer
+ * @param {number} qrSessionId - QR Session ID
+ * @param {Object} paymentData - Payment details
+ * @param {Array} paymentData.ordersConfirmed - Danh sách orders đã thanh toán
+ * @param {Array} paymentData.ordersCancelled - Danh sách orders đã hủy
+ * @param {number} paymentData.totalAmount - Tổng số tiền đã thanh toán
+ * @returns {Object} Result
+ */
+export async function notifyPaymentCompleted(qrSessionId, paymentData) {
+    console.log('🔔 notifyPaymentCompleted called with:', { qrSessionId, paymentData });
+
+    if (!io) {
+        console.error('❌ Socket.IO not initialized');
+        return { success: false, error: 'Socket.IO not initialized' };
+    }
+
+    if (!qrSessionId) {
+        console.error('❌ qrSessionId is required');
+        return { success: false, error: 'qrSessionId is required' };
+    }
+
+    const { ordersConfirmed = [], ordersCancelled = [], totalAmount = 0 } = paymentData;
+
+    // Tạo message chi tiết
+    const confirmedCount = ordersConfirmed.length;
+    const cancelledCount = ordersCancelled.length;
+
+    let message = `Thanh toán thành công`;
+
+    message += '. Cảm ơn quý khách!';
+
+    const room = `QR_SESSION_${qrSessionId}`;
+
+    // Emit notification với type 'session_paid' chứa đầy đủ payment data
+    io.to(room).emit('notification', {
+        type: 'session_paid',
+        message,
+        timestamp: new Date().toISOString(),
+        data: {
+            sessionId: qrSessionId,
+            paidAt: new Date().toISOString(),
+            ordersConfirmed: ordersConfirmed.map(o => ({
+                id: o.id,
+                status: o.status,
+                totalPrice: o.total_price
+            })),
+            ordersCancelled: ordersCancelled.map(o => ({
+                id: o.id,
+                status: o.status
+            })),
+            totalAmount,
+            message
+        }
+    });
+
+    console.log('✅ Payment notification sent:', {
+        room,
+        confirmedCount,
+        cancelledCount,
+        totalAmount
+    });
+
+    return {
+        success: true,
+        qrSessionId,
+        room,
+        confirmedCount,
+        cancelledCount,
+        totalAmount,
+        message
+    };
+}
+
 export default {
     notifyUser,
-    notifyAllUsers
+    notifyAllUsers,
+    notifyPaymentCompleted
 };

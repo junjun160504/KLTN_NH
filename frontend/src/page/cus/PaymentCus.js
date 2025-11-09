@@ -6,6 +6,7 @@ import {
     Modal,
     Spin,
     App,
+    Form,
 } from "antd";
 import {
     ArrowLeftOutlined,
@@ -13,9 +14,12 @@ import {
     BankOutlined,
     QrcodeOutlined,
     DownloadOutlined,
+    CloseCircleOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
+import LoyaltyRegistrationModal from "../../components/LoyaltyRegistrationModal";
+import notificationService from "../../services/notificationService";
 
 const { Header, Content } = Layout;
 const { Title, Text } = Typography;
@@ -46,10 +50,20 @@ const formatPrice = (price) => {
 export default function PaymentPage() {
     const navigate = useNavigate();
     const location = useLocation();
-    const { message } = App.useApp(); // ✅ Use App hook for message
+    const { message, modal } = App.useApp(); // ✅ Use App hook for message and modal
 
     // Nhận data từ BillsCus page
-    const { totalPrice: initialTotal = 0, unpaidOrders = [] } = location.state || {};
+    const { unpaidOrders = [] } = location.state || {};
+
+    console.log("Unpaid Orders:", unpaidOrders);
+
+    // ✅ Lọc chỉ lấy các đơn đã được xác nhận (không phải NEW)
+    const confirmedOrders = unpaidOrders.filter(order => order.status !== 'NEW');
+
+    // ✅ Tính lại tổng tiền chỉ từ các đơn đã xác nhận
+    const confirmedTotal = confirmedOrders.reduce((sum, order) => {
+        return sum + (order.total_price || 0);
+    }, 0);
 
     // State
     const [paymentMethod, setPaymentMethod] = useState('CASH'); // 'CASH', 'BANKING', 'QR', 'CARD'
@@ -66,7 +80,13 @@ export default function PaymentPage() {
 
     // ✅ Loyalty Points State - Fetch from API
     const [customerPoints, setCustomerPoints] = useState(0);
+    const [customerInfo, setCustomerInfo] = useState(null); // ✅ Store full customer info
     const [loadingPoints, setLoadingPoints] = useState(true);
+
+    // ✅ Loyalty Registration Modal State
+    const [isLoyaltyModalVisible, setIsLoyaltyModalVisible] = useState(false);
+    const [isLoyaltyLoading, setIsLoyaltyLoading] = useState(false);
+    const [form] = Form.useForm();
 
     // ✅ Fetch customer loyalty points on mount
     useEffect(() => {
@@ -79,6 +99,7 @@ export default function PaymentPage() {
                 if (!savedCustomer) {
                     console.log('No loyalty customer found in localStorage');
                     setCustomerPoints(0);
+                    setCustomerInfo(null);
                     setLoadingPoints(false);
                     return;
                 }
@@ -89,6 +110,7 @@ export default function PaymentPage() {
                 if (!phone) {
                     console.log('No phone number found');
                     setCustomerPoints(0);
+                    setCustomerInfo(null);
                     setLoadingPoints(false);
                     return;
                 }
@@ -104,15 +126,20 @@ export default function PaymentPage() {
 
                     // Update state
                     setCustomerPoints(points);
+                    setCustomerInfo({
+                        name: latestData.name || null,
+                        phone: latestData.phone,
+                    });
 
                     // Update localStorage with latest data
                     localStorage.setItem('loyalty_customer', JSON.stringify({
                         id: latestData.id,
                         phone: latestData.phone,
+                        name: latestData.name || null,
                         loyalty_points: points,
                     }));
 
-                    console.log(`✅ Customer points loaded: ${points} điểm`);
+                    console.log(`✅ Customer info loaded:`, latestData);
                 }
             } catch (error) {
                 console.error('Error fetching customer points:', error);
@@ -121,9 +148,11 @@ export default function PaymentPage() {
                     console.log('Customer not found - clearing localStorage');
                     localStorage.removeItem('loyalty_customer');
                     setCustomerPoints(0);
+                    setCustomerInfo(null);
                 } else {
-                    message.warning('Không thể tải điểm tích lũy!');
+                    message.warning('Không thể tải thông tin khách hàng!');
                     setCustomerPoints(0);
+                    setCustomerInfo(null);
                 }
             } finally {
                 setLoadingPoints(false);
@@ -133,8 +162,163 @@ export default function PaymentPage() {
         fetchCustomerPoints();
     }, [message]); // ✅ Add message to dependencies
 
+    // ✅ Listen for payment confirmation from admin via Socket.IO
+    useEffect(() => {
+        const handleSessionPaid = (notification) => {
+            console.log('💰 Notification received:', notification);
+
+            // Check if this is a session_paid event
+            if (notification.type !== 'session_paid') {
+                return; // Ignore other event types
+            }
+
+            const data = notification.data || notification;
+
+            const {
+                sessionId,
+                ordersConfirmed,
+                ordersCancelled,
+                totalAmount: paidAmount,
+                message: paymentMessage
+            } = data;
+
+            // Validate session matches current session
+            const sessionData = localStorage.getItem("qr_session");
+            if (sessionData) {
+                const { session_id } = JSON.parse(sessionData);
+                if (session_id && Number(session_id) !== Number(sessionId)) {
+                    console.warn('⚠️ Payment notification for different session, ignoring');
+                    return;
+                }
+            }
+
+            // Close waiting modal if visible
+            setWaitingModalVisible(false);
+            setLoading(false);
+
+            // Show success modal with auto-redirect
+            const successModal = modal.success({
+                title: '🎉 Thanh toán thành công!',
+                width: 460,
+                centered: true,
+                content: (
+                    <div style={{ padding: '20px 0' }}>
+                        <div style={{
+                            fontSize: '15px',
+                            marginBottom: '20px',
+                            textAlign: 'center',
+                            color: '#52c41a',
+                            fontWeight: 500
+                        }}>
+                            {paymentMessage || `Cảm ơn quý khách! Tổng tiền: ${formatPrice(paidAmount)}₫`}
+                        </div>
+
+                        {/* Payment Details */}
+                        <div style={{
+                            backgroundColor: '#f5f5f5',
+                            padding: '16px',
+                            borderRadius: '12px',
+                            marginBottom: '16px',
+                            border: '1px solid #e8f4e8'
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                                <span style={{ color: '#666', fontSize: '13px' }}>Phiên:</span>
+                                <span style={{ fontWeight: 600, fontSize: '13px' }}>#{sessionId}</span>
+                            </div>
+
+                            {ordersConfirmed && ordersConfirmed.length > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                                    <span style={{ color: '#52c41a', fontSize: '13px' }}>✓ Đơn đã thanh toán:</span>
+                                    <span style={{ fontWeight: 600, color: '#52c41a', fontSize: '13px' }}>
+                                        {ordersConfirmed.length} đơn
+                                    </span>
+                                </div>
+                            )}
+
+                            {ordersCancelled && ordersCancelled.length > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                                    <span style={{ color: '#ff4d4f', fontSize: '13px' }}>✗ Đơn đã hủy:</span>
+                                    <span style={{ fontWeight: 600, color: '#ff4d4f', fontSize: '13px' }}>
+                                        {ordersCancelled.length} đơn
+                                    </span>
+                                </div>
+                            )}
+
+                            <div style={{
+                                borderTop: '1px solid #d9d9d9',
+                                paddingTop: '12px',
+                                marginTop: '12px',
+                                display: 'flex',
+                                justifyContent: 'space-between'
+                            }}>
+                                <span style={{ fontSize: '15px', fontWeight: 600 }}>Tổng thanh toán:</span>
+                                <span style={{ fontSize: '18px', fontWeight: 700, color: '#52c41a' }}>
+                                    {formatPrice(paidAmount)}₫
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Countdown message */}
+                        <div style={{
+                            textAlign: 'center',
+                            color: '#8c8c8c',
+                            fontSize: '13px',
+                            fontStyle: 'italic'
+                        }}>
+                            Tự động chuyển về trang chủ sau 30 giây...
+                        </div>
+                    </div>
+                ),
+                okText: 'Về trang chủ',
+                okButtonProps: {
+                    style: {
+                        background: 'linear-gradient(135deg, #226533 0%, #2d8e47 100%)',
+                        border: 'none',
+                        borderRadius: '8px',
+                        height: '40px',
+                        fontWeight: 600
+                    }
+                },
+                onOk: () => {
+                    // Clear session data
+                    localStorage.removeItem('qr_session');
+                    localStorage.removeItem('cart');
+
+                    // Redirect to home
+                    navigate('/cus/homes');
+                }
+            });
+
+            // Auto-redirect after 3 seconds
+            setTimeout(() => {
+                successModal.destroy();
+
+                // Clear session data
+                localStorage.removeItem('qr_session');
+                localStorage.removeItem('cart');
+
+                // Redirect to home
+                navigate('/cus/homes');
+            }, 30000);
+        };
+
+        // Register listener (returns cleanup function)
+        const removeListener = notificationService.addListener(handleSessionPaid);
+
+        console.log('✅ Payment confirmation listener registered');
+
+        // Cleanup on unmount
+        return () => {
+            if (removeListener) {
+                removeListener();
+                console.log('🔌 Payment confirmation listener removed');
+            }
+        };
+    }, [navigate, message, modal]);
+
     // Tính toán
-    const totalAmount = initialTotal;
+    // ✅ Dùng confirmedTotal thay vì initialTotal để chỉ tính đơn đã xác nhận
+    const totalAmount = confirmedTotal;
 
     // Tính số điểm tối đa có thể dùng (không vượt quá tổng tiền và điểm hiện có)
     const maxPointsCanUse = Math.min(customerPoints, totalAmount);
@@ -173,6 +357,15 @@ export default function PaymentPage() {
     const handlePayment = async () => {
         try {
             setLoading(true);
+
+            // ✅ Kiểm tra có đơn hàng đã xác nhận không
+            if (confirmedOrders.length === 0) {
+                message.warning({
+                    content: "Không có đơn hàng nào đã được xác nhận để thanh toán!",
+                    duration: 4
+                });
+                return;
+            }
 
             if (finalAmount <= 0) {
                 message.warning("Số tiền thanh toán phải lớn hơn 0!");
@@ -222,7 +415,7 @@ export default function PaymentPage() {
                     amount: finalAmount,
                     discount_points: pointsDiscount,
                     original_amount: totalAmount,
-                    order_ids: unpaidOrders.map(o => o.id)
+                    order_ids: confirmedOrders.map(o => o.id) // ✅ Chỉ gửi ID của đơn đã xác nhận
                 })
             };
 
@@ -232,23 +425,14 @@ export default function PaymentPage() {
             // ✅ Hiển thị modal đang chờ xác nhận
             setWaitingModalVisible(true);
 
-            // Thông báo thành công
-            message.success({
-                content: "Đã gửi yêu cầu thanh toán!",
-                duration: 2
+            message.info({
+                content: '📨 Đã gửi yêu cầu thanh toán đến nhân viên',
+                duration: 3
             });
 
-            // TODO: Implement polling hoặc WebSocket để check payment status
-            // Tạm thời dùng timeout để demo
-            setTimeout(() => {
-                setWaitingModalVisible(false);
-                navigate('/cus/bills', {
-                    state: {
-                        paymentRequested: true,
-                        paymentMethod: 'CASH'
-                    }
-                });
-            }, 5000); // 5 giây demo, thực tế sẽ dùng WebSocket
+            // ✅ Đợi event 'session_paid' từ Socket.IO
+            // Listener đã được đăng ký trong useEffect
+            // Sẽ tự động đóng modal và redirect khi admin xác nhận
 
         } catch (error) {
             console.error("Cash payment notification error:", error);
@@ -266,8 +450,16 @@ export default function PaymentPage() {
                 setQrModalVisible(true);
 
                 try {
-                    // Gọi API thanh toán cho order đầu tiên để lấy QR code
-                    const firstOrder = unpaidOrders[0];
+                    // ✅ Gọi API thanh toán cho order đầu tiên ĐÃ XÁC NHẬN để lấy QR code
+                    const firstOrder = confirmedOrders[0];
+
+                    if (!firstOrder) {
+                        message.warning("Không có đơn hàng nào đã được xác nhận để thanh toán!");
+                        setQrLoading(false);
+                        setQrModalVisible(false);
+                        return;
+                    }
+
                     const response = await axios.post(`${REACT_APP_API_URL}/payment`, {
                         order_id: firstOrder.id,
                         method: paymentMethod,
@@ -296,8 +488,13 @@ export default function PaymentPage() {
             // CARD hoặc phương thức khác
             // TODO: Implement logic cho CARD
 
-            // Gọi API thanh toán cho từng order
-            const paymentPromises = unpaidOrders.map(order =>
+            // ✅ Gọi API thanh toán cho từng order ĐÃ XÁC NHẬN
+            if (confirmedOrders.length === 0) {
+                message.warning("Không có đơn hàng nào đã được xác nhận để thanh toán!");
+                return;
+            }
+
+            const paymentPromises = confirmedOrders.map(order =>
                 axios.post(`${REACT_APP_API_URL}/payment`, {
                     order_id: order.id,
                     method: paymentMethod,
@@ -323,6 +520,8 @@ export default function PaymentPage() {
             throw error;
         }
     };
+
+
 
     // Tải QR code về máy
     const handleDownloadQR = async () => {
@@ -356,7 +555,60 @@ export default function PaymentPage() {
     // Đóng modal QR
     const handleCloseQRModal = () => {
         setQrModalVisible(false);
-        // ✅ Giữ nguyên trang PaymentCus, không navigate
+    };
+
+    const handleLoyaltySubmit = async (values) => {
+        try {
+            const phone = values.phone.trim();
+            const name = values.name ? values.name.trim() : null;
+
+            setIsLoyaltyLoading(true);
+
+            // Call API to register customer
+            const response = await axios.post(`${REACT_APP_API_URL}/customers`, {
+                phone: phone,
+                name: name,
+            });
+
+            if (response.status === 201 || response.status === 200) {
+                const customerData = response.data.data;
+
+                // Save to localStorage
+                const customerInfoData = {
+                    id: customerData.id,
+                    phone: customerData.phone,
+                    name: customerData.name || null,
+                    loyalty_points: customerData.loyalty_points || 0,
+                };
+                localStorage.setItem('loyalty_customer', JSON.stringify(customerInfoData));
+
+                // Update state to reflect new customer
+                setCustomerInfo({
+                    name: customerData.name || null,
+                    phone: customerData.phone,
+                });
+                setCustomerPoints(customerData.loyalty_points || 0);
+
+                message.success({
+                    content: response.status === 201
+                        ? 'Đăng ký thành công!'
+                        : 'Cập nhật thông tin thành công!',
+                    duration: 3,
+                });
+
+                // Close modal and reset form
+                setIsLoyaltyModalVisible(false);
+                form.resetFields();
+            }
+        } catch (error) {
+            console.error("Error registering loyalty:", error);
+            message.error({
+                content: 'Có lỗi xảy ra. Vui lòng thử lại.',
+                duration: 3,
+            });
+        } finally {
+            setIsLoyaltyLoading(false);
+        }
     };
 
     return (
@@ -420,7 +672,7 @@ export default function PaymentPage() {
                     </Text>
                 </div>
 
-                {/* Dùng điểm và Số tiền thanh toán - GỘP THÀNH 1 Ô */}
+                {/* Thông tin khách hàng và Điểm tích lũy - GỘP THÀNH 1 Ô */}
                 <div
                     style={{
                         background: "#fff",
@@ -431,7 +683,57 @@ export default function PaymentPage() {
                         border: "1px solid #f0f0f0",
                     }}
                 >
-                    {/* Dùng điểm tích lũy */}
+                    {/* ========== THÔNG TIN KHÁCH HÀNG ========== */}
+                    {loadingPoints ? (
+                        <div style={{ textAlign: 'center', padding: '12px 0' }}>
+                            <Spin size="small" tip="Đang tải thông tin..." />
+                        </div>
+                    ) : customerInfo ? (
+                        <div
+                            style={{
+                                marginBottom: 16,
+                                paddingBottom: 16,
+                                borderBottom: "1px solid #f0f0f0",
+                            }}
+                        >
+                            <Text style={{ fontSize: 14, color: "#666", display: "block", marginBottom: 12 }}>
+                                Thông tin khách hàng
+                            </Text>
+
+                            {/* Tên khách hàng */}
+                            {customerInfo.name && (
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        marginBottom: 8,
+                                    }}
+                                >
+                                    <Text style={{ fontSize: 13, color: "#999" }}>Tên khách hàng:</Text>
+                                    <Text strong style={{ fontSize: 14, color: "#333" }}>
+                                        {customerInfo.name}
+                                    </Text>
+                                </div>
+                            )}
+
+                            {/* Số điện thoại */}
+                            <div
+                                style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                }}
+                            >
+                                <Text style={{ fontSize: 13, color: "#999" }}>Số điện thoại:</Text>
+                                <Text strong style={{ fontSize: 14, color: "#333" }}>
+                                    {customerInfo.phone}
+                                </Text>
+                            </div>
+                        </div>
+                    ) : null}
+
+                    {/* ========== DÙNG ĐIỂM TÍCH LŨY ========== */}
                     <div
                         style={{
                             display: "flex",
@@ -501,7 +803,20 @@ export default function PaymentPage() {
                         ) : (
                             <div style={{ width: '100%' }}>
                                 <Text style={{ fontSize: 13, color: "#999", fontStyle: "italic" }}>
-                                    💡 Bạn chưa có điểm tích lũy. Đăng ký ngay để nhận ưu đãi!
+                                    💡 Bạn chưa có điểm tích lũy.{' '}
+                                    <span
+                                        onClick={() => setIsLoyaltyModalVisible(true)}
+                                        style={{
+                                            color: "#667eea",
+                                            fontWeight: 600,
+                                            cursor: "pointer",
+                                            textDecoration: "underline",
+                                            fontStyle: "normal",
+                                        }}
+                                    >
+                                        Đăng ký ngay
+                                    </span>
+                                    {' '}để nhận ưu đãi!
                                 </Text>
                             </div>
                         )}
@@ -671,7 +986,7 @@ export default function PaymentPage() {
             {/* QR Code Modal - Modern Design */}
             <Modal
                 open={qrModalVisible}
-                onCancel={handleCloseQRModal}
+                // onCancel={handleCloseQRModal}
                 footer={null}
                 centered
                 width="95%"
@@ -732,6 +1047,37 @@ export default function PaymentPage() {
                         background: 'linear-gradient(135deg, #f8fffe 0%, #f0f9ff 100%)',
                         position: 'relative',
                     }}>
+                        {/* Close Button - Top Right */}
+                        <Button
+                            type="text"
+                            icon={<CloseCircleOutlined style={{ fontSize: 24, color: '#fff' }} />}
+                            onClick={handleCloseQRModal}
+                            style={{
+                                position: 'absolute',
+                                top: 12,
+                                right: 12,
+                                zIndex: 10,
+                                width: 40,
+                                height: 40,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: 'rgba(0, 0, 0, 0.2)',
+                                backdropFilter: 'blur(4px)',
+                                borderRadius: '50%',
+                                border: 'none',
+                                transition: 'all 0.3s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)';
+                                e.currentTarget.style.transform = 'scale(1.1)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'rgba(0, 0, 0, 0.2)';
+                                e.currentTarget.style.transform = 'scale(1)';
+                            }}
+                        />
+
                         {/* Header */}
                         <div style={{
                             padding: '16px 16px 12px',
@@ -902,7 +1248,7 @@ export default function PaymentPage() {
                                         e.target.style.boxShadow = '0 4px 16px rgba(34, 101, 51, 0.3)';
                                     }}
                                 >
-                                    Hoàn thành
+                                    Xác nhận thanh toán
                                 </Button>
                             </div>
                         </div>
@@ -949,6 +1295,18 @@ export default function PaymentPage() {
                     </div>
                 ) : null}
             </Modal>
+
+            {/* ========== LOYALTY REGISTRATION MODAL ========== */}
+            <LoyaltyRegistrationModal
+                visible={isLoyaltyModalVisible}
+                onCancel={() => {
+                    setIsLoyaltyModalVisible(false);
+                    form.resetFields();
+                }}
+                onSubmit={handleLoyaltySubmit}
+                loading={isLoyaltyLoading}
+                form={form}
+            />
         </Layout>
     );
 }

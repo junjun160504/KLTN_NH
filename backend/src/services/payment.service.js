@@ -1,6 +1,7 @@
 import { pool, query } from "../config/db.js";
 import { buildVietQR } from "../utils/vietqr.js";
 import { closeSession } from "./qrSession.service.js";
+import { notifyPaymentCompleted } from "./simpleNotification.service.js";
 
 // 1. Thanh toán
 export async function payOrder({ order_id, method, print_bill }) {
@@ -313,4 +314,113 @@ export async function listPayments({ qr_session_id, from, to }) {
   }
   const [rows] = await pool.query(sql, params);
   return rows;
+}
+
+
+export async function payOrderByAdmin({ sessionId, adminId }) {
+  const connect = await pool.getConnection();
+
+  try {
+    // Validate session exists and is active
+    const sqlCheckSession = `SELECT * FROM qr_sessions WHERE id = ? AND status = 'ACTIVE'`;
+    const sessions = await query(sqlCheckSession, [sessionId]);
+
+    if (sessions.length === 0) {
+      throw new Error("Session not found or already completed");
+    }
+
+    // Get all orders for this session
+    const sqlFindOrder = `SELECT * FROM orders WHERE qr_session_id = ?`;
+    const orders = await query(sqlFindOrder, [sessionId]);
+
+    if (orders.length === 0) {
+      throw new Error("No orders found for the given sessionId");
+    }
+
+    // Separate orders by status
+    console.log('📦 Processing orders:', orders.length);
+    const ordersToConfirm = orders.filter(item => item.status === 'IN_PROGRESS' || item.status === 'DONE');
+    const ordersToCancel = orders.filter(item => item.status === 'NEW');
+
+    console.log('✅ Orders to confirm (IN_PROGRESS/DONE):', ordersToConfirm.length);
+    console.log('❌ Orders to cancel (NEW):', ordersToCancel.length);
+
+    // Calculate total amount from confirmed orders
+    const totalAmount = ordersToConfirm.reduce((sum, order) => sum + Number(order.total_price || 0), 0);
+
+    await connect.beginTransaction();
+
+    try {
+      // 1. Cancel NEW orders
+      if (ordersToCancel.length > 0) {
+        const orderIdsToCancel = ordersToCancel.map(item => item.id);
+        const placeholders = orderIdsToCancel.map(() => '?').join(',');
+        await connect.query(`
+          UPDATE orders 
+          SET status = 'CANCELLED', admin_id = ?, updated_at = NOW()
+          WHERE id IN (${placeholders})
+        `, [adminId, ...orderIdsToCancel]);
+      }
+
+      // 2. Mark IN_PROGRESS and DONE orders as PAID
+      if (ordersToConfirm.length > 0) {
+        const orderIdsToConfirm = ordersToConfirm.map(item => item.id);
+        const placeholders = orderIdsToConfirm.map(() => '?').join(',');
+        await connect.query(`
+          UPDATE orders 
+          SET status = 'PAID', admin_id = ?, updated_at = NOW()
+          WHERE id IN (${placeholders})
+        `, [adminId, ...orderIdsToConfirm]);
+      }
+
+      // 3. Close session as COMPLETED
+      await connect.query(`
+        UPDATE qr_sessions 
+        SET status = 'COMPLETED'
+        WHERE id = ?
+      `, [sessionId]);
+
+      await connect.commit();
+      console.log('✅ Transaction committed successfully');
+
+      // 4. Send real-time notification to customer via Socket.IO
+      try {
+        await notifyPaymentCompleted(sessionId, {
+          ordersConfirmed: ordersToConfirm,
+          ordersCancelled: ordersToCancel,
+          totalAmount
+        });
+        console.log('✅ Payment notification sent to customer');
+      } catch (notifyError) {
+        // Don't fail the payment if notification fails
+        console.error('⚠️ Failed to send payment notification:', notifyError);
+      }
+
+      return {
+        success: true,
+        message: 'Payment by admin completed successfully',
+        ordersConfirmed: ordersToConfirm.map(item => ({
+          id: item.id,
+          status: 'PAID',
+          total_price: item.total_price
+        })),
+        ordersCancelled: ordersToCancel.map(item => ({
+          id: item.id,
+          status: 'CANCELLED'
+        })),
+        totalAmount,
+        sessionId,
+        sessionStatus: 'COMPLETED'
+      };
+    } catch (error) {
+      await connect.rollback();
+      console.error('❌ Transaction rolled back:', error);
+      throw error;
+    }
+  } catch (error) {
+    console.error("payOrderByAdmin error:", error.message);
+    throw error;
+  } finally {
+    connect.release();
+  }
 }

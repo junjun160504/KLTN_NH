@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import {
@@ -11,7 +11,6 @@ import {
   Tag,
   Carousel,
   Modal,
-  Input,
   Form,
   App,
 } from "antd";
@@ -21,13 +20,13 @@ import {
   WechatOutlined,
   ShoppingOutlined,
   EnvironmentFilled,
-  PhoneOutlined,
   StarFilled,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useParams } from "react-router-dom";
-import React, { useEffect } from "react";
 import axios from "axios";
+import { useQRHandler } from "../../hooks/useQRHandler"; // ✅ Import QR handler
+import LoyaltyRegistrationModal from "../../components/LoyaltyRegistrationModal";
 const { Header, Content, Footer } = Layout;
 const { Title, Text } = Typography;
 
@@ -36,6 +35,25 @@ export default function HomecsPage() {
   const { modal, message } = App.useApp(); // ✅ Use App hook for modal and message
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // ✅ QR Handler - Auto process QR params when scanning QR code
+  // Use useCallback to prevent recreating functions on every render
+  const handleQRSuccess = useCallback((sessionData) => {
+    console.log('✅ QR Session created from HomesCus:', sessionData);
+    message.success(`Đã quét QR thành công! Bàn ${sessionData.table_number}`);
+  }, [message]);
+
+  const handleQRError = useCallback((error) => {
+    console.error('❌ QR Error in HomesCus:', error);
+    message.error('QR Code không hợp lệ hoặc đã hết hạn');
+  }, [message]);
+
+  const { isProcessing: isQRProcessing, qrError } = useQRHandler({
+    redirectPath: '/cus/homes', // Stay on home page after processing
+    autoRedirect: false, // Don't redirect, just process QR
+    onSuccess: handleQRSuccess,
+    onError: handleQRError
+  });
 
   // ✅ Loyalty Modal states
   const [isLoyaltyModalVisible, setIsLoyaltyModalVisible] = useState(false);
@@ -101,17 +119,17 @@ export default function HomecsPage() {
   };
 
   // ✅ Handle Loyalty Registration
-  const handleLoyaltySubmit = async () => {
+  const handleLoyaltySubmit = async (values) => {
     try {
-      // Validate form
-      const values = await form.validateFields();
       const phone = values.phone.trim();
+      const name = values.name ? values.name.trim() : null;
 
       setIsLoyaltyLoading(true);
 
       // Call API to register customer
       const response = await axios.post(`${process.env.REACT_APP_API_URL}/customers`, {
         phone: phone,
+        name: name, // ✅ Include name if provided
       });
 
       if (response.status === 201 || response.status === 200) {
@@ -121,6 +139,7 @@ export default function HomecsPage() {
         const customerInfo = {
           id: customerData.id,
           phone: customerData.phone,
+          name: customerData.name || null, // ✅ Save name
           loyalty_points: customerData.loyalty_points || 0,
         };
         localStorage.setItem('loyalty_customer', JSON.stringify(customerInfo));
@@ -129,7 +148,7 @@ export default function HomecsPage() {
         message.success({
           content: response.status === 201
             ? 'Đăng ký thành công!'
-            : 'Số điện thoại đã được đăng ký!',
+            : 'Cập nhật thông tin thành công!',
           duration: 3,
         });
 
@@ -170,6 +189,7 @@ export default function HomecsPage() {
           const updatedCustomer = {
             id: latestData.id,
             phone: latestData.phone,
+            name: latestData.name || null,
             loyalty_points: latestData.points || 0,
           };
           localStorage.setItem('loyalty_customer', JSON.stringify(updatedCustomer));
@@ -187,6 +207,12 @@ export default function HomecsPage() {
             content: (
               <div className="mt-4">
                 <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg p-4 mb-3">
+                  {latestData.name && (
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-gray-600 text-sm">Tên khách hàng:</span>
+                      <span className="font-bold text-gray-800">{latestData.name}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-gray-600 text-sm">Số điện thoại:</span>
                     <span className="font-bold text-gray-800">{latestData.phone}</span>
@@ -574,87 +600,17 @@ export default function HomecsPage() {
         </div>
       </Modal>
 
-      {/* ========== LOYALTY POINTS MODAL - Simple Mobile-First Design ========== */}
-      <Modal
-        title={
-          <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
-              <StarFilled className="text-white text-lg" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-gray-800 m-0">Tích điểm thưởng</h3>
-              <p className="text-xs text-gray-500 m-0">Nhập SĐT để nhận ưu đãi</p>
-            </div>
-          </div>
-        }
-        open={isLoyaltyModalVisible}
+      {/* ========== LOYALTY REGISTRATION MODAL ========== */}
+      <LoyaltyRegistrationModal
+        visible={isLoyaltyModalVisible}
         onCancel={() => {
           setIsLoyaltyModalVisible(false);
           form.resetFields();
         }}
-        footer={null}
-        width={420}
-        centered
-        className="japanese-modal"
-        destroyOnHidden
-      >
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleLoyaltySubmit}
-          className="mt-4"
-        >
-          {/* Phone Input */}
-          <Form.Item
-            name="phone"
-            rules={[
-              { required: true, message: 'Vui lòng nhập số điện thoại' },
-              {
-                pattern: /^(0[3|5|7|8|9])[0-9]{8}$/,
-                message: 'Số điện thoại không hợp lệ (VD: 0912345678)'
-              }
-            ]}
-          >
-            <Input
-              prefix={<PhoneOutlined className="text-purple-500" />}
-              placeholder="Nhập số điện thoại (10 số)"
-              size="large"
-              maxLength={10}
-              className="rounded-lg"
-            />
-          </Form.Item>
-
-          {/* Info Box */}
-          <div className="bg-purple-50 rounded-lg p-3 mb-4 border border-purple-100">
-            <p className="text-xs text-gray-600 m-0">
-              💎 <strong>1 điểm</strong> cho mỗi <strong>10.000₫</strong> chi tiêu
-            </p>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2">
-            <Button
-              size="large"
-              onClick={() => {
-                setIsLoyaltyModalVisible(false);
-                form.resetFields();
-              }}
-              className="flex-1 rounded-lg"
-            >
-              Hủy
-            </Button>
-            <Button
-              type="primary"
-              size="large"
-              htmlType="submit"
-              loading={isLoyaltyLoading}
-              className="flex-1 rounded-lg bg-gradient-to-r from-purple-500 to-indigo-600 border-0"
-            >
-              Đăng ký
-            </Button>
-          </div>
-        </Form>
-      </Modal>
+        onSubmit={handleLoyaltySubmit}
+        loading={isLoyaltyLoading}
+        form={form}
+      />
     </Layout>
   );
 }

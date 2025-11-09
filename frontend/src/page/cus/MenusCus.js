@@ -1,8 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import CustomerFooterNav from "../../components/CustomerFooterNav";
-import QRProcessingStatus from "../../components/QRProcessingStatus";
-import { useQRHandler } from "../../hooks/useQRHandler";
 import { useSession } from "../../contexts/SessionContext";
 import {
   Layout,
@@ -46,21 +44,6 @@ export default function CustomerMenuPage() {
   const dispatch = useDispatch();
   const { session } = useSession();
   const { message } = App.useApp(); // ✅ Use hook instead of static method
-
-  // QR Handler cho auto-processing QR parameters
-  const { isProcessing, qrError } = useQRHandler({
-    redirectPath: '/cus/homes',
-    autoRedirect: false, // Stay on menu page after QR processing
-    onSuccess: (sessionData) => {
-      message.success(`Chào mừng đến nhà hàng Phương Nam`);
-    },
-    onError: (error) => {
-      message.error({
-        content: 'Lỗi QR Code',
-        duration: 4
-      });
-    }
-  });
 
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchText, setSearchText] = useState("");
@@ -711,28 +694,6 @@ export default function CustomerMenuPage() {
           </Row>
         )}
       </Content>
-
-      {/* QR Processing Status */}
-      {(isProcessing || qrError) && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-          zIndex: 9999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <QRProcessingStatus
-            isProcessing={isProcessing}
-            error={qrError}
-            onRetry={() => window.location.reload()}
-          />
-        </div>
-      )}
 
       {/* Footer giỏ hàng */}
       <CustomerFooterNav />

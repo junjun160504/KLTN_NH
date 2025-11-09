@@ -18,6 +18,9 @@ import {
   FireOutlined,
   SyncOutlined,
   QrcodeOutlined,
+  MinusOutlined,
+  PlusOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -29,12 +32,65 @@ const { Title, Text } = Typography;
 
 const REACT_APP_API_URL = process.env.REACT_APP_API_URL;
 
+// 🎨 Practical UI - Design Tokens
+const DESIGN_TOKENS = {
+  // Spacing Scale (4px base)
+  spacing: {
+    xs: 4,
+    sm: 8,
+    md: 12,
+    lg: 16,
+    xl: 24,
+    xxl: 32,
+  },
+  // Typography Scale
+  fontSize: {
+    xs: 10,
+    sm: 11,
+    base: 13,
+    md: 14,
+    lg: 15,
+    xl: 16,
+  },
+  // Color Palette - Minimal
+  colors: {
+    primary: '#226533',
+    primaryLight: '#2d8e47',
+    text: '#333',
+    textSecondary: '#666',
+    textTertiary: '#999',
+    border: '#e8e8e8',
+    borderLight: '#f0f0f0',
+    background: '#f5f7fa',
+    white: '#fff',
+    // Semantic colors
+    success: '#52c41a',
+    warning: '#fa8c16',
+    error: '#ff4d4f',
+    info: '#1890ff',
+  },
+  // Border Radius
+  radius: {
+    sm: 4,
+    md: 6,
+    lg: 8,
+    xl: 10,
+    full: 9999,
+  },
+  // Touch Targets (min 44x44px for accessibility)
+  touchTarget: {
+    min: 44,
+    button: 32,
+    icon: 24,
+  },
+};
+
 // ✅ Format giá tiền theo chuẩn VN: 500000 => 500.000
 const formatPrice = (price) => {
   return Math.round(price).toLocaleString('vi-VN');
 };
 
-// ✅ Status config cho ORDER (không phải item) - Move ra ngoài để tránh re-create
+// ✅ Status config - Simplified for Practical UI
 const STATUS_CONFIG = {
   NEW: {
     label: "Đang chờ",
@@ -45,7 +101,7 @@ const STATUS_CONFIG = {
     progress: 0,
   },
   IN_PROGRESS: {
-    label: "Đang làm",
+    label: "Đang phục vụ",
     color: "orange",
     bgColor: "bg-orange-50",
     borderColor: "border-orange-200",
@@ -96,6 +152,70 @@ export default function CustomerBillPage() {
       ...prev,
       [orderId]: !prev[orderId]
     }));
+  };
+
+  // ✅ Update item quantity in NEW order
+  const handleUpdateQuantity = async (orderId, itemId, newQuantity) => {
+    if (newQuantity < 1) {
+      message.warning('Số lượng phải lớn hơn 0');
+      return;
+    }
+
+    try {
+      await axios.put(`${REACT_APP_API_URL}/orders/${orderId}/items/${itemId}`, {
+        quantity: newQuantity
+      });
+
+      message.success('Cập nhật số lượng thành công');
+      fetchOrders(true); // Silent refresh
+    } catch (error) {
+      console.error('Error updating quantity:', error);
+      message.error('Không thể cập nhật số lượng. Vui lòng thử lại!');
+    }
+  };
+
+  // ✅ Delete item from NEW order
+  const handleDeleteItem = async (orderId, itemId, itemName) => {
+    Modal.confirm({
+      title: 'Xác nhận xóa món',
+      content: `Bạn có chắc muốn xóa "${itemName}" khỏi đơn hàng?`,
+      okText: 'Xóa',
+      cancelText: 'Hủy',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await axios.delete(`${REACT_APP_API_URL}/orders/${orderId}/items/${itemId}`);
+
+          message.success('Đã xóa món thành công');
+          fetchOrders(true); // Silent refresh
+        } catch (error) {
+          console.error('Error deleting item:', error);
+          message.error('Không thể xóa món. Vui lòng thử lại!');
+        }
+      }
+    });
+  };
+
+  // ✅ Cancel entire NEW order
+  const handleCancelOrder = async (orderId) => {
+    Modal.confirm({
+      title: 'Xác nhận hủy đơn',
+      content: 'Bạn có chắc muốn hủy toàn bộ đơn hàng này?',
+      okText: 'Hủy đơn',
+      cancelText: 'Quay lại',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await axios.put(`${REACT_APP_API_URL}/orders/${orderId}/cancel`);
+
+          message.success('Đã hủy đơn hàng thành công');
+          fetchOrders(true); // Silent refresh
+        } catch (error) {
+          console.error('Error cancelling order:', error);
+          message.error('Không thể hủy đơn. Vui lòng thử lại!');
+        }
+      }
+    });
   };
 
   // ✅ Check if customer has scanned QR - Only show notification once
@@ -194,14 +314,20 @@ export default function CustomerBillPage() {
     [orderItems]
   );
 
-  const totalQty = useMemo(() =>
-    unpaidOrders.reduce((sum, order) => sum + (order.totalItems || 0), 0),
+  // ✅ Lọc chỉ lấy các đơn đã được xác nhận (không phải NEW)
+  const confirmedOrders = useMemo(() =>
+    unpaidOrders.filter(order => order.status !== 'NEW'),
     [unpaidOrders]
   );
 
+  const totalQty = useMemo(() =>
+    confirmedOrders.reduce((sum, order) => sum + (order.totalItems || 0), 0),
+    [confirmedOrders]
+  );
+
   const totalPrice = useMemo(() =>
-    unpaidOrders.reduce((sum, order) => sum + (order.totalPrice || 0), 0),
-    [unpaidOrders]
+    confirmedOrders.reduce((sum, order) => sum + (order.totalPrice || 0), 0),
+    [confirmedOrders]
   );
 
   // ✅ Format time
@@ -211,63 +337,54 @@ export default function CustomerBillPage() {
   };
 
   return (
-    <Layout style={{ minHeight: "100vh", background: "#f5f7fa" }}>
+    <Layout className="min-h-screen" style={{ background: DESIGN_TOKENS.colors.background }}>
       {/* ========== HEADER ========== */}
       <Header
-        className="transition-all duration-300"
+        className="fixed top-0 left-0 right-0 z-[1000] transition-all duration-300"
         style={{
-          background: "#fff",
-          padding: "0 16px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.06)",
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 1000,
+          background: DESIGN_TOKENS.colors.white,
+          padding: `0 ${DESIGN_TOKENS.spacing.lg}px`,
           height: 64,
+          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.06)",
         }}
       >
-        <Button
-          type="text"
-          icon={<ArrowLeftOutlined style={{ color: "#333", fontSize: 18 }} />}
-          onClick={() => navigate(-1)}
-        />
-        <div className="text-center">
-          <Title level={5} style={{ margin: 0, color: "#226533", fontWeight: 600 }}>
+        <div className="flex items-center justify-between h-full">
+          <Button
+            type="text"
+            icon={<ArrowLeftOutlined />}
+            onClick={() => navigate(-1)}
+            className="w-11 h-11 flex items-center justify-center"
+            style={{ fontSize: DESIGN_TOKENS.fontSize.xl }}
+          />
+          <Title
+            level={5}
+            className="m-0 font-semibold"
+            style={{ color: DESIGN_TOKENS.colors.primary }}
+          >
             Chi tiết đơn hàng
           </Title>
+          <Button
+            type="text"
+            icon={<SyncOutlined />}
+            onClick={() => fetchOrders(false)}
+            loading={loading}
+            disabled={!session || !session.session_id}
+            className="w-11 h-11 flex items-center justify-center"
+            style={{
+              fontSize: DESIGN_TOKENS.fontSize.xl,
+              color: DESIGN_TOKENS.colors.primary
+            }}
+          />
         </div>
-        <Button
-          type="text"
-          icon={<SyncOutlined style={{ color: "#226533", fontSize: 18 }} />}
-          onClick={() => fetchOrders(false)} // Manual refresh - hiển thị loading
-          loading={loading}
-          disabled={!session || !session.session_id} // Disable if no session
-        />
       </Header>
 
       {/* ========== CONTENT ========== */}
-      <Content
-        style={{
-          padding: "1px",
-          paddingTop: "72px",
-          paddingBottom: "180px",
-        }}
-      >
+      <Content className="pt-[72px] pb-[180px] px-1">
         {/* ===== CHECK IF NO SESSION - SHOW EMPTY STATE ===== */}
         {!session || !session.session_id ? (
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            minHeight: 'calc(100vh - 200px)',
-            padding: '20px'
-          }}>
+          <div className="flex justify-center items-center min-h-[calc(100vh-200px)] p-5">
             <Result
-              icon={<QrcodeOutlined style={{ fontSize: 80, color: '#226533' }} />}
+              icon={<QrcodeOutlined style={{ fontSize: 80, color: DESIGN_TOKENS.colors.primary }} />}
               title="Chưa quét QR Code"
               subTitle="Vui lòng quét QR Code trên bàn để xem đơn hàng của bạn"
               extra={[
@@ -276,13 +393,12 @@ export default function CustomerBillPage() {
                   type="primary"
                   size="large"
                   onClick={() => navigate('/cus/homes')}
+                  className="h-11 font-semibold"
                   style={{
-                    background: "linear-gradient(135deg, #226533 0%, #2d8e47 100%)",
+                    background: `linear-gradient(135deg, ${DESIGN_TOKENS.colors.primary} 0%, ${DESIGN_TOKENS.colors.primaryLight} 100%)`,
                     border: "none",
-                    borderRadius: 8,
-                    height: 44,
-                    fontSize: 15,
-                    fontWeight: 600,
+                    borderRadius: DESIGN_TOKENS.radius.lg,
+                    fontSize: DESIGN_TOKENS.fontSize.lg,
                   }}
                 >
                   Về trang chủ
@@ -305,7 +421,7 @@ export default function CustomerBillPage() {
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
               />
             ) : (
-              <div style={{ marginBottom: 16 }}>
+              <div className="mb-4">
                 {/* Render each ORDER as a card */}
                 {orderItems.map((order) => {
                   const config = STATUS_CONFIG[order.status];
@@ -314,225 +430,276 @@ export default function CustomerBillPage() {
                   return (
                     <div
                       key={order.id}
+                      className="mb-3 bg-white rounded-lg overflow-hidden shadow-sm"
                       style={{
-                        marginBottom: 12,
-                        background: "#fff",
-                        borderRadius: 8,
-                        overflow: "hidden",
-                        boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-                        border: "1px solid #f0f0f0",
-                        opacity: order.status === 'PAID' ? 0.8 : 1, // Mờ đi nếu đã thanh toán
+                        border: `1px solid ${DESIGN_TOKENS.colors.borderLight}`,
+                        opacity: order.status === 'PAID' ? 0.7 : 1,
                       }}
                     >
-                      {/* Order Header - Compact & Clean */}
+                      {/* Order Header - Redesigned for Mobile */}
                       <div
+                        className="flex items-start justify-between gap-2"
                         style={{
-                          padding: "10px 12px",
-                          background: config.bgColor.replace("bg-", "").replace("-50", ""),
-                          backgroundColor:
-                            order.status === "NEW" ? "#e6f7ff" :
-                              order.status === "IN_PROGRESS" ? "#fff7e6" :
-                                order.status === "DONE" ? "#f6ffed" :
-                                  order.status === "PAID" ? "#f9f0ff" : "#fff1f0",
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
+                          padding: `${DESIGN_TOKENS.spacing.md}px ${DESIGN_TOKENS.spacing.md}px`,
+                          backgroundColor: DESIGN_TOKENS.colors.white,
+                          borderBottom: `1px solid ${DESIGN_TOKENS.colors.borderLight}`,
                         }}
                       >
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        {/* Left: Icon + Order Info + Status */}
+                        <div className="flex items-start gap-2 flex-1 min-w-0">
                           {/* Status Icon */}
-                          <div
-                            style={{
-                              fontSize: 16,
-                              display: "flex",
-                              alignItems: "center",
-                            }}
-                          >
+                          <div className="flex items-center justify-center flex-shrink-0" style={{ fontSize: 18 }}>
                             {config.icon}
                           </div>
 
-                          {/* Order Info */}
-                          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                            <Text strong style={{ fontSize: 13, color: "#333", lineHeight: 1 }}>
-                              Đơn hàng #{order.id}
-                            </Text>
-                            <Text type="secondary" style={{ fontSize: 11, lineHeight: 1 }}>
-                              {formatTime(order.created_at)}
-                            </Text>
+                          {/* Order Info Stack */}
+                          <div className="flex flex-col gap-1 flex-1 min-w-0">
+                            {/* Order Number + Status Badge */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Text
+                                strong
+                                className="leading-tight"
+                                style={{
+                                  fontSize: DESIGN_TOKENS.fontSize.md,
+                                  color: DESIGN_TOKENS.colors.text
+                                }}
+                              >
+                                Đơn hàng #{order.id}
+                              </Text>
+                              <Tag
+                                color={config.color}
+                                className="m-0 font-medium"
+                                style={{
+                                  borderRadius: DESIGN_TOKENS.radius.sm,
+                                  fontSize: DESIGN_TOKENS.fontSize.xs,
+                                  padding: "1px 6px",
+                                  lineHeight: "18px",
+                                }}
+                              >
+                                {config.label}
+                              </Tag>
+                            </div>
                           </div>
                         </div>
 
-                        {/* Status Badge */}
-                        <Tag
-                          color={config.color}
-                          style={{
-                            borderRadius: 4,
-                            fontSize: 10,
-                            padding: "2px 6px",
-                            margin: 0,
-                            fontWeight: 500,
-                          }}
-                        >
-                          {config.label}
-                        </Tag>
+                        {/* Right: Time + Cancel Button */}
+                        {order.status === 'NEW' && (
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <Text
+                              type="secondary"
+                              style={{ fontSize: DESIGN_TOKENS.fontSize.xs }}
+                            >
+                              {formatTime(order.created_at)}
+                            </Text>
+                            <Button
+                              type="text"
+                              danger
+                              size="small"
+                              onClick={() => handleCancelOrder(order.id)}
+                              className="flex items-center justify-center hover:bg-red-50"
+                              style={{
+                                padding: '4px 8px',
+                                fontSize: DESIGN_TOKENS.fontSize.sm,
+                                fontWeight: 500,
+                                height: 'auto',
+                              }}
+                            >
+                              Hủy
+                            </Button>
+                          </div>
+                        )}
                       </div>
 
-                      {/* Order Items List - Optimized for Mobile */}
-                      <div style={{ padding: "10px 12px" }}>
-                        {/* Reverse items array to show newest first */}
+                      {/* Order Items List - New 3-Column Layout */}
+                      <div style={{ padding: `${DESIGN_TOKENS.spacing.sm}px ${DESIGN_TOKENS.spacing.md}px` }}>
                         {[...(order.items || [])].reverse()
                           .slice(0, isExpanded ? order.items.length : 1)
                           .map((item, index, array) => (
                             <div
                               key={item.id}
+                              className="relative" // For absolute positioned note
                               style={{
-                                display: "flex",
-                                gap: 10,
-                                paddingBottom: index < array.length - 1 ? 10 : 0,
-                                marginBottom: index < array.length - 1 ? 10 : 0,
-                                borderBottom: index < array.length - 1 ? "1px dashed #f0f0f0" : "none",
+                                // Add extra paddingBottom if note exists
+                                paddingBottom: index < array.length - 1 ? (item.note ? 32 : DESIGN_TOKENS.spacing.sm) : (item.note ? 32 : 0),
+                                marginBottom: index < array.length - 1 ? DESIGN_TOKENS.spacing.sm : 0,
+                                borderBottom: index < array.length - 1 ? `1px dashed ${DESIGN_TOKENS.colors.borderLight}` : "none",
                               }}
                             >
-                              {/* Item Image - Smaller for mobile */}
-                              <img
-                                src={item.image_url || "https://via.placeholder.com/70"}
-                                alt={item.menu_item_name}
-                                style={{
-                                  width: 70,
-                                  height: 70,
-                                  objectFit: "cover",
-                                  borderRadius: 6,
-                                  border: "1px solid #e8e8e8",
-                                  flexShrink: 0,
-                                }}
-                              />
-
-                              {/* Item Info - Vertical Layout */}
-                              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
-                                {/* Item Name - 2 lines max */}
-                                <Text
-                                  strong
+                              <div className="flex gap-2.5">
+                                {/* Left Column: Item Image */}
+                                <img
+                                  src={item.image_url || "https://via.placeholder.com/70"}
+                                  alt={item.menu_item_name}
+                                  className="flex-shrink-0 object-cover"
                                   style={{
-                                    fontSize: 13,
-                                    lineHeight: "18px",
-                                    display: "-webkit-box",
-                                    WebkitLineClamp: 2,
-                                    WebkitBoxOrient: "vertical",
-                                    overflow: "hidden",
-                                    color: "#333",
+                                    width: 70,
+                                    height: 70,
+                                    borderRadius: DESIGN_TOKENS.radius.md,
+                                    border: `1px solid ${DESIGN_TOKENS.colors.border}`,
                                   }}
-                                >
-                                  {item.menu_item_name}
-                                </Text>
+                                />
 
-                                {/* Price Row - Compact (MOVED UP) */}
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                  }}
-                                >
-                                  {/* Unit Price */}
-                                  <Text type="secondary" style={{ fontSize: 11 }}>
-                                    {formatPrice(item.unit_price)}đ
-                                  </Text>
-
-                                  {/* Quantity & Total */}
-                                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                    <Text type="secondary" style={{ fontSize: 11 }}>
-                                      x{item.quantity}
-                                    </Text>
-                                    <Text
-                                      strong
-                                      style={{
-                                        fontSize: 14,
-                                        color: "#226533",
-                                        fontWeight: 600,
-                                      }}
-                                    >
-                                      {formatPrice(item.unit_price * item.quantity)}đ
-                                    </Text>
-                                  </div>
-                                </div>
-
-                                {/* Note (if exists) - Compact (MOVED DOWN) */}
-                                {item.note && (
-                                  <div
+                                {/* Middle Column: Name & Unit Price */}
+                                <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
+                                  <Text
+                                    strong
+                                    className="line-clamp-2"
                                     style={{
-                                      padding: "3px 6px",
-                                      borderRadius: 3,
-                                      background: "#f5f5f5",
-                                      display: "inline-block",
-                                      alignSelf: "flex-start",
+                                      fontSize: DESIGN_TOKENS.fontSize.md,
+                                      lineHeight: "1.4",
+                                      color: DESIGN_TOKENS.colors.text,
                                     }}
                                   >
-                                    <Text style={{ fontSize: 10, color: "#666" }}>
+                                    {item.menu_item_name}
+                                  </Text>
+                                  <Text
+                                    type="secondary"
+                                    style={{ fontSize: DESIGN_TOKENS.fontSize.sm }}
+                                  >
+                                    {formatPrice(item.unit_price)}đ
+                                  </Text>
+                                </div>
+
+                                {/* Right Column: Total Price & Quantity Controls */}
+                                <div className="flex flex-col items-end justify-center gap-2">
+                                  <Text
+                                    strong
+                                    className="font-semibold"
+                                    style={{
+                                      fontSize: DESIGN_TOKENS.fontSize.lg,
+                                      color: DESIGN_TOKENS.colors.primary,
+                                    }}
+                                  >
+                                    {formatPrice(item.unit_price * item.quantity)}đ
+                                  </Text>
+                                  {order.status === 'NEW' ? (
+                                    <div className="flex items-center gap-1">
+                                      <Button
+                                        type="text"
+                                        size="small"
+                                        icon={<MinusOutlined />}
+                                        onClick={() => handleUpdateQuantity(order.id, item.id, item.quantity - 1)}
+                                        disabled={item.quantity <= 1}
+                                        className="flex items-center justify-center"
+                                        style={{
+                                          width: 24,
+                                          height: 24,
+                                          fontSize: 12,
+                                          padding: 0,
+                                          color: item.quantity <= 1 ? '#d9d9d9' : DESIGN_TOKENS.colors.text,
+                                        }}
+                                      />
+                                      <Text
+                                        strong
+                                        style={{
+                                          minWidth: 24,
+                                          fontSize: DESIGN_TOKENS.fontSize.base,
+                                          color: DESIGN_TOKENS.colors.text,
+                                          textAlign: 'center',
+                                        }}
+                                      >
+                                        {item.quantity}
+                                      </Text>
+                                      <Button
+                                        type="text"
+                                        size="small"
+                                        icon={<PlusOutlined />}
+                                        onClick={() => handleUpdateQuantity(order.id, item.id, item.quantity + 1)}
+                                        className="flex items-center justify-center"
+                                        style={{
+                                          width: 24,
+                                          height: 24,
+                                          fontSize: 12,
+                                          padding: 0,
+                                          color: DESIGN_TOKENS.colors.text,
+                                        }}
+                                      />
+                                    </div>
+                                  ) : (
+                                    <Text
+                                      type="secondary"
+                                      style={{ fontSize: DESIGN_TOKENS.fontSize.sm, height: 24, display: 'flex', alignItems: 'center' }}
+                                    >
+                                      x {item.quantity}
+                                    </Text>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Note (if exists) - Positioned absolutely at the bottom */}
+                              {item.note && (
+                                <div
+                                  className="absolute bottom-0 left-0 w-full"
+                                  style={{ paddingLeft: 70 + DESIGN_TOKENS.spacing.sm }} // Align with info columns
+                                >
+                                  <div
+                                    className="inline-block"
+                                    style={{
+                                      padding: `2px ${DESIGN_TOKENS.spacing.sm}px`,
+                                      borderRadius: DESIGN_TOKENS.radius.sm,
+                                      background: "#ffffffff",
+                                    }}
+                                  >
+                                    <Text style={{ fontSize: DESIGN_TOKENS.fontSize.xs, color: "#6e6751ff" }}>
                                       💬 {item.note}
                                     </Text>
                                   </div>
-                                )}
-                              </div>
+                                </div>
+                              )}
                             </div>
                           ))}
 
-                        {/* Show More / Show Less Button - Compact */}
+                        {/* Show More / Show Less Button */}
                         {order.items && order.items.length > 1 && (
                           <div
                             onClick={() => toggleOrderExpand(order.id)}
+                            className="flex items-center justify-center gap-1 text-center font-medium cursor-pointer"
                             style={{
-                              marginTop: 8,
-                              padding: "6px 0",
-                              textAlign: "center",
-                              color: "#226533",
-                              fontSize: 12,
-                              fontWeight: 500,
-                              cursor: "pointer",
-                              borderTop: "1px solid #f5f5f5",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: 4,
+                              marginTop: DESIGN_TOKENS.spacing.sm,
+                              padding: `${DESIGN_TOKENS.spacing.sm}px 0`,
+                              color: DESIGN_TOKENS.colors.primary,
+                              fontSize: DESIGN_TOKENS.fontSize.md,
+                              borderTop: `1px solid ${DESIGN_TOKENS.colors.borderLight}`,
                             }}
                           >
-                            <span style={{ fontSize: 10 }}>
+                            <span style={{ fontSize: DESIGN_TOKENS.fontSize.xs }}>
                               {isExpanded ? "▲" : "▼"}
                             </span>
                             <span>
-                              {isExpanded
-                                ? "Thu gọn"
-                                // : `Xem thêm ${order.items.length - 1} món`
-                                : `Xem thêm`
-                              }
+                              {isExpanded ? "Thu gọn" : "Xem thêm"}
                             </span>
                           </div>
                         )}
                       </div>
 
-                      {/* Order Footer - Compact Total */}
+                      {/* Order Footer - Clean & Minimal */}
                       <div
+                        className="flex justify-between items-center"
                         style={{
-                          padding: "8px 12px",
+                          padding: `${DESIGN_TOKENS.spacing.sm}px ${DESIGN_TOKENS.spacing.md}px`,
                           background: "#fafafa",
-                          borderTop: "1px solid #f0f0f0",
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
+                          borderTop: `1px solid ${DESIGN_TOKENS.colors.borderLight}`,
                         }}
                       >
-                        <Text type="secondary" style={{ fontSize: 11 }}>
+                        <Text
+                          type="secondary"
+                          style={{ fontSize: DESIGN_TOKENS.fontSize.sm }}
+                        >
                           {order.totalItems} món
                         </Text>
-                        <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                          <Text type="secondary" style={{ fontSize: 11 }}>
+                        <div className="flex items-baseline gap-1">
+                          <Text
+                            type="secondary"
+                            style={{ fontSize: DESIGN_TOKENS.fontSize.sm }}
+                          >
                             Tổng:
                           </Text>
                           <Text
                             strong
+                            className="font-semibold"
                             style={{
-                              fontSize: 15,
-                              color: "#226533",
-                              fontWeight: 600,
+                              fontSize: DESIGN_TOKENS.fontSize.lg,
+                              color: DESIGN_TOKENS.colors.primary,
                             }}
                           >
                             {formatPrice(order.totalPrice)}đ
@@ -540,18 +707,15 @@ export default function CustomerBillPage() {
                         </div>
                       </div>
 
-                      {/* Progress Bar - Thin indicator at bottom */}
+                      {/* Progress Bar - Minimal indicator */}
                       <div
+                        className="h-0.5 transition-all duration-500"
                         style={{
-                          height: 2,
                           width: `${config.progress}%`,
                           background:
-                            order.status === "NEW"
-                              ? "#1890ff"
-                              : order.status === "IN_PROGRESS"
-                                ? "#fa8c16"
-                                : "#52c41a",
-                          transition: "width 0.5s ease",
+                            order.status === "NEW" ? DESIGN_TOKENS.colors.info :
+                              order.status === "IN_PROGRESS" ? DESIGN_TOKENS.colors.warning :
+                                DESIGN_TOKENS.colors.success,
                         }}
                       />
                     </div>
@@ -564,40 +728,41 @@ export default function CustomerBillPage() {
       </Content>
 
       {/* ========== FIXED FOOTER PAYMENT ========== */}
-      {/* Chỉ hiển thị khi có đơn chưa thanh toán */}
-      {unpaidOrders.length > 0 && (
+      {/* Chỉ hiển thị khi có đơn đã xác nhận chưa thanh toán */}
+      {confirmedOrders.length > 0 && (
         <div
-          className="animate-slide-up"
+          className="fixed bottom-[60px] left-0 right-0 z-[1000] bg-white animate-slide-up"
           style={{
-            position: "fixed",
-            bottom: 60,
-            left: 0,
-            right: 0,
-            background: "#fff",
-            padding: "10px 12px",
-            borderTop: "2px solid #f0f0f0",
+            padding: `${DESIGN_TOKENS.spacing.sm}px ${DESIGN_TOKENS.spacing.md}px`,
+            borderTop: `2px solid ${DESIGN_TOKENS.colors.borderLight}`,
             boxShadow: "0 -4px 16px rgba(0,0,0,0.08)",
-            zIndex: 1000,
           }}
         >
-          {/* Compact Summary in One Row */}
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-          }}>
+          <div className="flex items-center justify-between gap-3">
             {/* Left: Total Info */}
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 2 }}>
-                <Text strong style={{ fontSize: 16, color: "#226533" }}>
+            <div className="flex-1">
+              <div className="flex items-baseline gap-2 mb-0.5">
+                <Text
+                  strong
+                  className="font-semibold"
+                  style={{
+                    fontSize: DESIGN_TOKENS.fontSize.xl,
+                    color: DESIGN_TOKENS.colors.primary
+                  }}
+                >
                   {formatPrice(totalPrice)}đ
                 </Text>
-                <Text type="secondary" style={{ fontSize: 12 }}>
+                <Text
+                  type="secondary"
+                  style={{ fontSize: DESIGN_TOKENS.fontSize.md }}
+                >
                   ({totalQty} món)
                 </Text>
               </div>
-              <Text type="secondary" style={{ fontSize: 11 }}>
+              <Text
+                type="secondary"
+                style={{ fontSize: DESIGN_TOKENS.fontSize.sm }}
+              >
                 Giảm giá: -0đ
               </Text>
             </div>
@@ -606,24 +771,23 @@ export default function CustomerBillPage() {
             <Button
               type="primary"
               size="large"
-              style={{
-                fontSize: 15,
-                fontWeight: 600,
-                height: 44,
-                paddingLeft: 16,
-                paddingRight: 16,
-                background: "linear-gradient(135deg, #226533 0%, #2d8e47 100%)",
-                border: "none",
-                borderRadius: 10,
-                boxShadow: "0 4px 12px rgba(34, 101, 51, 0.3)",
-                flexShrink: 0,
-              }}
               onClick={() => navigate('/cus/payment', {
                 state: {
                   totalPrice,
-                  unpaidOrders
+                  unpaidOrders: confirmedOrders
                 }
               })}
+              className="flex-shrink-0 font-semibold"
+              style={{
+                fontSize: DESIGN_TOKENS.fontSize.lg,
+                height: DESIGN_TOKENS.touchTarget.min,
+                paddingLeft: DESIGN_TOKENS.spacing.lg,
+                paddingRight: DESIGN_TOKENS.spacing.lg,
+                background: `linear-gradient(135deg, ${DESIGN_TOKENS.colors.primary} 0%, ${DESIGN_TOKENS.colors.primaryLight} 100%)`,
+                border: "none",
+                borderRadius: DESIGN_TOKENS.radius.xl,
+                boxShadow: `0 4px 12px rgba(34, 101, 51, 0.3)`,
+              }}
             >
               💳 Thanh toán
             </Button>
@@ -642,28 +806,35 @@ export default function CustomerBillPage() {
         footer={null}
         width={360}
       >
-        <div style={{ textAlign: "center", padding: "16px 8px" }}>
+        <div className="text-center" style={{ padding: `${DESIGN_TOKENS.spacing.lg}px ${DESIGN_TOKENS.spacing.sm}px` }}>
           <div
-            className="animate-bounce"
+            className="animate-bounce mx-auto flex items-center justify-center"
             style={{
               width: 80,
               height: 80,
-              margin: "0 auto 16px",
+              marginBottom: DESIGN_TOKENS.spacing.lg,
               background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              borderRadius: DESIGN_TOKENS.radius.full,
             }}
           >
-            <SmileOutlined style={{ fontSize: 40, color: "#fff" }} />
+            <SmileOutlined style={{ fontSize: 40, color: DESIGN_TOKENS.colors.white }} />
           </div>
 
-          <Title level={3} style={{ marginBottom: 8, color: "#226533" }}>
+          <Title
+            level={3}
+            className="mb-2"
+            style={{ color: DESIGN_TOKENS.colors.primary }}
+          >
             Cảm ơn bạn! 🎉
           </Title>
-          <Text style={{ fontSize: 15, color: "#666", display: "block", marginBottom: 24 }}>
-            Cảm ơn bạn đã lựa chọn <b style={{ color: "#226533" }}>Phương Nam</b>
+          <Text
+            className="block mb-6"
+            style={{
+              fontSize: DESIGN_TOKENS.fontSize.lg,
+              color: DESIGN_TOKENS.colors.textSecondary
+            }}
+          >
+            Cảm ơn bạn đã lựa chọn <b style={{ color: DESIGN_TOKENS.colors.primary }}>Phương Nam</b>
             <br />
             Hãy đánh giá để chúng tôi phục vụ tốt hơn nhé! ⭐
           </Text>
@@ -673,28 +844,28 @@ export default function CustomerBillPage() {
               type="primary"
               size="large"
               block
+              onClick={() => navigate("/cus/reviews")}
+              className="font-semibold"
               style={{
                 height: 48,
-                fontSize: 16,
-                fontWeight: 600,
-                background: "linear-gradient(135deg, #226533 0%, #2d8e47 100%)",
+                fontSize: DESIGN_TOKENS.fontSize.xl,
+                background: `linear-gradient(135deg, ${DESIGN_TOKENS.colors.primary} 0%, ${DESIGN_TOKENS.colors.primaryLight} 100%)`,
                 border: "none",
-                borderRadius: 12,
+                borderRadius: DESIGN_TOKENS.radius.lg,
               }}
-              onClick={() => navigate("/cus/reviews")}
             >
               ⭐ Đánh giá ngay
             </Button>
             <Button
               size="large"
               block
+              onClick={() => navigate("/cus/homes")}
+              className="font-semibold"
               style={{
                 height: 48,
-                fontSize: 16,
-                fontWeight: 600,
-                borderRadius: 12,
+                fontSize: DESIGN_TOKENS.fontSize.xl,
+                borderRadius: DESIGN_TOKENS.radius.lg,
               }}
-              onClick={() => navigate("/cus/homes")}
             >
               🏠 Về trang chủ
             </Button>

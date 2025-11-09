@@ -1,4 +1,5 @@
 import * as paymentService from "../services/payment.service.js";
+import { validateSession } from "../services/qrSession.service.js";
 import { notifyUser } from "../services/simpleNotification.service.js";
 
 // Thanh toán
@@ -81,3 +82,40 @@ export async function listPayments(req, res) {
     res.status(500).json({ status: 500, message: err.message });
   }
 }
+
+
+export async function paymentByAdmin(req, res) {
+  try {
+    const { sessionId, adminId } = req.body;
+
+    // validate sessionId is active
+    const session = await validateSession(sessionId);
+    if (!session.valid) {
+      return res.status(400).json({ status: 400, message: "Invalid or expired session" });
+    }
+
+    const result = await paymentService.payOrderByAdmin({ sessionId, adminId });
+    if (!result.success) {
+      return res.status(400).json({ status: 400, message: result.message });
+    }
+    res.status(200).json({ status: 200, data: result });
+  } catch (error) {
+    console.error("paymentByAdmin error:", error);
+    res.status(500).json({ status: 500, message: error.message });
+  }
+}
+
+export async function notifyForUser(req, res) {
+  try {
+    const { sessionId, message } = req.body;
+    await notifyUser(sessionId, {
+      type: 'success',
+      message: 'Đơn hàng đã được xác nhận'
+    });
+    res.status(200).json({ status: 200, message: "Notification sent" });
+  } catch (error) {
+    console.error("notifyForUser error:", error);
+    res.status(500).json({ status: 500, message: error.message });
+  }
+}
+
