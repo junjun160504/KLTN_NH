@@ -6,7 +6,7 @@ import {
   Button,
   Input,
   Select,
-  message,
+  App,
   Popconfirm,
   Form,
   Switch,
@@ -30,6 +30,8 @@ const { Option } = Select;
 const REACT_APP_API_URL = process.env.REACT_APP_API_URL;
 
 const CategoriesPage = () => {
+  const { message } = App.useApp();
+
   const [collapsed, setCollapsed] = useState(false);
   const [pageTitle] = useState("Quản lý danh mục");
 
@@ -66,7 +68,7 @@ const CategoriesPage = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [message]);
 
   // Xóa danh mục (permanent delete)
   async function handleDeleteCategory(id) {

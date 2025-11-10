@@ -30,6 +30,9 @@ app.use(express.json());
 // Serve static files (QR images)
 app.use('/qr', express.static(path.join(process.cwd(), 'public/qr')));
 
+// Serve static files (Uploaded images)
+app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
+
 app.use('/api/menu', menuRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);

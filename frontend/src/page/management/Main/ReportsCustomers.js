@@ -85,7 +85,7 @@ const ReportsCustomerPage = () => {
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
-      <AppSidebar collapsed={collapsed} currentPageKey="reports-customers" />
+      <AppSidebar collapsed={collapsed} currentPageKey="report_customers" />
       <Layout style={{ marginLeft: collapsed ? 80 : 220 }}>
         <AppHeader
           collapsed={collapsed}

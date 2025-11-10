@@ -194,7 +194,6 @@ export async function createOrderByAdmin({ table_id, items, admin_id, customer_p
     } catch (notifError) {
       console.error('⚠️ Failed to send notification:', notifError);
     }
-
     return orderData;
 
   } catch (err) {

@@ -145,7 +145,7 @@ const ReportsProductPage = () => {
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
-      <AppSidebar collapsed={collapsed} currentPageKey="reports-products" />
+      <AppSidebar collapsed={collapsed} currentPageKey="report_products" />
       <Layout style={{ marginLeft: collapsed ? 80 : 220 }}>
         <AppHeader
           collapsed={collapsed}
@@ -213,7 +213,7 @@ const ReportsProductPage = () => {
                   colorField="type"
                   radius={0.8}
                   label={{
-                    type: "spider", 
+                    type: "spider",
                     content: "{name} {percentage}",
                   }}
                   interactions={[{ type: "element-active" }]}

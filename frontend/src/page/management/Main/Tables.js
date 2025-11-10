@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import useSidebarCollapse from '../../../hooks/useSidebarCollapse'
 import {
   Layout,
   Button,
@@ -140,7 +141,7 @@ const TablesPage = () => {
   const { message } = App.useApp() // Use App hook for message
   const { user } = useAuth() // Get current logged-in admin
 
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useSidebarCollapse()
   const [pageTitle] = useState('Quản lý bàn')
 
   // Use polling hook for tables and orders
