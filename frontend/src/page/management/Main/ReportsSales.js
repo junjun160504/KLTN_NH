@@ -340,7 +340,7 @@ const ReportsSalesPage = () => {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <AppSidebar collapsed={collapsed} currentPageKey="reports-sales" />
+      <AppSidebar collapsed={collapsed} currentPageKey="report_sales" />
       <Layout style={{ marginLeft: collapsed ? 80 : 220 }}>
         <AppHeader
           collapsed={collapsed}
