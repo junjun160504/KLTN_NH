@@ -21,6 +21,7 @@ import {
   importMenuItemsFromExcel,
 } from "../controllers/menu.controller.js";
 import { uploadExcel, handleUploadError } from "../middlewares/upload.middleware.js";
+import { uploadMenuImage, handleImageUploadError } from "../middlewares/imageUpload.middleware.js";
 
 console.log("Mounting /api/menu routes...");
 const router = express.Router();
@@ -81,11 +82,11 @@ router.get("/cus/menus/:name", getMenuItems);
 
 
 
-// Admin: thêm món
-router.post("/admin/menus", createMenuItem);
+// Admin: thêm món (với upload ảnh)
+router.post("/admin/menus", uploadMenuImage, handleImageUploadError, createMenuItem);
 
-// Admin: cập nhật món
-router.put("/admin/menus/:id", updateMenuItem);
+// Admin: cập nhật món (với upload ảnh)
+router.put("/admin/menus/:id", uploadMenuImage, handleImageUploadError, updateMenuItem);
 
 // Admin: xóa mềm món (soft delete)
 router.delete("/admin/menus/:id", deleteMenuItem);

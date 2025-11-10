@@ -1,4 +1,6 @@
 import * as menuService from "../services/menu.service.js";
+import { deleteOldImage } from "../middlewares/imageUpload.middleware.js";
+import fs from 'fs';
 
 // Lấy danh sách món (theo tên hoặc all)
 export async function getMenuItems(req, res) {
@@ -15,11 +17,49 @@ export async function getMenuItems(req, res) {
 // Thêm món mới (admin)
 export async function createMenuItem(req, res) {
   try {
-    const newItem = await menuService.addMenuItem(req.body);
-    res.status(201).json({ status: 201, data: newItem });
+    // Parse category nếu là JSON string (từ FormData)
+    let category = req.body.category;
+    if (typeof category === 'string') {
+      try {
+        category = JSON.parse(category);
+      } catch (e) {
+        // Nếu không parse được, giữ nguyên
+      }
+    }
+
+    // Get image path from multer (if uploaded file)
+    // Priority: uploaded file > image_url từ body
+    const image_url = req.file
+      ? `/uploads/menu-items/${req.file.filename}`
+      : req.body.image_url || null;
+
+    const newItem = await menuService.addMenuItem({
+      ...req.body,
+      category,
+      image_url
+    });
+
+    res.status(201).json({
+      status: 201,
+      data: newItem,
+      message: 'Thêm món ăn thành công'
+    });
   } catch (err) {
+    // Delete uploaded file if error occurs
+    if (req.file && req.file.path) {
+      try {
+        fs.unlinkSync(req.file.path);
+        console.log('🗑️ Deleted uploaded file due to error');
+      } catch (unlinkErr) {
+        console.error('Error deleting file:', unlinkErr);
+      }
+    }
+
     console.error("createMenuItem error:", err);
-    res.status(500).json({ status: 500, message: "Internal server error" });
+    res.status(500).json({
+      status: 500,
+      message: err.message || "Internal server error"
+    });
   }
 }
 
@@ -75,14 +115,43 @@ export async function getMenuItemDetail(req, res) {
 export async function updateMenuItem(req, res) {
   try {
     const { id } = req.params;
-    const { name, price, description, category, image_url, is_available } = req.body;
+    let { name, price, description, category, image_url, is_available } = req.body;
+
+    // Parse category nếu là JSON string (từ FormData)
+    if (typeof category === 'string') {
+      try {
+        category = JSON.parse(category);
+      } catch (e) {
+        // Nếu không parse được, giữ nguyên
+      }
+    }
 
     // Validation: Kiểm tra price nếu có
     if (price !== undefined && (isNaN(price) || price < 0)) {
+      // Delete uploaded file if validation fails
+      if (req.file && req.file.path) {
+        fs.unlinkSync(req.file.path);
+      }
+
       return res.status(400).json({
         status: 400,
         message: "Invalid price value"
       });
+    }
+
+    // Get old item to retrieve old image path
+    const oldItem = await menuService.getMenuItemById(id);
+
+    // Get new image path from multer (if uploaded file)
+    // Priority: uploaded file > image_url từ body > keep old image
+    let newImageUrl = image_url;
+    if (req.file) {
+      newImageUrl = `/uploads/menu-items/${req.file.filename}`;
+
+      // Delete old image if exists and is local file
+      if (oldItem && oldItem.image_url && oldItem.image_url.startsWith('/uploads/')) {
+        deleteOldImage(oldItem.image_url);
+      }
     }
 
     const updatedItem = await menuService.updateMenuItem(id, {
@@ -90,7 +159,7 @@ export async function updateMenuItem(req, res) {
       price,
       description,
       category,
-      image_url,
+      image_url: newImageUrl,
       is_available
     });
 
@@ -100,6 +169,16 @@ export async function updateMenuItem(req, res) {
       data: updatedItem
     });
   } catch (err) {
+    // Delete uploaded file if error occurs
+    if (req.file && req.file.path) {
+      try {
+        fs.unlinkSync(req.file.path);
+        console.log('🗑️ Deleted uploaded file due to error');
+      } catch (unlinkErr) {
+        console.error('Error deleting file:', unlinkErr);
+      }
+    }
+
     console.error("updateMenuItem error:", err);
 
     if (err.message === "Menu item not found") {
@@ -111,7 +190,7 @@ export async function updateMenuItem(req, res) {
 
     res.status(500).json({
       status: 500,
-      message: "Internal server error"
+      message: err.message || "Internal server error"
     });
   }
 }

@@ -71,6 +71,12 @@ const MenuPage = () => {
   const [skipMode, setSkipMode] = useState(true);
   const [importing, setImporting] = useState(false);
 
+  // Image upload state
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [editImageFile, setEditImageFile] = useState(null);
+  const [editImagePreview, setEditImagePreview] = useState(null);
+
   // ================= API =================
   // Fetch món ăn dựa trên category (sử dụng useCallback để tránh warning)
   const fetchFoods = useCallback(async (categoryId = "all") => {
@@ -149,25 +155,45 @@ const MenuPage = () => {
   // Hàm xử lý submit thêm món mới
   const handleAddFood = async (values) => {
     try {
-      await axios.post(`${REACT_APP_API_URL}/menu/admin/menus`, {
-        name: values.name,
-        price: values.price,
-        description: values.description || "",
-        category: values.category,
-        image_url: values.image_url || "",
-        is_available: values.is_available ? 1 : 0, // Convert boolean to 0/1 for API
+      // Create FormData instead of JSON to support file upload
+      const formData = new FormData();
+      formData.append('name', values.name);
+      formData.append('price', values.price);
+      formData.append('description', values.description || '');
+      formData.append('is_available', values.is_available ? 1 : 0);
+
+      // Append categories as JSON string
+      if (values.category && values.category.length > 0) {
+        formData.append('category', JSON.stringify(values.category));
+      }
+
+      // Append image file OR image URL
+      if (imageFile) {
+        formData.append('image', imageFile);
+      } else if (values.image_url) {
+        formData.append('image_url', values.image_url);
+      }
+
+      await axios.post(`${REACT_APP_API_URL}/menu/admin/menus`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
       });
+
       message.success({
         content: "Thêm món ăn thành công",
         duration: 3,
       });
       setDrawerOpen(false);
       addForm.resetFields();
+      setImageFile(null);
+      setImagePreview(null);
       fetchFoods(activeCategory); // Refresh với category hiện tại
     } catch (err) {
       if (err?.errorFields) return; // Lỗi validate
+      console.error('Add food error:', err);
       message.error({
-        content: "Thêm món ăn thất bại",
+        content: err.response?.data?.message || "Thêm món ăn thất bại",
         duration: 3,
       });
     }
@@ -176,6 +202,10 @@ const MenuPage = () => {
   // Hàm mở popup chỉnh sửa
   const openEditDrawer = (food) => {
     setEditingFood(food);
+
+    // Reset image state
+    setEditImageFile(null);
+    setEditImagePreview(null);
 
     // Xử lý categories - chuyển từ array of objects sang array of ids
     let categoryIds = [];
@@ -197,25 +227,46 @@ const MenuPage = () => {
   const handleEditFood = async () => {
     try {
       const values = await editForm.validateFields();
-      await axios.put(`${REACT_APP_API_URL}/menu/admin/menus/${editingFood.id}`, {
-        name: values.name,
-        price: values.price,
-        description: values.description || "",
-        category: values.category,
-        image_url: values.image_url || "",
-        is_available: values.is_available,
+
+      // Create FormData instead of JSON to support file upload
+      const formData = new FormData();
+      formData.append('name', values.name);
+      formData.append('price', values.price);
+      formData.append('description', values.description || '');
+      formData.append('is_available', values.is_available);
+
+      // Append categories as JSON string
+      if (values.category && values.category.length > 0) {
+        formData.append('category', JSON.stringify(values.category));
+      }
+
+      // Append image file OR image URL
+      if (editImageFile) {
+        formData.append('image', editImageFile);
+      } else if (values.image_url) {
+        formData.append('image_url', values.image_url);
+      }
+
+      await axios.put(`${REACT_APP_API_URL}/menu/admin/menus/${editingFood.id}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
       });
+
       message.success({
         content: "Cập nhật món ăn thành công",
         duration: 3,
       });
       setEditDrawerOpen(false);
       editForm.resetFields();
+      setEditImageFile(null);
+      setEditImagePreview(null);
       fetchFoods(activeCategory); // Refresh với category hiện tại
     } catch (err) {
       if (err?.errorFields) return;
+      console.error('Edit food error:', err);
       message.error({
-        content: "Cập nhật món ăn thất bại",
+        content: err.response?.data?.message || "Cập nhật món ăn thất bại",
         duration: 3,
       });
     }
@@ -337,7 +388,13 @@ const MenuPage = () => {
         <div className="flex items-center gap-3 py-1">
           <div className="relative group">
             <Image
-              src={record.image_url || 'https://via.placeholder.com/56x56?text=No+Image'}
+              src={
+                record.image_url
+                  ? record.image_url.startsWith('http')
+                    ? record.image_url
+                    : `${REACT_APP_API_URL.replace('/api', '')}${record.image_url}`
+                  : 'https://via.placeholder.com/56x56?text=No+Image'
+              }
               alt={record.name}
               width={56}
               height={56}
@@ -662,23 +719,93 @@ const MenuPage = () => {
               <div className="space-y-6">
                 {/* Ảnh món ăn */}
                 <div className="bg-gray-50 rounded-xl p-6 border border-gray-100">
-                  <Form.Item
-                    label={
-                      <span className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                        <span className="w-1 h-4 bg-emerald-500 rounded-full"></span>
-                        Hình ảnh món ăn
-                      </span>
-                    }
-                    name="image_url"
-                  >
-                    <Input
-                      prefix={<CloudUploadOutlined className="text-gray-400 outline-none" />}
-                      placeholder="https://example.com/image.jpg"
-                      className="rounded-lg h-11"
-                    />
-                  </Form.Item>
-                  <p className="text-xs text-gray-400 mt-2 italic">
-                    💡 Gợi ý: Sử dụng ảnh có tỷ lệ 1:1 hoặc 4:3 để hiển thị đẹp nhất
+                  <div className="mb-4">
+                    <span className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-4">
+                      <span className="w-1 h-4 bg-emerald-500 rounded-full"></span>
+                      Hình ảnh món ăn
+                    </span>
+
+                    {/* Upload ảnh */}
+                    <div className="mb-4">
+                      <div className="text-xs font-medium text-gray-600 mb-2">Tải ảnh lên:</div>
+                      <Upload
+                        listType="picture-card"
+                        maxCount={1}
+                        showUploadList={true}
+                        beforeUpload={(file) => {
+                          // Validate file type
+                          const isImage = file.type.startsWith('image/');
+                          if (!isImage) {
+                            message.error('Chỉ chấp nhận file ảnh!');
+                            return false;
+                          }
+
+                          // Validate file size (5MB)
+                          const isLt5M = file.size / 1024 / 1024 < 5;
+                          if (!isLt5M) {
+                            message.error('Ảnh phải nhỏ hơn 5MB!');
+                            return false;
+                          }
+
+                          // Set image file for upload
+                          setImageFile(file);
+
+                          // Create preview
+                          const reader = new FileReader();
+                          reader.onload = (e) => setImagePreview(e.target.result);
+                          reader.readAsDataURL(file);
+
+                          // Disable URL input when file is selected
+                          addForm.setFieldValue('image_url', '');
+
+                          return false; // Prevent auto upload
+                        }}
+                        onRemove={() => {
+                          setImageFile(null);
+                          setImagePreview(null);
+                        }}
+                        fileList={imageFile ? [{
+                          uid: '-1',
+                          name: imageFile.name,
+                          status: 'done',
+                          url: imagePreview
+                        }] : []}
+                      >
+                        {!imageFile && (
+                          <div>
+                            <CloudUploadOutlined style={{ fontSize: '24px', color: '#52c41a' }} />
+                            <div style={{ marginTop: 8, fontSize: '13px' }}>Tải ảnh lên</div>
+                          </div>
+                        )}
+                      </Upload>
+                    </div>
+
+                    {/* Hoặc nhập URL */}
+                    <div>
+                      <Form.Item
+                        name="image_url"
+                        label={<span className="text-xs font-medium text-gray-600">Hoặc nhập URL ảnh:</span>}
+                        style={{ marginBottom: 0 }}
+                      >
+                        <Input
+                          prefix={<CloudUploadOutlined className="text-gray-400" />}
+                          placeholder="https://example.com/image.jpg"
+                          className="rounded-lg h-10"
+                          disabled={!!imageFile}
+                          onChange={(e) => {
+                            // Clear uploaded file when URL is entered
+                            if (e.target.value) {
+                              setImageFile(null);
+                              setImagePreview(null);
+                            }
+                          }}
+                        />
+                      </Form.Item>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-gray-400 mt-3 italic">
+                    💡 Gợi ý: Tải ảnh lên hoặc nhập URL. Ảnh có tỷ lệ 1:1 hoặc 4:3 hiển thị đẹp nhất (tối đa 5MB)
                   </p>
                 </div>
 
@@ -740,7 +867,7 @@ const MenuPage = () => {
                       rows={3}
                       placeholder="Mô tả chi tiết về món ăn, nguyên liệu, cách chế biến..."
                       className="rounded-lg"
-                      maxLength={500}
+                      maxLength={5000}
                       showCount
                     />
                   </Form.Item>
@@ -820,6 +947,8 @@ const MenuPage = () => {
                   onClick={() => {
                     setDrawerOpen(false);
                     addForm.resetFields();
+                    setImageFile(null);
+                    setImagePreview(null);
                   }}
                   className="rounded-lg px-6 h-11"
                 >
@@ -855,6 +984,8 @@ const MenuPage = () => {
               setEditDrawerOpen(false);
               editForm.resetFields();
               setEditingFood(null);
+              setEditImageFile(null);
+              setEditImagePreview(null);
             }}
             width={700}
             footer={null}
@@ -872,23 +1003,114 @@ const MenuPage = () => {
               <div className="space-y-6">
                 {/* Ảnh món ăn */}
                 <div className="bg-gray-50 rounded-xl p-6 border border-gray-100">
-                  <Form.Item
-                    label={
-                      <span className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                        <span className="w-1 h-4 bg-blue-500 rounded-full"></span>
-                        Hình ảnh món ăn
-                      </span>
-                    }
-                    name="image_url"
-                  >
-                    <Input
-                      prefix={<CloudUploadOutlined className="text-gray-400" />}
-                      placeholder="https://example.com/image.jpg"
-                      className="rounded-lg h-11"
-                    />
-                  </Form.Item>
-                  <p className="text-xs text-gray-400 mt-2 italic">
-                    💡 Gợi ý: Sử dụng ảnh có tỷ lệ 1:1 hoặc 4:3 để hiển thị đẹp nhất
+                  <div className="mb-4">
+                    <span className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-4">
+                      <span className="w-1 h-4 bg-blue-500 rounded-full"></span>
+                      Hình ảnh món ăn
+                    </span>
+
+                    {/* Current image preview if exists */}
+                    {editingFood?.image_url && !editImageFile && !editForm.getFieldValue('image_url') && (
+                      <div className="mb-4">
+                        <div className="text-xs font-medium text-gray-600 mb-2">Ảnh hiện tại:</div>
+                        <div className="inline-block">
+                          <Image
+                            src={
+                              editingFood.image_url.startsWith('http')
+                                ? editingFood.image_url
+                                : `${REACT_APP_API_URL.replace('/api', '')}${editingFood.image_url}`
+                            }
+                            alt="Current"
+                            width={150}
+                            height={150}
+                            className="rounded-lg object-cover border border-gray-200"
+                            fallback="https://via.placeholder.com/150?text=No+Image"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Upload ảnh mới */}
+                    <div className="mb-4">
+                      <div className="text-xs font-medium text-gray-600 mb-2">Tải ảnh mới:</div>
+                      <Upload
+                        listType="picture-card"
+                        maxCount={1}
+                        showUploadList={true}
+                        beforeUpload={(file) => {
+                          // Validate file type
+                          const isImage = file.type.startsWith('image/');
+                          if (!isImage) {
+                            message.error('Chỉ chấp nhận file ảnh!');
+                            return false;
+                          }
+
+                          // Validate file size (5MB)
+                          const isLt5M = file.size / 1024 / 1024 < 5;
+                          if (!isLt5M) {
+                            message.error('Ảnh phải nhỏ hơn 5MB!');
+                            return false;
+                          }
+
+                          // Set image file for upload
+                          setEditImageFile(file);
+
+                          // Create preview
+                          const reader = new FileReader();
+                          reader.onload = (e) => setEditImagePreview(e.target.result);
+                          reader.readAsDataURL(file);
+
+                          // Disable URL input when file is selected
+                          editForm.setFieldValue('image_url', '');
+
+                          return false; // Prevent auto upload
+                        }}
+                        onRemove={() => {
+                          setEditImageFile(null);
+                          setEditImagePreview(null);
+                        }}
+                        fileList={editImageFile ? [{
+                          uid: '-1',
+                          name: editImageFile.name,
+                          status: 'done',
+                          url: editImagePreview
+                        }] : []}
+                      >
+                        {!editImageFile && (
+                          <div>
+                            <CloudUploadOutlined style={{ fontSize: '24px', color: '#1890ff' }} />
+                            <div style={{ marginTop: 8, fontSize: '13px' }}>Tải ảnh mới</div>
+                          </div>
+                        )}
+                      </Upload>
+                    </div>
+
+                    {/* Hoặc nhập URL */}
+                    <div>
+                      <Form.Item
+                        name="image_url"
+                        label={<span className="text-xs font-medium text-gray-600">Hoặc nhập URL ảnh mới:</span>}
+                        style={{ marginBottom: 0 }}
+                      >
+                        <Input
+                          prefix={<CloudUploadOutlined className="text-gray-400" />}
+                          placeholder="https://example.com/image.jpg"
+                          className="rounded-lg h-10"
+                          disabled={!!editImageFile}
+                          onChange={(e) => {
+                            // Clear uploaded file when URL is entered
+                            if (e.target.value) {
+                              setEditImageFile(null);
+                              setEditImagePreview(null);
+                            }
+                          }}
+                        />
+                      </Form.Item>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-gray-400 mt-3 italic">
+                    💡 Gợi ý: Tải ảnh mới lên hoặc nhập URL. Để trống nếu giữ ảnh cũ (tối đa 5MB)
                   </p>
                 </div>
 
@@ -950,7 +1172,7 @@ const MenuPage = () => {
                       rows={3}
                       placeholder="Mô tả chi tiết về món ăn, nguyên liệu, cách chế biến..."
                       className="rounded-lg"
-                      maxLength={500}
+                      maxLength={5000}
                       showCount
                     />
                   </Form.Item>
@@ -1032,6 +1254,8 @@ const MenuPage = () => {
                     setEditDrawerOpen(false);
                     editForm.resetFields();
                     setEditingFood(null);
+                    setEditImageFile(null);
+                    setEditImagePreview(null);
                   }}
                   className="rounded-lg px-6 h-11"
                 >

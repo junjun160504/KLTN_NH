@@ -132,7 +132,7 @@ CREATE TABLE order_items (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     order_id BIGINT NOT NULL,
     cart_item_id BIGINT,  -- 👈 tham chiếu món gốc trong giỏ
-    menu_item_id BIGINT NOT NULL,
+    menu_item_id BIGINT,
     quantity INT DEFAULT 1,
     note TEXT,
     unit_price DECIMAL(12,2),
