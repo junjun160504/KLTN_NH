@@ -1,6 +1,22 @@
 import { query } from "../config/db.js";
 import QRCodeUtils from "../utils/qrCodeUtils.js";
 
+// ✅ Get table detail by ID
+export async function getTableById(id) {
+    try {
+        const rows = await query("SELECT * FROM tables WHERE id = ?", [id]);
+
+        if (!rows || rows.length === 0) {
+            throw new Error(`Table with ID ${id} not found`);
+        }
+
+        return rows[0];
+    } catch (error) {
+        console.error("Error getting table by ID:", error);
+        throw new Error(`Failed to get table: ${error.message}`);
+    }
+}
+
 export async function createTable({ table_number }) {
     try {
         // Step 1: Create table record first (without QR URL)

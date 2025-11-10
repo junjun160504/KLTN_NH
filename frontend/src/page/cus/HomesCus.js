@@ -35,13 +35,41 @@ export default function HomecsPage() {
   const { modal, message } = App.useApp(); // ✅ Use App hook for modal and message
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [tableNumber, setTableNumber] = useState(null); // ✅ State for actual table number
+
+  // ✅ Fetch table number from database
+  const fetchTableNumber = useCallback(async () => {
+    try {
+      const qrSession = JSON.parse(localStorage.getItem("qr_session")) || {};
+      const tableId = qrSession.table_id;
+
+      if (tableId) {
+        const response = await axios.get(
+          `${process.env.REACT_APP_API_URL}/tables/${tableId}`
+        );
+
+        if (response.status === 200 && response.data.data) {
+          setTableNumber(response.data.data.table_number);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching table number:", error);
+      // Keep default "N/A" if error occurs
+    }
+  }, []);
+
+  // ✅ Fetch table number when component mounts
+  useEffect(() => {
+    fetchTableNumber();
+  }, [fetchTableNumber]);
 
   // ✅ QR Handler - Auto process QR params when scanning QR code
   // Use useCallback to prevent recreating functions on every render
   const handleQRSuccess = useCallback((sessionData) => {
-    console.log('✅ QR Session created from HomesCus:', sessionData);
-    message.success(`Đã quét QR thành công! Bàn ${sessionData.table_number}`);
-  }, [message]);
+    message.success(`Đã quét QR thành công!`);
+    fetchTableNumber();
+    // ✅ Fetch table number again after QR scan
+  }, [message, fetchTableNumber]);
 
   const handleQRError = useCallback((error) => {
     console.error('❌ QR Error in HomesCus:', error);
@@ -266,9 +294,6 @@ export default function HomecsPage() {
     greeting = "Chào buổi chiều Quý khách";
   }
 
-  const qrSession = JSON.parse(localStorage.getItem("qr_session")) || {};
-  const tableNumber = qrSession.table_id || "N/A";
-
   const banners = [
     "/assets/images/Banner1.jpg",
     "/assets/images/Banner2.png",
@@ -314,18 +339,23 @@ export default function HomecsPage() {
         </div>
 
         <Text strong style={{ fontSize: 16, color: "#333" }}>
-          {greeting} • Bàn{" "}
-          <Tag
-            color="green"
-            style={{
-              fontWeight: "bold",
-              fontSize: 15,
-              borderRadius: "8px",
-              padding: "4px 12px",
-            }}
-          >
-            {tableNumber}
-          </Tag>
+          {greeting}
+          {tableNumber && (
+            <>
+              {" • Bàn "}
+              <Tag
+                color="green"
+                style={{
+                  fontWeight: "bold",
+                  fontSize: 15,
+                  borderRadius: "8px",
+                  padding: "4px 12px",
+                }}
+              >
+                {tableNumber}
+              </Tag>
+            </>
+          )}
         </Text>
       </Header>
 

@@ -88,79 +88,97 @@ export default function PaymentPage() {
     const [isLoyaltyLoading, setIsLoyaltyLoading] = useState(false);
     const [form] = Form.useForm();
 
-    // ✅ Fetch customer loyalty points on mount
-    useEffect(() => {
-        const fetchCustomerPoints = async () => {
-            try {
-                setLoadingPoints(true);
+    // ✅ Fetch customer loyalty points - ALWAYS from API (Real-time)
+    const fetchCustomerPoints = React.useCallback(async () => {
+        try {
+            setLoadingPoints(true);
 
-                // Get customer info from localStorage
-                const savedCustomer = localStorage.getItem('loyalty_customer');
-                if (!savedCustomer) {
-                    console.log('No loyalty customer found in localStorage');
-                    setCustomerPoints(0);
-                    setCustomerInfo(null);
-                    setLoadingPoints(false);
-                    return;
-                }
-
-                const customer = JSON.parse(savedCustomer);
-                const phone = customer.phone;
-
-                if (!phone) {
-                    console.log('No phone number found');
-                    setCustomerPoints(0);
-                    setCustomerInfo(null);
-                    setLoadingPoints(false);
-                    return;
-                }
-
-                // Call API to get latest points
-                const response = await axios.get(
-                    `${REACT_APP_API_URL}/customers/me/${phone}`
-                );
-
-                if (response.status === 200) {
-                    const latestData = response.data.data;
-                    const points = latestData.points || 0;
-
-                    // Update state
-                    setCustomerPoints(points);
-                    setCustomerInfo({
-                        name: latestData.name || null,
-                        phone: latestData.phone,
-                    });
-
-                    // Update localStorage with latest data
-                    localStorage.setItem('loyalty_customer', JSON.stringify({
-                        id: latestData.id,
-                        phone: latestData.phone,
-                        name: latestData.name || null,
-                        loyalty_points: points,
-                    }));
-
-                    console.log(`✅ Customer info loaded:`, latestData);
-                }
-            } catch (error) {
-                console.error('Error fetching customer points:', error);
-
-                if (error.response?.status === 404) {
-                    console.log('Customer not found - clearing localStorage');
-                    localStorage.removeItem('loyalty_customer');
-                    setCustomerPoints(0);
-                    setCustomerInfo(null);
-                } else {
-                    message.warning('Không thể tải thông tin khách hàng!');
-                    setCustomerPoints(0);
-                    setCustomerInfo(null);
-                }
-            } finally {
+            // Get customer phone from localStorage
+            const savedCustomer = localStorage.getItem('loyalty_customer');
+            if (!savedCustomer) {
+                console.log('No loyalty customer found in localStorage');
+                setCustomerPoints(0);
+                setCustomerInfo(null);
                 setLoadingPoints(false);
+                return;
+            }
+
+            const customer = JSON.parse(savedCustomer);
+            const phone = customer.phone;
+
+            if (!phone) {
+                console.log('No phone number found');
+                setCustomerPoints(0);
+                setCustomerInfo(null);
+                setLoadingPoints(false);
+                return;
+            }
+
+            // ✅ Call API to get LATEST points from database (Real-time)
+            const response = await axios.get(
+                `${REACT_APP_API_URL}/customers/me/${phone}`
+            );
+
+            if (response.status === 200) {
+                const latestData = response.data.data;
+                const realtimePoints = latestData.points || 0;
+
+                // ✅ Update state with real-time data
+                setCustomerPoints(realtimePoints);
+                setCustomerInfo({
+                    name: latestData.name || null,
+                    phone: latestData.phone,
+                });
+
+                // ✅ Update localStorage with latest data (for offline fallback)
+                localStorage.setItem('loyalty_customer', JSON.stringify({
+                    id: latestData.id,
+                    phone: latestData.phone,
+                    name: latestData.name || null,
+                    loyalty_points: realtimePoints,
+                }));
+
+                console.log(`✅ [Real-time] Customer points loaded from API:`, realtimePoints);
+            }
+        } catch (error) {
+            console.error('❌ Error fetching customer points from API:', error);
+
+            if (error.response?.status === 404) {
+                console.log('Customer not found - clearing localStorage');
+                localStorage.removeItem('loyalty_customer');
+                setCustomerPoints(0);
+                setCustomerInfo(null);
+            } else {
+                message.warning({
+                    content: 'Không thể tải điểm thưởng! Vui lòng thử lại.',
+                    duration: 3
+                });
+                setCustomerPoints(0);
+                setCustomerInfo(null);
+            }
+        } finally {
+            setLoadingPoints(false);
+        }
+    }, [message]);
+
+    // ✅ Fetch on mount and when page becomes visible (user returns)
+    useEffect(() => {
+        fetchCustomerPoints();
+
+        // ✅ Re-fetch when user returns to this page (visibility change)
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                console.log('📱 Page visible - Re-fetching customer points...');
+                fetchCustomerPoints();
             }
         };
 
-        fetchCustomerPoints();
-    }, [message]); // ✅ Add message to dependencies
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [fetchCustomerPoints]);
 
     // ✅ Listen for payment confirmation from admin via Socket.IO
     useEffect(() => {

@@ -482,7 +482,7 @@ export default function CustomerBillPage() {
                           </div>
                         </div>
 
-                        {/* Right: Time + Cancel Button */}
+                        {/* Right: Time + Action Buttons */}
                         {order.status === 'NEW' && (
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <Text
@@ -508,9 +508,33 @@ export default function CustomerBillPage() {
                             </Button>
                           </div>
                         )}
-                      </div>
 
-                      {/* Order Items List - New 3-Column Layout */}
+                        {/* Right: Review Button for IN_PROGRESS orders */}
+                        {order.status === 'IN_PROGRESS' && (
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <Button
+                              type="primary"
+                              size="small"
+                              onClick={() => navigate('/cus/reviews', {
+                                state: { orderIds: [order.id] } // ✅ Pass as array for flexibility
+                              })}
+                              className="flex items-center justify-center"
+                              style={{
+                                padding: '4px 10px',
+                                fontSize: DESIGN_TOKENS.fontSize.xs,
+                                fontWeight: 500,
+                                height: 'auto',
+                                background: `linear-gradient(135deg, ${DESIGN_TOKENS.colors.warning} 0%, #ff9800 100%)`,
+                                border: 'none',
+                                borderRadius: DESIGN_TOKENS.radius.sm,
+                                boxShadow: '0 2px 6px rgba(250, 140, 22, 0.25)',
+                              }}
+                            >
+                              Đánh giá
+                            </Button>
+                          </div>
+                        )}
+                      </div>                      {/* Order Items List - New 3-Column Layout */}
                       <div style={{ padding: `${DESIGN_TOKENS.spacing.sm}px ${DESIGN_TOKENS.spacing.md}px` }}>
                         {[...(order.items || [])].reverse()
                           .slice(0, isExpanded ? order.items.length : 1)
@@ -844,7 +868,13 @@ export default function CustomerBillPage() {
               type="primary"
               size="large"
               block
-              onClick={() => navigate("/cus/reviews")}
+              onClick={() => {
+                // ✅ Pass all confirmed order IDs for review
+                const confirmedOrderIds = confirmedOrders.map(o => o.id);
+                navigate("/cus/reviews", {
+                  state: { orderIds: confirmedOrderIds }
+                });
+              }}
               className="font-semibold"
               style={{
                 height: 48,

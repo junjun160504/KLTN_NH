@@ -258,14 +258,24 @@ export default function CustomerMenuPage() {
 
     const order = JSON.parse(sessionStorage.getItem("order")) || { orderId: tableId, foodOrderList: [] };
 
-    if (order.foodOrderList.some(item => item.id === food.id)) {
-      // nếu đã có món trong giỏ, tăng số lượng
-      order.foodOrderList = order.foodOrderList.map(item =>
-        item.id === food.id ? { ...item, quantity: item.quantity + 1 } : item
-      );
+    // ✅ Chuẩn hóa: Check món đã có trong giỏ chưa (cùng ID và note rỗng)
+    const existingItemIndex = order.foodOrderList.findIndex(
+      (item) => item.id === food.id && (item.note === "" || item.note === undefined || item.note === null)
+    );
+
+    if (existingItemIndex !== -1) {
+      // ✅ Món đã tồn tại → Tăng số lượng
+      order.foodOrderList[existingItemIndex].quantity += 1;
     } else {
-      // nếu chưa có món trong giỏ, thêm mới
-      order.foodOrderList.push({ ...food, quantity: 1 });
+      // ✅ Món chưa có → Thêm mới với cấu trúc chuẩn
+      order.foodOrderList.push({
+        id: food.id,
+        name: food.name,
+        price: food.price,
+        quantity: 1,
+        note: "", // ✅ Luôn có field note (rỗng khi thêm từ MenusCus)
+        image_url: food.image_url || "https://via.placeholder.com/80x80?text=No+Image",
+      });
     }
 
     // Lưu vào sessionStorage

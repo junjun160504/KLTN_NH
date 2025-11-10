@@ -88,23 +88,26 @@ export default function FoodDetailPage() {
       foodOrderList: [],
     };
 
-    // Check if item already exists in cart
+    // ✅ Chuẩn hóa note: Trim và convert null/undefined thành ""
+    const normalizedNote = (note || "").trim();
+
+    // ✅ Check if item already exists in cart (same ID and same note)
     const existingItemIndex = savedOrder.foodOrderList.findIndex(
-      (item) => item.id === menuItem.id && item.note === note
+      (item) => item.id === menuItem.id && (item.note || "").trim() === normalizedNote
     );
 
     if (existingItemIndex !== -1) {
-      // Update quantity if item exists with same note
+      // ✅ Update quantity if item exists with same note
       savedOrder.foodOrderList[existingItemIndex].quantity += quantity;
     } else {
-      // Add new item to cart
+      // ✅ Add new item to cart with standardized structure
       savedOrder.foodOrderList.push({
         id: menuItem.id,
         name: menuItem.name,
         price: menuItem.price,
         quantity: quantity,
-        note: note || "",
-        image_url: menuItem.image_url || "https://source.unsplash.com/80x80/?food",
+        note: normalizedNote, // ✅ Lưu note đã chuẩn hóa
+        image_url: menuItem.image_url || "https://via.placeholder.com/80x80?text=No+Image",
       });
     }
 

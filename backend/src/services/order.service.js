@@ -121,7 +121,6 @@ export async function createOrderByAdmin({ table_id, items, admin_id, customer_p
         );
       }
 
-      console.log(`✅ [ADMIN] Adding items to existing NEW order #${orderId}`);
     } else {
       // Create new order (no NEW order found)
       const [orderResult] = await connection.query(
@@ -130,7 +129,6 @@ export async function createOrderByAdmin({ table_id, items, admin_id, customer_p
       );
       orderId = orderResult.insertId;
       isNewOrder = true;
-      console.log(`✅ [ADMIN] Created new order #${orderId} for table #${table_id}`);
     }
 
     // 5. Validate menu items and prepare batch insert data
@@ -193,26 +191,6 @@ export async function createOrderByAdmin({ table_id, items, admin_id, customer_p
 
       const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
       const tableName = `Bàn ${table.table_number}`;
-
-      await notificationService.createNotification({
-        target_type: "STAFF",
-        target_id: null,
-        type: isNewOrder ? "ORDER_NEW" : "ORDER_UPDATE",
-        title: `🔧 [ADMIN] ${tableName} - ${isNewOrder ? 'Đơn mới' : 'Thêm món'} #${orderId}`,
-        message: `Admin đã tạo đơn với ${totalItems} món: ${itemNames}`,
-        priority: "high",
-        action_url: `/management/orders/${orderId}`,
-        metadata: {
-          orderId,
-          qrSessionId,
-          tableId: table_id,
-          tableName: table.table_number,
-          totalItems,
-          createdByAdmin: true,
-          adminId: admin_id
-        },
-      });
-      console.log(`📤 [ADMIN] Notification sent: Order #${orderId} - ${tableName}`);
     } catch (notifError) {
       console.error('⚠️ Failed to send notification:', notifError);
     }
