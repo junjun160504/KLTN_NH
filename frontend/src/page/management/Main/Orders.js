@@ -3,6 +3,7 @@ import AppHeader from '../../../components/AppHeader'
 import AppSidebar from '../../../components/AppSidebar'
 import CustomDateRangePicker from '../../../components/CustomDateRangePicker'
 import { useOrdersPolling } from '../../../hooks/useOrdersPolling'
+import useSidebarCollapse from '../../../hooks/useSidebarCollapse'
 import {
   Layout,
   Button,
@@ -81,7 +82,7 @@ const STATUS_COLORS = {
 function OrderPage() {
   const [modal, contextHolder] = Modal.useModal()
 
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useSidebarCollapse()
   const [pageTitle] = useState('Đơn hàng')
   const [filterStatus, setFilterStatus] = useState('ALL')
   const [searchText, setSearchText] = useState('')

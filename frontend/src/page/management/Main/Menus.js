@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import AppHeader from "../../../components/AppHeader";
 import AppSidebar from "../../../components/AppSidebar";
+import useSidebarCollapse from "../../../hooks/useSidebarCollapse";
 import {
   Layout,
   Button,
@@ -41,7 +42,7 @@ const REACT_APP_API_URL = process.env.REACT_APP_API_URL;
 
 const MenuPage = () => {
   const { message } = App.useApp(); // ✅ Use App hook for message
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useSidebarCollapse();
   const [pageTitle] = useState("Quản lý thực đơn");
 
   const [allFoods, setAllFoods] = useState([]); // dữ liệu gốc
@@ -538,7 +539,7 @@ const MenuPage = () => {
   return (
     <Layout style={{ minHeight: "100vh" }}>
       {/* Sidebar */}
-      <AppSidebar collapsed={collapsed} currentPageKey="categorys" />
+      <AppSidebar collapsed={collapsed} currentPageKey="menus" />
 
       <Layout style={{ marginLeft: collapsed ? 80 : 220 }}>
         {/* Header */}

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Layout, Menu } from "antd";
 import {
   AppstoreOutlined,
@@ -17,7 +17,52 @@ const { Sider } = Layout;
 
 const AppSidebar = ({ collapsed, currentPageKey, setPageTitle }) => {
   const navigate = useNavigate();
-  const [openKeys, setOpenKeys] = useState([]);
+  const menuContainerRef = useRef(null);
+
+  // Lưu trạng thái mở/đóng của submenu vào localStorage
+  const [openKeys, setOpenKeys] = useState(() => {
+    const saved = localStorage.getItem('sidebarOpenKeys');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // Lưu vào localStorage mỗi khi openKeys thay đổi
+  useEffect(() => {
+    localStorage.setItem('sidebarOpenKeys', JSON.stringify(openKeys));
+  }, [openKeys]);
+
+  // Đảm bảo submenu mở khi sidebar mở và currentPageKey thuộc submenu
+  useEffect(() => {
+    if (!collapsed && currentPageKey) {
+      const parentKey = getParentKey(currentPageKey);
+      if (parentKey && !openKeys.includes(parentKey)) {
+        setOpenKeys([...openKeys, parentKey]);
+      }
+    }
+  }, [collapsed, currentPageKey]);
+
+  // Helper function để tìm parent key
+  const getParentKey = (key) => {
+    if (['menus', 'categorys'].includes(key)) return 'products';
+    if (['report_sales', 'report_products', 'report_customers', 'report_chatbot'].includes(key)) return 'report';
+    return null;
+  };
+
+  // Scroll đến menu item được chọn
+  useEffect(() => {
+    if (currentPageKey && menuContainerRef.current) {
+      setTimeout(() => {
+        const selectedElement = menuContainerRef.current.querySelector(
+          `.ant-menu-item-selected, .ant-menu-submenu-selected`
+        );
+        if (selectedElement) {
+          selectedElement.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+          });
+        }
+      }, 100);
+    }
+  }, [currentPageKey]);
 
   // map key -> path & title
   const menuConfig = {
@@ -33,12 +78,6 @@ const AppSidebar = ({ collapsed, currentPageKey, setPageTitle }) => {
     report_products: { path: "/main/reports/products", title: "Báo cáo sản phẩm" },
     report_customers: { path: "/main/reports/customers", title: "Báo cáo khách hàng" },
     report_chatbot: { path: "/main/reports/chatbots", title: "Báo cáo Chatbot" },
-  };
-
-  const toggleSubmenu = (key) => {
-    setOpenKeys((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
-    );
   };
 
   return (
@@ -59,15 +98,25 @@ const AppSidebar = ({ collapsed, currentPageKey, setPageTitle }) => {
       </div>
 
       {/* Menu với scroll - Grid Layout */}
-      <div className="h-[calc(100%-6rem)] overflow-y-auto">
+      <div
+        ref={menuContainerRef}
+        className="h-[calc(100%-6rem)] overflow-y-auto"
+      >
         <Menu
           mode="inline"
           selectedKeys={[currentPageKey]}
-          openKeys={openKeys}
+          openKeys={collapsed ? undefined : openKeys}
+          onOpenChange={(keys) => {
+            // Chỉ update khi sidebar đang mở
+            if (!collapsed) {
+              setOpenKeys(keys);
+            }
+          }}
           onClick={(e) => {
             navigate(menuConfig[e.key].path);
             if (setPageTitle) setPageTitle(menuConfig[e.key].title);
           }}
+          inlineCollapsed={collapsed}
           items={[
             { key: "homes", icon: <AppstoreOutlined />, label: "Tổng quan" },
             { key: 'tables', icon: <TableOutlined />, label: 'Bàn' },
@@ -80,7 +129,6 @@ const AppSidebar = ({ collapsed, currentPageKey, setPageTitle }) => {
                 { key: "menus", icon: <CoffeeOutlined />, label: "Thực đơn" },
                 { key: "categorys", icon: <CoffeeOutlined />, label: "Danh mục" }
               ],
-              onTitleClick: () => toggleSubmenu("products"),
             },
             { key: "customers", icon: <UserOutlined />, label: "Khách hàng" },
             { key: "staffs", icon: <TeamOutlined />, label: "Nhân viên" },
@@ -95,7 +143,6 @@ const AppSidebar = ({ collapsed, currentPageKey, setPageTitle }) => {
                 { key: "report_customers", label: "Báo cáo khách hàng" },
                 { key: "report_chatbot", label: "Báo cáo Chatbot" },
               ],
-              onTitleClick: () => toggleSubmenu("report"),
             },
           ]}
         />

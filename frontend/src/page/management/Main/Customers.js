@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect, useCallback } from 'react'
 import AppHeader from '../../../components/AppHeader'
 import AppSidebar from '../../../components/AppSidebar'
+import useSidebarCollapse from '../../../hooks/useSidebarCollapse'
 import {
   Layout,
   Button,
@@ -40,7 +41,7 @@ const { Content } = Layout
 const REACT_APP_API_URL = process.env.REACT_APP_API_URL
 
 const CustomersPage = () => {
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useSidebarCollapse()
   const [pageTitle] = useState('Quản lý khách hàng')
   const [allCustomers, setAllCustomers] = useState([])
   const [customers, setCustomers] = useState([])

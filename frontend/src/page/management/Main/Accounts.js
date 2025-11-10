@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import AppHeader from "../../../components/AppHeader";
 import AppSidebar from "../../../components/AppSidebar";
+import useSidebarCollapse from "../../../hooks/useSidebarCollapse";
 import {
   Layout,
   Button,
@@ -33,7 +34,7 @@ const { Option } = Select;
 const REACT_APP_API_URL = process.env.REACT_APP_API_URL;
 
 const AccountsPage = () => {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useSidebarCollapse();
   const [pageTitle] = useState("Quản lý tài khoản");
 
   const [allAccounts, setAllAccounts] = useState([]);
