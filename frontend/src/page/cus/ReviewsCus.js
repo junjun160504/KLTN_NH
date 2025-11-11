@@ -33,6 +33,7 @@ export default function CustomerReviewAllPage() {
   const [loading, setLoading] = useState(true);
   const [orderItems, setOrderItems] = useState([]); // All items from orders
   const [itemReviews, setItemReviews] = useState({}); // { itemId: { rating, note } }
+  const [qrSessionId, setQrSessionId] = useState(null); // ✅ Store qr_session_id for restaurant review
 
   // ✅ Đánh giá nhà hàng (chung cho tất cả orders)
   const [storeRating, setStoreRating] = useState(0);
@@ -47,64 +48,132 @@ export default function CustomerReviewAllPage() {
   const [warningVisible, setWarningVisible] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // ✅ Generate unique key for localStorage based on orderIds
-  const getReviewStorageKey = useCallback(() => {
-    if (!orderIds || orderIds.length === 0) return null;
-    const sortedIds = [...orderIds].sort((a, b) => a - b);
-    return `review_draft_${sortedIds.join('_')}`;
-  }, [orderIds]);
+  // ✅ Generate unique key for localStorage for each order (for item reviews)
+  // Strategy: Save each order's reviews separately to avoid losing data when orderIds change
+  const getReviewStorageKeyForOrder = useCallback((orderId) => {
+    return `review_draft_order_${orderId}`;
+  }, []);
+
+  // ✅ Key chung cho đánh giá nhà hàng (không phụ thuộc orderIds)
+  const RESTAURANT_REVIEW_KEY = 'restaurant_review_common';
 
   // ✅ Load saved review from localStorage
+  // Strategy: Load reviews from each order separately, then merge
   const loadSavedReview = useCallback(() => {
-    const storageKey = getReviewStorageKey();
-    if (!storageKey) return null;
+    if (!orderIds || orderIds.length === 0) return null;
 
     try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        console.log('📥 Loaded saved review from localStorage:', parsed);
-        return parsed;
+      // Merge item reviews from all orders
+      let mergedItemReviews = {};
+      let isSubmittedData = false;
+      let submittedAtData = null;
+
+      // Load reviews from each order
+      orderIds.forEach(orderId => {
+        const storageKey = getReviewStorageKeyForOrder(orderId);
+        const saved = localStorage.getItem(storageKey);
+
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          // Merge item reviews
+          mergedItemReviews = { ...mergedItemReviews, ...(parsed.itemReviews || {}) };
+          // If any order was submitted, mark as submitted
+          if (parsed.isSubmitted) {
+            isSubmittedData = true;
+            submittedAtData = parsed.submittedAt || submittedAtData;
+          }
+          console.log(`📥 Loaded item reviews from order ${orderId}:`, parsed);
+        }
+      });
+
+      // Load đánh giá nhà hàng từ key chung
+      const restaurantReview = localStorage.getItem(RESTAURANT_REVIEW_KEY);
+      let storeRatingData = 0;
+      let storeFeedbackData = "";
+
+      if (restaurantReview) {
+        const parsed = JSON.parse(restaurantReview);
+        storeRatingData = parsed.rating || 0;
+        storeFeedbackData = parsed.feedback || "";
+        console.log('📥 Loaded restaurant review from localStorage:', parsed);
       }
+
+      return {
+        itemReviews: mergedItemReviews,
+        storeRating: storeRatingData,
+        storeFeedback: storeFeedbackData,
+        isSubmitted: isSubmittedData,
+        submittedAt: submittedAtData,
+      };
     } catch (error) {
       console.error('Error loading saved review:', error);
     }
     return null;
-  }, [getReviewStorageKey]);
+  }, [orderIds, getReviewStorageKeyForOrder, RESTAURANT_REVIEW_KEY]);
 
   // ✅ Save review to localStorage (auto-save)
+  // Strategy: Save each order's item reviews separately to avoid data loss
   const saveReviewToLocalStorage = useCallback(() => {
-    const storageKey = getReviewStorageKey();
-    if (!storageKey) return;
+    if (!orderIds || orderIds.length === 0) return;
 
     try {
-      const reviewData = {
-        itemReviews,
-        storeRating,
-        storeFeedback,
-        isSubmitted,
-        submittedAt,
+      // Group item reviews by orderId
+      const reviewsByOrder = {};
+
+      orderItems.forEach(item => {
+        const orderId = item.orderId;
+        const itemReview = itemReviews[item.id];
+
+        if (!reviewsByOrder[orderId]) {
+          reviewsByOrder[orderId] = {};
+        }
+
+        if (itemReview) {
+          reviewsByOrder[orderId][item.id] = itemReview;
+        }
+      });
+
+      // Save each order's reviews separately
+      Object.entries(reviewsByOrder).forEach(([orderId, reviews]) => {
+        const storageKey = getReviewStorageKeyForOrder(parseInt(orderId));
+        const data = {
+          itemReviews: reviews,
+          isSubmitted,
+          submittedAt,
+          timestamp: Date.now(),
+        };
+        localStorage.setItem(storageKey, JSON.stringify(data));
+        console.log(`💾 Auto-saved reviews for order ${orderId}`);
+      });
+
+      // Save đánh giá nhà hàng vào key chung
+      const restaurantReviewData = {
+        rating: storeRating,
+        feedback: storeFeedback,
         timestamp: Date.now(),
       };
-      localStorage.setItem(storageKey, JSON.stringify(reviewData));
-      console.log('💾 Auto-saved review to localStorage');
+      localStorage.setItem(RESTAURANT_REVIEW_KEY, JSON.stringify(restaurantReviewData));
+      console.log('💾 Auto-saved restaurant review to localStorage (shared)');
     } catch (error) {
       console.error('Error saving review to localStorage:', error);
     }
-  }, [itemReviews, storeRating, storeFeedback, isSubmitted, submittedAt, getReviewStorageKey]);
+  }, [orderIds, orderItems, itemReviews, storeRating, storeFeedback, isSubmitted, submittedAt, getReviewStorageKeyForOrder, RESTAURANT_REVIEW_KEY]);
 
   // ✅ Clear saved review from localStorage (after submit)
   const clearSavedReview = useCallback(() => {
-    const storageKey = getReviewStorageKey();
-    if (!storageKey) return;
+    if (!orderIds || orderIds.length === 0) return;
 
     try {
-      localStorage.removeItem(storageKey);
-      console.log('🗑️ Cleared saved review from localStorage');
+      // Clear reviews for each order
+      orderIds.forEach(orderId => {
+        const storageKey = getReviewStorageKeyForOrder(orderId);
+        localStorage.removeItem(storageKey);
+        console.log(`🗑️ Cleared saved review for order ${orderId}`);
+      });
     } catch (error) {
       console.error('Error clearing saved review:', error);
     }
-  }, [getReviewStorageKey]);
+  }, [orderIds, getReviewStorageKeyForOrder]);
 
   // ✅ Fetch order items from API
   const fetchOrderItems = useCallback(async () => {
@@ -136,6 +205,11 @@ export default function CustomerReviewAllPage() {
 
       setOrderItems(allItems);
 
+      // ✅ Extract qr_session_id from first order (all orders should have same session)
+      if (responses.length > 0 && responses[0].data.data.qr_session_id) {
+        setQrSessionId(responses[0].data.data.qr_session_id);
+      }
+
       // ✅ Try to load saved review from localStorage
       const savedReview = loadSavedReview();
 
@@ -148,17 +222,17 @@ export default function CustomerReviewAllPage() {
         setSubmittedAt(savedReview.submittedAt || null);
 
         // Show different message based on submission status
-        if (savedReview.isSubmitted) {
-          message.success({
-            content: '✅ Đánh giá đã gửi trước đó. Bạn có thể chỉnh sửa và gửi lại.',
-            duration: 4,
-          });
-        } else {
-          message.info({
-            content: '📝 Đã tải bản nháp đánh giá trước đó',
-            duration: 3,
-          });
-        }
+        // if (savedReview.isSubmitted) {
+        //   message.success({
+        //     content: '✅ Đánh giá đã gửi trước đó. Bạn có thể chỉnh sửa và gửi lại.',
+        //     duration: 4,
+        //   });
+        // } else {
+        //   message.info({
+        //     content: '📝 Đã tải bản nháp đánh giá trước đó',
+        //     duration: 3,
+        //   });
+        // }
       } else {
         // Initialize empty review state for each item
         const initialReviews = {};
@@ -175,12 +249,12 @@ export default function CustomerReviewAllPage() {
     }
   }, [orderIds, message, loadSavedReview]);
 
-  // ✅ Fetch on mount
+  // Fetch on mount
   useEffect(() => {
     fetchOrderItems();
   }, [fetchOrderItems]);
 
-  // ✅ Auto-save review to localStorage when data changes
+  // Auto-save review to localStorage when data changes
   useEffect(() => {
     // Only save if we have items loaded (not during initial load)
     if (orderItems.length > 0) {
@@ -193,7 +267,7 @@ export default function CustomerReviewAllPage() {
     }
   }, [itemReviews, storeRating, storeFeedback, orderItems.length, saveReviewToLocalStorage]);
 
-  // ✅ Handle rating change for specific item
+  // Handle rating change for specific item
   const handleRateFood = (itemId, value) => {
     setItemReviews(prev => ({
       ...prev,
@@ -201,7 +275,7 @@ export default function CustomerReviewAllPage() {
     }));
   };
 
-  // ✅ Handle note change for specific item
+  // Handle note change for specific item
   const handleNoteFood = (itemId, value) => {
     setItemReviews(prev => ({
       ...prev,
@@ -209,7 +283,7 @@ export default function CustomerReviewAllPage() {
     }));
   };
 
-  // ✅ Submit reviews
+  // Submit reviews
   const handleSubmit = async () => {
     // Check if at least one review is provided
     const hasItemReview = Object.values(itemReviews).some(
@@ -226,31 +300,71 @@ export default function CustomerReviewAllPage() {
     try {
       setSubmitting(true);
 
-      // Prepare review data
-      const reviewData = {
-        // Item reviews (only items with rating or note)
-        itemReviews: Object.entries(itemReviews)
-          .filter(([_, review]) => review.rating > 0 || review.note.trim() !== "")
-          .map(([itemId, review]) => ({
-            orderItemId: parseInt(itemId),
-            rating: review.rating,
-            comment: review.note.trim()
-          })),
+      // ========================================
+      // SUBMIT ITEM REVIEWS (món ăn)
+      // ========================================
+      const itemReviewsToSubmit = Object.entries(itemReviews)
+        .filter(([_, review]) => review.rating > 0 || review.note.trim() !== "")
+        .map(([orderItemId, review]) => {
+          // Find the corresponding order_item to get menu_item_id
+          const orderItem = orderItems.find(item => item.id === parseInt(orderItemId));
 
-        // Store review
-        storeReview: hasStoreReview ? {
+          if (!orderItem) {
+            console.warn(`Order item ${orderItemId} not found!`);
+            return null;
+          }
+
+          return {
+            item_id: orderItem.menu_item_id,        // ✅ Map orderItemId → menu_item_id
+            qr_session_id: qrSessionId,             // ✅ Add qr_session_id
+            rating: review.rating || 0,
+            comment: review.note.trim() || null
+          };
+        })
+        .filter(review => review !== null); // Remove nulls
+
+      console.log("📤 Submitting item reviews:", itemReviewsToSubmit);
+
+      // Call API for each item review
+      const itemReviewPromises = itemReviewsToSubmit.map(reviewData =>
+        axios.post(`${REACT_APP_API_URL}/review/menu`, reviewData)
+          .catch(error => {
+            console.error(`Failed to submit review for item ${reviewData.item_id}:`, error);
+            return { error: true, data: reviewData };
+          })
+      );
+
+      const itemReviewResults = await Promise.all(itemReviewPromises);
+
+      const successCount = itemReviewResults.filter(r => !r.error).length;
+      const failCount = itemReviewResults.filter(r => r.error).length;
+
+      console.log(`✅ Item reviews: ${successCount} success, ${failCount} failed`);
+
+      // ========================================
+      // SUBMIT RESTAURANT REVIEW (nhà hàng)
+      // ========================================
+      if (hasStoreReview && qrSessionId) {
+        const restaurantReviewData = {
+          qr_session_id: qrSessionId,
           rating: storeRating,
-          comment: storeFeedback.trim()
-        } : null
-      };
+          comment: storeFeedback.trim() || null
+        };
 
-      console.log("📤 Submitting reviews:", reviewData);
+        console.log("📤 Submitting restaurant review:", restaurantReviewData);
 
-      // TODO: Call API to submit reviews
-      // await axios.post(`${REACT_APP_API_URL}/reviews`, reviewData);
+        try {
+          await axios.post(`${REACT_APP_API_URL}/review`, restaurantReviewData);
+          console.log("✅ Restaurant review submitted");
+        } catch (error) {
+          console.error("Failed to submit restaurant review:", error);
+          // Don't throw, continue to show success for item reviews
+        }
+      }
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // ========================================
+      // SUCCESS HANDLING
+      // ========================================
 
       // ✅ Mark as submitted and save to localStorage (don't clear)
       setIsSubmitted(true);
@@ -258,6 +372,12 @@ export default function CustomerReviewAllPage() {
 
       // Auto-save will trigger and save the submitted state
       // User can come back and edit later
+
+      if (failCount > 0) {
+        message.warning(`Đã gửi ${successCount}/${itemReviewsToSubmit.length} đánh giá món ăn thành công`);
+      } else {
+        message.success('Đã gửi đánh giá thành công!');
+      }
 
       setThankYouVisible(true);
 
@@ -273,26 +393,26 @@ export default function CustomerReviewAllPage() {
   const handleClearDraft = () => {
     Modal.confirm({
       title: 'Xóa bản nháp?',
-      content: 'Bạn có chắc muốn xóa toàn bộ đánh giá đã nhập?',
+      content: 'Bạn có chắc muốn xóa toàn bộ đánh giá đã nhập? (Đánh giá nhà hàng sẽ được giữ lại)',
       okText: 'Xóa',
       cancelText: 'Hủy',
       okButtonProps: { danger: true },
       onOk: () => {
-        // Reset all reviews to initial state
+        // Reset item reviews to initial state
         const resetReviews = {};
         orderItems.forEach(item => {
           resetReviews[item.id] = { rating: 0, note: "" };
         });
         setItemReviews(resetReviews);
-        setStoreRating(0);
-        setStoreFeedback("");
         setIsSubmitted(false);
         setSubmittedAt(null);
 
-        // Clear localStorage
+        // Clear item reviews localStorage
         clearSavedReview();
 
-        message.success('Đã xóa bản nháp đánh giá');
+        // Keep restaurant review (don't reset storeRating and storeFeedback)
+
+        message.success('Đã xóa bản nháp đánh giá món ăn (giữ nguyên đánh giá nhà hàng)');
       }
     });
   }; return (

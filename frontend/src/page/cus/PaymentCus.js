@@ -180,6 +180,24 @@ export default function PaymentPage() {
         };
     }, [fetchCustomerPoints]);
 
+    // ✅ Check if orders have been reviewed
+    const checkIfReviewed = React.useCallback((orderIds) => {
+        if (!orderIds || orderIds.length === 0) return false;
+
+        const sortedIds = [...orderIds].sort((a, b) => a - b);
+        const storageKey = `review_draft_${sortedIds.join('_')}`;
+        const saved = localStorage.getItem(storageKey);
+
+        if (!saved) return false;
+
+        try {
+            const data = JSON.parse(saved);
+            return data.isSubmitted || false;
+        } catch {
+            return false;
+        }
+    }, []);
+
     // ✅ Listen for payment confirmation from admin via Socket.IO
     useEffect(() => {
         const handleSessionPaid = (notification) => {
@@ -213,6 +231,15 @@ export default function PaymentPage() {
             // Close waiting modal if visible
             setWaitingModalVisible(false);
             setLoading(false);
+
+            // ✅ Extract order IDs for review
+            // ordersConfirmed from socket is array of objects: [{ id, status, totalPrice }, ...]
+            // Need to extract just the IDs
+            const orderIdsForReview = ordersConfirmed && ordersConfirmed.length > 0
+                ? ordersConfirmed.map(o => o.id)
+                : confirmedOrders.map(o => o.id);
+
+            const hasReviewed = checkIfReviewed(orderIdsForReview);
 
             // Show success modal with auto-redirect
             const successModal = modal.success({
@@ -276,6 +303,33 @@ export default function PaymentPage() {
                             </div>
                         </div>
 
+                        {/* ✅ Smart Review Prompt - Only if NOT reviewed yet */}
+                        {!hasReviewed && (
+                            <div style={{
+                                background: 'linear-gradient(135deg, #fff7e6 0%, #fffbf0 100%)',
+                                padding: '14px 16px',
+                                borderRadius: '12px',
+                                marginBottom: '16px',
+                                border: '1px solid #ffd591',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 12,
+                            }}>
+                                <div style={{
+                                    fontSize: 28,
+                                    lineHeight: 1,
+                                }}>⭐</div>
+                                <div style={{ flex: 1 }}>
+                                    <Text strong style={{ fontSize: 13, display: 'block', color: '#d46b08' }}>
+                                        Chia sẻ trải nghiệm của bạn nhé!
+                                    </Text>
+                                    <Text style={{ fontSize: 11, color: '#fa8c16' }}>
+                                        Chỉ mất 30 giây để đánh giá
+                                    </Text>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Countdown message */}
                         <div style={{
                             textAlign: 'center',
@@ -287,16 +341,64 @@ export default function PaymentPage() {
                         </div>
                     </div>
                 ),
-                okText: 'Về trang chủ',
-                okButtonProps: {
+                okText: hasReviewed ? 'Về trang chủ' : undefined,
+                okButtonProps: hasReviewed ? {
                     style: {
                         background: 'linear-gradient(135deg, #226533 0%, #2d8e47 100%)',
                         border: 'none',
                         borderRadius: '8px',
                         height: '40px',
-                        fontWeight: 600
+                        fontWeight: 600,
+                        width: '100%',
                     }
-                },
+                } : undefined,
+                footer: !hasReviewed ? (
+                    <div style={{ display: 'flex', gap: 10, padding: '8px 0 0' }}>
+                        <Button
+                            size="large"
+                            onClick={() => {
+                                successModal.destroy();
+                                navigate('/cus/reviews', {
+                                    state: { orderIds: orderIdsForReview }
+                                });
+                            }}
+                            style={{
+                                flex: 1,
+                                height: 46,
+                                borderRadius: 10,
+                                fontSize: 14,
+                                fontWeight: 600,
+                                border: '2px solid #fa8c16',
+                                color: '#fa8c16',
+                                background: '#fff',
+                            }}
+                        >
+                            ⭐ Đánh giá
+                        </Button>
+
+                        <Button
+                            type="primary"
+                            size="large"
+                            onClick={() => {
+                                successModal.destroy();
+                                localStorage.removeItem('qr_session');
+                                localStorage.removeItem('cart');
+                                navigate('/cus/homes');
+                            }}
+                            style={{
+                                flex: 1,
+                                height: 46,
+                                borderRadius: 10,
+                                fontSize: 14,
+                                fontWeight: 600,
+                                background: 'linear-gradient(135deg, #226533 0%, #2d8e47 100%)',
+                                border: 'none',
+                            }}
+                        >
+                            Về trang chủ
+                        </Button>
+                    </div>
+                ) : undefined,
                 onOk: () => {
                     // Clear session data
                     localStorage.removeItem('qr_session');
@@ -317,7 +419,7 @@ export default function PaymentPage() {
 
                 // Redirect to home
                 navigate('/cus/homes');
-            }, 30000);
+            }, 3000000);
         };
 
         // Register listener (returns cleanup function)
@@ -332,7 +434,7 @@ export default function PaymentPage() {
                 console.log('🔌 Payment confirmation listener removed');
             }
         };
-    }, [navigate, message, modal]);
+    }, [navigate, message, modal, checkIfReviewed, confirmedOrders]);
 
     // Tính toán
     // ✅ Dùng confirmedTotal thay vì initialTotal để chỉ tính đơn đã xác nhận
