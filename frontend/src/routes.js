@@ -28,11 +28,18 @@ import AdminLayout from "./layouts/AdminLayout";
 import CustomerLayout from "./layouts/CustomerLayout";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 
+import OrderSessionPage from "./page/management/Main/Orders_SessionView";
+
 const routes = [
   // Login page (public - không cần protection)
   {
     path: "/main/login",
     element: <LoginPage />,
+  },
+
+  {
+    path: "/main/order-sessions",
+    element: <OrderSessionPage />,
   },
 
   // Admin routes - Wrapped với ProtectedAdminRoute và AdminLayout
