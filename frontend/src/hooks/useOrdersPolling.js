@@ -33,7 +33,9 @@ export const useOrdersPolling = (interval = 5000, enabled = true) => {
         newOrder.status !== oldOrder.status ||
         newOrder.total_amount !== oldOrder.total_amount ||
         newOrder.items?.length !== oldOrder.items?.length ||
-        newOrder.updated_at !== oldOrder.updated_at
+        newOrder.updated_at !== oldOrder.updated_at ||
+        newOrder.qr_session_id !== oldOrder.qr_session_id ||
+        newOrder.session_status !== oldOrder.session_status
       ) {
         return true
       }
@@ -51,6 +53,8 @@ export const useOrdersPolling = (interval = 5000, enabled = true) => {
       // Transform orders (keep all fields needed by UI)
       const transformedOrders = fetchedOrders.map((order) => ({
         id: order.id,
+        qr_session_id: order.qr_session_id, // ✅ Add this
+        session_status: order.session_status, // ✅ Add this
         table_id: order.table_id,
         table_number: order.table_number,
         customer_phone: order.customer_phone,

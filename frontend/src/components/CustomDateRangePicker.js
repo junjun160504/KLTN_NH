@@ -36,6 +36,7 @@ const CustomDateRangePicker = ({ value, onChange, className }) => {
 
     // Preset shortcuts
     const presets = [
+        { key: 'all', label: 'Tất cả', getValue: () => null },
         { key: 'today', label: 'Hôm nay', getValue: () => [dayjs().startOf('day'), dayjs().endOf('day')] },
         { key: 'yesterday', label: 'Hôm qua', getValue: () => [dayjs().subtract(1, 'day').startOf('day'), dayjs().subtract(1, 'day').endOf('day')] },
         { key: 'last7days', label: '7 ngày qua', getValue: () => [dayjs().subtract(6, 'day').startOf('day'), dayjs().endOf('day')] },
@@ -66,6 +67,10 @@ const CustomDateRangePicker = ({ value, onChange, className }) => {
         if (preset.getValue) {
             const newRange = preset.getValue();
             setInternalValue(newRange);
+            // Nếu chọn "Tất cả" (null), apply ngay lập tức
+            if (newRange === null) {
+                onChange?.(null);
+            }
         }
     };
 
@@ -204,6 +209,11 @@ const CustomDateRangePicker = ({ value, onChange, className }) => {
                     if (dates) {
                         setInternalValue(dates);
                         setSelectedPreset('custom');
+                    } else {
+                        // Khi clear (dates = null)
+                        setInternalValue(null);
+                        setSelectedPreset('all');
+                        onChange?.(null);
                     }
                 }}
                 className={`custom-range-picker ${className || ''}`}
@@ -211,9 +221,10 @@ const CustomDateRangePicker = ({ value, onChange, className }) => {
                 renderExtraFooter={renderExtraFooter}
                 showTime={false}
                 format="DD/MM/YYYY"
-                placeholder={['Ngày bắt đầu', 'Ngày kết thúc']}
+                placeholder={['Tất cả thời gian', 'Tất cả thời gian']}
                 style={{ width: 'auto' }}
                 dropdownClassName="custom-date-range-dropdown"
+                allowClear
                 styles={{
                     popup: {
                         root: {

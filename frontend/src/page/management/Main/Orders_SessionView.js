@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import AppHeader from '../../../components/AppHeader'
 import AppSidebar from '../../../components/AppSidebar'
 import CustomDateRangePicker from '../../../components/CustomDateRangePicker'
-import OrderList from '../../../components/management/OrderList'
 import { useOrdersPolling } from '../../../hooks/useOrdersPolling'
 import useSidebarCollapse from '../../../hooks/useSidebarCollapse'
 import {
@@ -23,7 +22,7 @@ import {
   Pagination,
   ConfigProvider,
   Drawer,
-  Typography
+  InputNumber
 } from 'antd'
 import vi_VN from 'antd/lib/locale/vi_VN'
 import {
@@ -35,7 +34,10 @@ import {
   ShopOutlined,
   EyeOutlined,
   PlusOutlined,
-  CloseOutlined
+  CloseCircleOutlined,
+  SaveOutlined,
+  EditOutlined,
+  DeleteOutlined
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import isBetween from 'dayjs/plugin/isBetween'
@@ -48,7 +50,6 @@ const REACT_APP_API_URL = process.env.REACT_APP_API_URL || 'http://localhost:800
 
 const { Content } = Layout
 const { Option } = Select
-const { Text, Title } = Typography
 
 // ==================== STATUS MAPPING ====================
 const STATUS_MAP = {
@@ -74,13 +75,15 @@ const STATUS_COLORS = {
 }
 
 const SESSION_STATUS_MAP = {
-  ACTIVE: 'Hoạt động',
-  ENDED: 'Kết thúc'
+  ACTIVE: 'Đang mở',
+  ENDED: 'Đã đóng',
+  COMPLETED: 'Đã đóng'
 }
 
 const SESSION_STATUS_COLORS = {
   ACTIVE: 'green',
-  ENDED: 'default'
+  ENDED: 'default',
+  COMPLETED: 'default'
 }
 
 function OrderSessionPage() {
@@ -105,9 +108,13 @@ function OrderSessionPage() {
   const [expandedRowKeys, setExpandedRowKeys] = useState([])
 
   // Order panel state
-  const [orderPanelOpen, setOrderPanelOpen] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
-  const [editingNotes, setEditingNotes] = useState({})
+  const [loadingDetail, setLoadingDetail] = useState(false)
+
+  // Edit item states
+  const [editingItemId, setEditingItemId] = useState(null)
+  const [editingQuantity, setEditingQuantity] = useState({})
+  const [updatingItemId, setUpdatingItemId] = useState(null)
 
   // ==================== POLLING HOOK ====================
   const { orders: pollingOrders, loading, refresh: refreshOrders } = useOrdersPolling(5000, true)
@@ -118,16 +125,20 @@ function OrderSessionPage() {
     const sessionMap = new Map()
 
     pollingOrders.forEach((order) => {
+      // Use qr_session_id directly (number) or create fake key for grouping
       const sessionId = order.qr_session_id || `no-session-${order.id}`
+      // Store the real numeric session ID (or null if no session)
+      const realSessionId = order.qr_session_id || null
+
       // Format: #S0123 (pad to 4 digits)
-      const sessionKey = sessionId.toString().startsWith('no-session-')
+      const sessionKey = String(sessionId).startsWith('no-session-')
         ? `#S${String(order.id).padStart(4, '0')}`
         : `#S${String(sessionId).padStart(4, '0')}`
 
       if (!sessionMap.has(sessionId)) {
         sessionMap.set(sessionId, {
           key: sessionKey,
-          sessionId: sessionId,
+          sessionId: realSessionId, // Store real session ID (number or null)
           sessionCode: sessionKey, // Format: #S0123
           tableId: order.table_id,
           tableNumber: order.table_number,
@@ -179,7 +190,7 @@ function OrderSessionPage() {
         ? true
         : session.orders.some(order => order.status === filterStatus)
 
-      // Date range filter
+      // Date range filter - null = Tất cả
       let timeMatch = true
       if (dateRange && dateRange.length === 2) {
         const [start, end] = dateRange
@@ -203,10 +214,30 @@ function OrderSessionPage() {
 
   // ==================== STATISTICS ====================
   const statistics = useMemo(() => {
-    const totalSessions = sessions.length
-    const activeSessions = sessions.filter(s => s.sessionStatus === 'ACTIVE').length
-    const totalOrders = pollingOrders.length
-    const revenue = pollingOrders
+    // Filter sessions by date range first
+    let sessionsInRange = sessions
+    if (dateRange && dateRange.length === 2) {
+      const [start, end] = dateRange
+      sessionsInRange = sessions.filter(session => {
+        const created = dayjs(session.createdAt)
+        return created.isBetween(start, end, null, '[]')
+      })
+    }
+
+    // Filter orders by date range
+    let ordersInRange = pollingOrders
+    if (dateRange && dateRange.length === 2) {
+      const [start, end] = dateRange
+      ordersInRange = pollingOrders.filter(order => {
+        const created = dayjs(order.created_at)
+        return created.isBetween(start, end, null, '[]')
+      })
+    }
+
+    const totalSessions = sessionsInRange.length
+    const activeSessions = sessionsInRange.filter(s => s.sessionStatus === 'ACTIVE').length
+    const totalOrders = ordersInRange.length
+    const revenue = ordersInRange
       .filter(o => o.status === 'PAID')
       .reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0)
 
@@ -216,9 +247,256 @@ function OrderSessionPage() {
       totalOrders,
       revenue
     }
-  }, [sessions, pollingOrders])
+  }, [sessions, pollingOrders, dateRange])
 
   // ==================== API FUNCTIONS ====================
+
+  // Generate HTML template cho kitchen bill (MUST BE BEFORE printKitchenBill)
+  const getKitchenBillHTML = useCallback((order, items) => {
+    const now = new Date().toLocaleString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+
+    const totalItems = items.length
+    const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0)
+
+    return `
+      <!DOCTYPE html>
+      <html lang="vi">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Báo bếp - ${order.table}</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <style>
+            @page { 
+              size: 80mm auto; 
+              margin: 0; 
+            }
+            body { 
+              margin: 0;
+              padding: 0;
+              font-family: 'Courier New', monospace;
+            }
+            @media print {
+              body { 
+                width: 80mm;
+                margin: 0 auto;
+              }
+            }
+          </style>
+        </head>
+        <body class="bg-white p-4">
+          <!-- Header -->
+          <div class="text-center border-b-2 border-dashed border-gray-800 pb-3 mb-3">
+            <h1 class="text-2xl font-bold mb-1">🍽️ NHÀ HÀNG</h1>
+            <h2 class="text-xl font-bold">PHIẾU BÁO BẾP</h2>
+          </div>
+
+          <!-- Order Info -->
+          <div class="space-y-2 mb-3 text-sm">
+            <div class="flex justify-between items-center">
+              <span class="font-semibold">Bàn:</span>
+              <span class="text-xl font-bold">${order.table}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="font-semibold">Đơn hàng:</span>
+              <span class="font-mono">${order.code}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="font-semibold">Thời gian:</span>
+              <span>${now}</span>
+            </div>
+          </div>
+
+          <!-- Items List -->
+          <div class="space-y-3 mb-3">
+            ${items.map(item => `
+              <div class="border-b border-gray-300 pb-3">
+                <div class="flex justify-between items-start mb-1">
+                  <div class="font-bold text-base flex-1 pr-2">${item.name}</div>
+                  <div class="text-2xl font-bold whitespace-nowrap">x${item.quantity}</div>
+                </div>
+                ${item.note ? `
+                  <div class="text-sm italic text-gray-600 mt-2 pl-3 border-l-2 border-orange-400">
+                    📝 ${item.note}
+                  </div>
+                ` : ''}
+              </div>
+            `).join('')}
+          </div>
+
+          <!-- Footer -->
+          <div class="border-t-2 border-dashed border-gray-800 pt-3 text-center text-sm">
+            <div class="mb-2">━━━━━━━━━━━━━━━━━━━━</div>
+            <div class="font-bold">
+              Tổng: ${totalItems} món - ${totalQuantity} phần
+            </div>
+            <div class="mt-3 text-xs text-gray-600">
+              In lúc: ${now}
+            </div>
+          </div>
+        </body>
+      </html>
+    `
+  }, [])
+
+  // Print kitchen bill using iframe (same as Orders.js)
+  const printKitchenBill = useCallback((order, items) => {
+    if (!order || !items || items.length === 0) {
+      message.error('Không có thông tin đơn hàng để in!')
+      return
+    }
+
+    // Tạo iframe ẩn
+    const iframe = document.createElement('iframe')
+    iframe.style.position = 'fixed'
+    iframe.style.right = '0'
+    iframe.style.bottom = '0'
+    iframe.style.width = '0'
+    iframe.style.height = '0'
+    iframe.style.border = 'none'
+
+    document.body.appendChild(iframe)
+
+    const iframeDoc = iframe.contentWindow.document
+    iframeDoc.open()
+    iframeDoc.write(getKitchenBillHTML(order, items))
+    iframeDoc.close()
+
+    // Trigger print sau khi load xong
+    iframe.onload = () => {
+      setTimeout(() => {
+        iframe.contentWindow.focus()
+        iframe.contentWindow.print()
+
+        // Xóa iframe sau khi in
+        setTimeout(() => {
+          document.body.removeChild(iframe)
+        }, 1000)
+      }, 500)
+    }
+  }, [getKitchenBillHTML, message])
+
+  // Fetch chi tiết đơn hàng theo ID
+  const fetchOrderDetails = useCallback(async (orderId) => {
+    try {
+      setLoadingDetail(true)
+      const response = await axios.get(`${REACT_APP_API_URL}/orders/${orderId}`)
+
+      if (response.data.status === 200) {
+        const order = response.data.data
+
+        // Transform data để match với UI format
+        const transformedOrder = {
+          key: order.id.toString(),
+          id: order.id,
+          code: `ORD-${String(order.id).padStart(4, '0')}`,
+          table: order.table_number ? `Bàn ${order.table_number}` : 'N/A',
+          tableNumber: order.table_number,
+          tableId: order.table_id,
+          qrSessionId: order.qr_session_id,
+          sessionStatus: order.session_status,
+          phone: order.customer_phone || '-',
+          point: order.loyalty_points_used || 0,
+          // API trả về total_price (string), convert sang number
+          totalAmount: parseFloat(order.total_price || 0),
+          total: `${parseFloat(order.total_price || 0).toLocaleString('vi-VN')}đ`,
+          status: order.status,
+          statusVI: STATUS_MAP.EN_TO_VI[order.status] || order.status,
+          createdAt: order.created_at || dayjs().toISOString(),
+          updatedAt: order.updated_at,
+          // API trả về unit_price (string), cần convert sang number
+          items: (order.items || []).map(item => ({
+            ...item,
+            id: item.order_item_id || item.id,
+            order_item_id: item.order_item_id || item.id,
+            name: item.menu_item_name || item.name || 'N/A',
+            imageUrl: item.image_url || '',
+            price: parseFloat(item.unit_price || 0),
+            quantity: item.quantity || 0
+          })),
+          note: order.note || '',
+          rawData: order
+        }
+
+        setSelectedOrder(transformedOrder)
+        return transformedOrder
+      }
+    } catch (error) {
+      console.error('[Orders] Fetch detail error:', error)
+
+      if (error.response?.status === 404) {
+        message.error('Không tìm thấy đơn hàng')
+      } else {
+        message.error('Không thể tải chi tiết đơn hàng')
+      }
+
+      setSelectedOrder(null)
+      return null
+    } finally {
+      setLoadingDetail(false)
+    }
+  }, [message])
+
+  // Cập nhật số lượng món trong đơn
+  const updateItemQuantityAPI = useCallback(async (orderId, orderItemId, quantity) => {
+    try {
+      setUpdatingItemId(orderItemId)
+      const response = await axios.put(
+        `${REACT_APP_API_URL}/orders/${orderId}/items/${orderItemId}`,
+        { quantity }
+      )
+
+      if (response.data.status === 200) {
+        message.success('Cập nhật số lượng thành công!')
+        await fetchOrderDetails(orderId)
+        refreshOrders()
+        return true
+      }
+    } catch (error) {
+      console.error('[Orders] Update item quantity error:', error)
+      const errorMsg = error.response?.data?.message || 'Không thể cập nhật số lượng'
+      message.error(errorMsg)
+      return false
+    } finally {
+      setUpdatingItemId(null)
+    }
+  }, [fetchOrderDetails, refreshOrders, message])
+
+  // Xóa món khỏi đơn
+  const removeItemAPI = useCallback(async (orderId, orderItemId) => {
+    try {
+      const response = await axios.delete(
+        `${REACT_APP_API_URL}/orders/${orderId}/items/${orderItemId}`
+      )
+
+      if (response.data.status === 200) {
+        message.success('Xóa món thành công!')
+
+        // Nếu xóa món cuối cùng, order sẽ bị xóa
+        if (response.data.data?.order_deleted) {
+          message.info('Đơn hàng đã bị xóa do không còn món nào')
+          setSelectedOrder(null)
+        } else {
+          await fetchOrderDetails(orderId)
+        }
+
+        refreshOrders()
+        return true
+      }
+    } catch (error) {
+      console.error('[Orders] Remove item error:', error)
+      const errorMsg = error.response?.data?.message || 'Không thể xóa món'
+      message.error(errorMsg)
+      return false
+    }
+  }, [fetchOrderDetails, refreshOrders, message])
   const cancelOrderAPI = useCallback(async (orderId, reason = '') => {
     try {
       const response = await axios.put(
@@ -239,11 +517,11 @@ function OrderSessionPage() {
     }
   }, [refreshOrders, message])
 
-  const handleViewDetail = useCallback((order) => {
-    setSelectedOrder(order.rawData)
-    setOrderPanelOpen(true)
-    setEditingNotes({})
-  }, [])
+  const handleViewDetail = useCallback(async (order) => {
+    await fetchOrderDetails(order.id)
+    setEditingItemId(null)
+    setEditingQuantity({})
+  }, [fetchOrderDetails])
 
   const handlePaymentSession = useCallback((session) => {
     const orders = session.orders
@@ -410,13 +688,14 @@ function OrderSessionPage() {
 
           message.success(`Thanh toán thành công ${confirmedOrders.length} đơn hàng!`)
 
-          // End session if all orders are paid/cancelled
-          if (session.sessionStatus === 'ACTIVE') {
+          // End session only if it has a real QR session ID (number)
+          if (session.sessionId !== null && session.sessionStatus === 'ACTIVE') {
             try {
               await axios.put(`${REACT_APP_API_URL}/qr-sessions/${session.sessionId}/end`)
               message.success('Phiên đã kết thúc!')
             } catch (error) {
               console.error('[Sessions] End session error:', error)
+              message.error('Không thể kết thúc phiên QR!')
             }
           }
 
@@ -430,79 +709,108 @@ function OrderSessionPage() {
   }, [modal, message, refreshOrders])
 
   // ==================== ORDER ITEM ACTIONS (Simplified - read-only for session view) ====================
-  const handleIncreaseQuantity = async (orderItemId) => {
-    message.info('Chức năng chỉnh sửa món ăn chỉ khả dụng trong trang Quản lý bàn')
-  }
-
-  const handleDecreaseQuantity = async (orderItemId) => {
-    message.info('Chức năng chỉnh sửa món ăn chỉ khả dụng trong trang Quản lý bàn')
-  }
-
-  const handleRemoveItem = async (orderItemId) => {
-    message.info('Chức năng xóa món ăn chỉ khả dụng trong trang Quản lý bàn')
-  }
-
-  const handleSaveNote = async (orderItemId, item) => {
-    message.info('Chức năng ghi chú chỉ khả dụng trong trang Quản lý bàn')
-  }
-
   const handleConfirmOrder = async (orderId) => {
     try {
+      // Get order info for printing before confirming
+      const orderToPrint = selectedOrder || pollingOrders.find(o => o.id === orderId)
+
       await axios.put(`${REACT_APP_API_URL}/staff/orders/${orderId}/confirm`)
       message.success('Đã xác nhận đơn hàng!')
+
+      // Print kitchen bill after confirming
+      if (orderToPrint && orderToPrint.items && orderToPrint.items.length > 0) {
+        const orderForPrint = {
+          table: orderToPrint.table_number ? `Bàn ${orderToPrint.table_number}` : orderToPrint.table || 'N/A',
+          code: `ORD-${String(orderId).padStart(4, '0')}`
+        }
+        printKitchenBill(orderForPrint, orderToPrint.items)
+      }
+
       refreshOrders()
+      // Refresh detail if drawer is open
+      if (selectedOrder && selectedOrder.id === orderId) {
+        await fetchOrderDetails(orderId)
+      }
     } catch (err) {
       console.error('Failed to confirm order:', err)
       message.error('Xác nhận đơn hàng thất bại!')
     }
   }
 
-  const handleCancelSingleOrder = async (orderId) => {
-    modal.confirm({
-      title: 'Xác nhận hủy đơn hàng',
-      content: `Bạn có chắc chắn muốn hủy đơn hàng này?`,
-      okText: 'Hủy đơn',
-      okType: 'danger',
-      cancelText: 'Quay lại',
-      onOk: async () => {
-        try {
-          await axios.put(`${REACT_APP_API_URL}/orders/${orderId}/cancel`, {
-            reason: 'Admin hủy đơn từ quản lý phiên'
-          })
-          message.success('Đã hủy đơn hàng thành công!')
-          refreshOrders()
-        } catch (err) {
-          console.error('Failed to cancel order:', err)
-          message.error('Hủy đơn hàng thất bại!')
+  // Bắt đầu edit số lượng món
+  const handleStartEditItem = useCallback((item) => {
+    setEditingItemId(item.id)
+    setEditingQuantity({ [item.id]: item.quantity })
+  }, [])
+
+  // Lưu số lượng mới
+  const handleSaveItemQuantity = useCallback(async (orderId, item) => {
+    const newQuantity = editingQuantity[item.id]
+
+    if (newQuantity === undefined || newQuantity === item.quantity) {
+      setEditingItemId(null)
+      return
+    }
+
+    if (newQuantity < 0) {
+      message.error('Số lượng không được âm!')
+      return
+    }
+
+    if (newQuantity === 0) {
+      modal.confirm({
+        title: 'Xác nhận xóa món',
+        content: `Số lượng = 0 sẽ xóa "${item.name}" khỏi đơn hàng. Bạn có chắc chắn?`,
+        okText: 'Xóa',
+        cancelText: 'Hủy',
+        okButtonProps: { danger: true },
+        onOk: async () => {
+          const success = await removeItemAPI(orderId, item.id)
+          if (success) {
+            setEditingItemId(null)
+            setEditingQuantity({})
+          }
         }
+      })
+      return
+    }
+
+    const success = await updateItemQuantityAPI(orderId, item.id, newQuantity)
+    if (success) {
+      setEditingItemId(null)
+      setEditingQuantity({})
+    }
+  }, [editingQuantity, updateItemQuantityAPI, removeItemAPI, modal, message])
+
+  // Hủy edit
+  const handleCancelEditItem = useCallback(() => {
+    setEditingItemId(null)
+    setEditingQuantity({})
+  }, [])
+
+  // Xóa món khỏi đơn
+  const handleRemoveItem = useCallback((orderId, item) => {
+    const orderItemId = item.order_item_id || item.id
+
+    if (!orderItemId) {
+      message.error('Không tìm thấy ID của món ăn!')
+      return
+    }
+
+    modal.confirm({
+      title: 'Xác nhận xóa món',
+      content: `Bạn có chắc chắn muốn xóa "${item.name}" khỏi đơn hàng?`,
+      okText: 'Xóa',
+      cancelText: 'Hủy',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        await removeItemAPI(orderId, orderItemId)
+      },
+      onCancel: () => {
+        console.log('Cancel remove item')
       }
     })
-  }
-
-  // Format date helper
-  const formatDate = (dateStr) => {
-    if (!dateStr) return ''
-    const date = new Date(dateStr)
-    return date?.toLocaleString('vi-VN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
-
-  // Get order status tag
-  const getOrderStatusTag = (status) => {
-    const statusMap = {
-      NEW: { text: 'Chờ xác nhận', color: 'blue' },
-      IN_PROGRESS: { text: 'Đang phục vụ', color: 'orange' },
-      PAID: { text: 'Đã thanh toán', color: 'purple' },
-      CANCELLED: { text: 'Đã hủy', color: 'red' }
-    }
-    const config = statusMap[status] || { text: status, color: 'default' }
-    return <Tag color={config.color}>{config.text}</Tag>
-  }
+  }, [removeItemAPI, modal, message])
 
   // Reset về trang 1 khi thay đổi filters
   useEffect(() => {
@@ -699,7 +1007,7 @@ function OrderSessionPage() {
               icon={<EyeOutlined />}
               onClick={() => handleViewDetail(order)}
             >
-              Xem chi tiết
+              {/* Xem chi tiết */}
             </Button>
           )}
         </Space>
@@ -726,74 +1034,53 @@ function OrderSessionPage() {
     )
   }
 
-  // ==================== ORDER PANEL COMPONENT ====================
-  const OrderPanel = () => {
+  // ==================== RENDER DRAWER FOOTER ====================
+
+  const renderDrawerFooter = () => {
     if (!selectedOrder) return null
+    const { status, id } = selectedOrder
 
-    // Format order as array for OrderList component
-    const orders = [selectedOrder]
+    if (status === 'CANCELLED' || status === 'PAID') {
+      return <Button onClick={() => setSelectedOrder(null)}>Đóng</Button>
+    }
 
-    return (
-      <div
-        style={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column'
-        }}
-      >
-        {/* Header */}
-        <div
-          style={{
-            padding: '16px',
-            borderBottom: '1px solid #f0f0f0',
-            backgroundColor: '#fff'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-                <Title level={4} style={{ margin: 0, fontSize: '18px' }}>
-                  Đơn hàng {selectedOrder.code || `ORD-${String(selectedOrder.id).padStart(4, '0')}`}
-                </Title>
-                <Tag color={STATUS_COLORS[selectedOrder.status]}>
-                  {STATUS_MAP.EN_TO_VI[selectedOrder.status] || selectedOrder.status}
-                </Tag>
-              </div>
-              <Text type="secondary" style={{ fontSize: '12px' }}>
-                Bàn {selectedOrder.table_number} • {selectedOrder.items?.length || 0} món
-              </Text>
-            </div>
+    if (status === 'NEW') {
+      return (
+        <Space className='w-full justify-between'>
+          <Popconfirm
+            title='Hủy đơn hàng'
+            description='Bạn có chắc chắn muốn hủy đơn hàng này?'
+            onConfirm={() => cancelOrderAPI(id, 'Hủy từ chi tiết đơn hàng')}
+            okText='Hủy đơn'
+            cancelText='Không'
+            okButtonProps={{ danger: true }}
+          >
+            <Button danger icon={<CloseCircleOutlined />}>
+              Hủy đơn
+            </Button>
+          </Popconfirm>
+          <Space>
             <Button
-              type="text"
-              icon={<CloseOutlined />}
-              onClick={() => {
-                setOrderPanelOpen(false)
-                setSelectedOrder(null)
-                setEditingNotes({})
-              }}
-            />
-          </div>
-        </div>
+              type='primary'
+              onClick={() => handleConfirmOrder(id)}
+            >
+              Xác nhận đơn
+            </Button>
+            <Button onClick={() => setSelectedOrder(null)}>Đóng</Button>
+          </Space>
+        </Space>
+      )
+    }
 
-        {/* Order Content */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
-          <OrderList
-            orders={orders}
-            editingNotes={editingNotes}
-            setEditingNotes={setEditingNotes}
-            handleIncreaseQuantity={handleIncreaseQuantity}
-            handleDecreaseQuantity={handleDecreaseQuantity}
-            handleRemoveItem={handleRemoveItem}
-            handleSaveNote={handleSaveNote}
-            handleConfirmOrder={handleConfirmOrder}
-            handleCancelSingleOrder={handleCancelSingleOrder}
-            getOrderStatusTag={getOrderStatusTag}
-            formatDate={formatDate}
-          />
-        </div>
-      </div>
-    )
+    if (status === 'IN_PROGRESS' || status === 'DONE') {
+      return (
+        <Space>
+          <Button onClick={() => setSelectedOrder(null)}>Đóng</Button>
+        </Space>
+      )
+    }
+
+    return <Button onClick={() => setSelectedOrder(null)}>Đóng</Button>
   }
 
   // ==================== RENDER ====================
@@ -976,31 +1263,235 @@ function OrderSessionPage() {
             </ConfigProvider>
           </Spin>
 
-          {/* Order Detail Panel */}
+          {/* Drawer Chi tiết đơn hàng */}
           <Drawer
-            title={null}
-            placement="right"
-            width={480}
-            open={orderPanelOpen}
+            title={
+              <div className='flex items-center justify-between'>
+                <span className='text-base font-semibold'>{selectedOrder?.code || ''}</span>
+                {selectedOrder && <StatusBadge status={selectedOrder.status} />}
+              </div>
+            }
+            open={!!selectedOrder}
             onClose={() => {
-              setOrderPanelOpen(false)
               setSelectedOrder(null)
-              setEditingNotes({})
+              setEditingItemId(null)
+              setEditingQuantity({})
             }}
-            closable={false}
-            mask={true}
-            maskClosable={true}
-            bodyStyle={{ padding: 0, height: '100%', backgroundColor: '#fff' }}
-            styles={{
-              body: {
-                display: 'flex',
-                flexDirection: 'column',
-                height: '100%',
-                backgroundColor: '#fff'
-              }
-            }}
+            width={640}
+            footer={!loadingDetail && renderDrawerFooter()}
           >
-            <OrderPanel />
+            {loadingDetail ? (
+              <Spin spinning={true} tip='Đang tải chi tiết đơn hàng...'>
+                <div style={{ minHeight: 200 }} />
+              </Spin>
+            ) : selectedOrder ? (
+              <>
+                {/* Thông tin tổng quan - Simple Card */}
+                <Card size='small' className='mb-3'>
+                  <Row gutter={[12, 6]}>
+                    <Col xs={12} sm={8}>
+                      <div className='text-xs text-gray-500 mb-0.5'>Bàn</div>
+                      <div className='font-semibold text-sm'>{selectedOrder.table}</div>
+                    </Col>
+                    <Col xs={12} sm={8}>
+                      <div className='text-xs text-gray-500 mb-0.5'>Số điện thoại</div>
+                      <div className='text-sm'>{selectedOrder.phone}</div>
+                    </Col>
+                    <Col xs={24} sm={8}>
+                      <div className='text-xs text-gray-500 mb-0.5'>Thời gian</div>
+                      <div className='text-sm'>
+                        {dayjs(selectedOrder.createdAt).format('HH:mm - DD/MM/YYYY')}
+                      </div>
+                    </Col>
+                  </Row>
+                  {selectedOrder.note && (
+                    <div className='mt-2 pt-2 border-t border-gray-200'>
+                      <div className='text-xs text-gray-500 mb-1'>Ghi chú đơn hàng</div>
+                      <div className='text-xs text-orange-600 italic'>{selectedOrder.note}</div>
+                    </div>
+                  )}
+                </Card>
+
+                {/* Danh sách món ăn - Main Content */}
+                <div className='mb-3'>
+                  <div className='flex items-center justify-between mb-2'>
+                    <h3 className='text-sm font-semibold text-gray-800 flex items-center'>
+                      <ShoppingCartOutlined className='mr-1.5 text-blue-600 text-base' />
+                      Danh sách món ({selectedOrder.items.length})
+                    </h3>
+                  </div>
+
+                  <div className='space-y-2'>
+                    {selectedOrder.items.map((item, index) => {
+                      const isEditing = editingItemId === item.id
+                      const isUpdating = updatingItemId === item.id
+                      const canEdit = selectedOrder.status === 'NEW'
+
+                      return (
+                        <Card
+                          key={item.id || index}
+                          size='small'
+                          hoverable={!isEditing}
+                          className={`border border-gray-200 ${isEditing ? 'border-blue-400 shadow-md' : 'hover:border-blue-300 hover:shadow-sm'} transition-all duration-200`}
+                        >
+                          <div className='flex gap-2.5'>
+                            {/* Image */}
+                            <div className='flex-shrink-0'>
+                              {item.imageUrl ? (
+                                <img
+                                  src={item.imageUrl}
+                                  alt={item.name}
+                                  className='w-16 h-16 object-cover rounded-md border border-gray-200'
+                                  onError={(e) => {
+                                    e.target.style.display = 'none'
+                                    e.target.nextSibling.style.display = 'flex'
+                                  }}
+                                />
+                              ) : null}
+                              <div
+                                className='w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-md flex items-center justify-center'
+                                style={{ display: item.imageUrl ? 'none' : 'flex' }}
+                              >
+                                <ShoppingCartOutlined className='text-xl text-gray-400' />
+                              </div>
+                            </div>
+
+                            {/* Content */}
+                            <div className='flex-1 min-w-0'>
+                              <div className='flex justify-between items-start mb-1.5'>
+                                <h4 className='font-semibold text-gray-800 text-sm leading-tight pr-2'>
+                                  {item.name}
+                                </h4>
+                                <div className='text-right flex-shrink-0'>
+                                  <div className='text-red-600 font-bold text-base whitespace-nowrap'>
+                                    {((item.price || 0) * (isEditing ? (editingQuantity[item.id] || item.quantity) : item.quantity || 0)).toLocaleString('vi-VN')}đ
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className='flex items-center gap-3 text-xs mb-2'>
+                                <div className='flex items-center gap-1'>
+                                  <span className='text-gray-500'>SL:</span>
+                                  {isEditing ? (
+                                    <InputNumber
+                                      size='small'
+                                      min={0}
+                                      max={999}
+                                      value={editingQuantity[item.id]}
+                                      onChange={(val) => setEditingQuantity({ ...editingQuantity, [item.id]: val })}
+                                      className='w-16'
+                                      disabled={isUpdating}
+                                    />
+                                  ) : (
+                                    <span className='font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded text-xs'>
+                                      {item.quantity || 0}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className='flex items-center gap-1'>
+                                  <span className='text-gray-500'>Đơn giá:</span>
+                                  <span className='font-medium text-gray-700'>
+                                    {(item.price || 0).toLocaleString('vi-VN')}đ
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Action buttons - Chỉ hiển thị khi status = NEW */}
+                              {canEdit && (
+                                <div className='flex gap-1 mt-2'>
+                                  {isEditing ? (
+                                    <>
+                                      <Button
+                                        type='primary'
+                                        size='small'
+                                        icon={<SaveOutlined />}
+                                        onClick={() => handleSaveItemQuantity(selectedOrder.id, item)}
+                                        loading={isUpdating}
+                                        className='text-xs px-2'
+                                      >
+                                        Lưu
+                                      </Button>
+                                      <Button
+                                        size='small'
+                                        onClick={handleCancelEditItem}
+                                        disabled={isUpdating}
+                                        className='text-xs px-2'
+                                      >
+                                        Hủy
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Button
+                                        type='link'
+                                        size='small'
+                                        icon={<EditOutlined />}
+                                        onClick={() => handleStartEditItem(item)}
+                                        className='text-xs px-2'
+                                      >
+                                        Sửa SL
+                                      </Button>
+                                      <Button
+                                        danger
+                                        type='link'
+                                        size='small'
+                                        icon={<DeleteOutlined />}
+                                        onClick={() => handleRemoveItem(selectedOrder.id, item)}
+                                        className='text-xs px-2'
+                                      >
+                                        Xóa
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+
+                              {item.note && (
+                                <div className='mt-1.5 pt-1.5 border-t border-gray-100'>
+                                  <div className='text-xs text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded inline-flex items-center gap-1'>
+                                    <span className='font-medium'>Ghi chú:</span>
+                                    <span>{item.note}</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </Card>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Tổng tiền - Summary Card */}
+                <Card className='mb-2'>
+                  <div className='space-y-2'>
+                    {selectedOrder.point > 0 && (
+                      <div className='flex justify-between items-center pb-2 border-b'>
+                        <span className='text-xs text-gray-600'>Điểm tích lũy sử dụng</span>
+                        <span className='font-semibold text-sm text-orange-600'>
+                          -{selectedOrder.point} điểm
+                        </span>
+                      </div>
+                    )}
+                    <div className='flex justify-between items-center'>
+                      <span className='text-base font-bold'>Tổng thanh toán</span>
+                      <span className='text-2xl font-bold' style={{ color: '#226533' }}>
+                        {selectedOrder.total}
+                      </span>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Meta info - Compact */}
+                {selectedOrder.updatedAt && (
+                  <div className='mt-2 text-center'>
+                    <span className='text-xs text-gray-400'>
+                      Cập nhật lần cuối: {dayjs(selectedOrder.updatedAt).format('HH:mm DD/MM/YYYY')}
+                    </span>
+                  </div>
+                )}
+              </>
+            ) : null}
           </Drawer>
         </Content>
       </Layout>

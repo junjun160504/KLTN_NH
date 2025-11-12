@@ -519,7 +519,9 @@ export async function getAllOrders(filters = {}) {
   let sql = `
     SELECT 
       o.*,
+      o.qr_session_id,
       qs.table_id,
+      qs.status as session_status,
       t.table_number,
       COUNT(oi.id) as total_items
     FROM orders o
@@ -579,8 +581,26 @@ export async function getAllOrders(filters = {}) {
 
   const [[{ total }]] = await pool.query(countSql, countParams);
 
+  // Fetch items for each order
+  const ordersWithItems = await Promise.all(
+    orders.map(async (order) => {
+      const [items] = await pool.query(
+        `SELECT 
+          oi.*, 
+          mi.name as menu_item_name, 
+          mi.image_url
+         FROM order_items oi
+         JOIN menu_items mi ON oi.menu_item_id = mi.id
+         WHERE oi.order_id = ?
+         ORDER BY oi.id ASC`,
+        [order.id]
+      );
+      return { ...order, items };
+    })
+  );
+
   return {
-    orders,
+    orders: ordersWithItems,
     pagination: {
       total,
       limit,

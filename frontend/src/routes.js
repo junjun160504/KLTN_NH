@@ -38,8 +38,8 @@ const routes = [
   },
 
   {
-    path: "/main/order-sessions",
-    element: <OrderSessionPage />,
+    path: "/main/order-old",
+    element: <OrderPage />,
   },
 
   // Admin routes - Wrapped với ProtectedAdminRoute và AdminLayout
@@ -55,7 +55,7 @@ const routes = [
     path: "/main/orders",
     element: (
       <ProtectedAdminRoute>
-        <AdminLayout><OrderPage /></AdminLayout>
+        <AdminLayout><OrderSessionPage /></AdminLayout>
       </ProtectedAdminRoute>
     ),
   },
