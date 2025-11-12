@@ -1,0 +1,108 @@
+# ========================================
+# ROOT GITIGNORE - KLTN_NH Project
+# ========================================
+
+# Environment Variables (CRITICAL - NEVER COMMIT!)
+.env
+.env.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.env.production
+.env.production.local
+*.env
+
+# Node modules
+node_modules/
+*/node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# Build outputs
+dist/
+build/
+out/
+*/build/
+*/dist/
+
+# Coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+
+# Package manager locks (optional - comment out if you want to commit)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Uploads (if you have user uploads)
+uploads/
+public/uploads/
+
+# Documentation (if auto-generated)
+# docs/
+
+# ========================================
+# Project specific
+# ========================================
+
+# QR codes generated
+backend/public/qr/*.png
+!backend/public/qr/.gitkeep
+
+# Frontend specific
+frontend/build/
+frontend/.env
+
+# Backend specific  
+backend/.env
+backend/node_modules/
+
+# Database backups
+database/backups/
+*.sql.backup
+
+# Test files (optional)
+# *.test.js
+# *.spec.js
