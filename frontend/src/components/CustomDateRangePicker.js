@@ -36,7 +36,14 @@ const CustomDateRangePicker = ({ value, onChange, className }) => {
 
     // Preset shortcuts
     const presets = [
-        { key: 'all', label: 'Tất cả', getValue: () => null },
+        {
+            key: 'all',
+            label: 'Tất cả',
+            getValue: () => [
+                dayjs().subtract(1, 'year').startOf('day'), // 1 năm trước
+                dayjs().endOf('day') // Hôm nay
+            ]
+        },
         { key: 'today', label: 'Hôm nay', getValue: () => [dayjs().startOf('day'), dayjs().endOf('day')] },
         { key: 'yesterday', label: 'Hôm qua', getValue: () => [dayjs().subtract(1, 'day').startOf('day'), dayjs().subtract(1, 'day').endOf('day')] },
         { key: 'last7days', label: '7 ngày qua', getValue: () => [dayjs().subtract(6, 'day').startOf('day'), dayjs().endOf('day')] },
@@ -64,13 +71,15 @@ const CustomDateRangePicker = ({ value, onChange, className }) => {
 
     const handlePresetClick = (preset) => {
         setSelectedPreset(preset.key);
-        if (preset.getValue) {
+        if (preset.getValue !== null) {
             const newRange = preset.getValue();
             setInternalValue(newRange);
-            // Nếu chọn "Tất cả" (null), apply ngay lập tức
-            if (newRange === null) {
-                onChange?.(null);
-            }
+
+            // Tất cả các presets đều có date range rồi, không cần apply ngay
+            // Chỉ update internal state, chờ user click "Áp dụng"
+        } else {
+            // Preset "Tùy chỉnh" - giữ nguyên internalValue hiện tại
+            setInternalValue(internalValue);
         }
     };
 

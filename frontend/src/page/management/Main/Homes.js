@@ -1,7 +1,10 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import dayjs from 'dayjs'
 import AppHeader from '../../../components/AppHeader'
 import AppSidebar from '../../../components/AppSidebar'
+import CustomDateRangePicker from '../../../components/CustomDateRangePicker'
 import useSidebarCollapse from '../../../hooks/useSidebarCollapse'
+import { dashboardApi } from '../../../services/dashboardApi'
 import {
   Layout,
   Card,
@@ -11,8 +14,11 @@ import {
   Table,
   Tag,
   Badge,
+  Button,
+  Progress,
+  Spin,
   Segmented,
-  Progress
+  message
 } from 'antd'
 import {
   ShoppingCart,
@@ -22,7 +28,8 @@ import {
   Clock,
   Award,
   CheckCircle,
-  Package
+  Package,
+  RefreshCw
 } from 'react-feather'
 import {
   AreaChart,
@@ -45,7 +52,27 @@ const { Title, Text } = Typography
 const Home = () => {
   const [collapsed, setCollapsed] = useSidebarCollapse()
   const [pageTitle] = useState('Tổng quan')
-  const [timeRange, setTimeRange] = useState('today')
+
+  // Date Range Filter State - Default: Today (00:00 - 23:59)
+  const [dateRange, setDateRange] = useState([
+    dayjs().startOf('day'),
+    dayjs().endOf('day')
+  ])
+
+  // Loading States
+  const [loading, setLoading] = useState(false)
+  const [statsLoading, setStatsLoading] = useState(false)
+  const [revenueLoading, setRevenueLoading] = useState(false)
+
+  // Data States
+  const [stats, setStats] = useState({
+    orders: { value: 0, growth: 0, previousValue: 0 },
+    revenue: { value: 0, growth: 0, previousValue: 0 },
+    customers: { value: 0, growth: 0, previousValue: 0 },
+    avgOrderValue: { value: 0, growth: 0, previousValue: 0 }
+  })
+
+  // Chart Configuration
   const [revenueViewType, setRevenueViewType] = useState('hour') // hour, day, month
   const [revenueChartType, setRevenueChartType] = useState('area') // area, bar
 
@@ -175,6 +202,97 @@ const Home = () => {
     return texts[status] || status
   }
 
+  // Fetch Key Metrics từ API
+  const fetchKeyMetrics = async () => {
+    try {
+      setStatsLoading(true)
+
+      const response = await dashboardApi.getKeyMetrics(
+        dateRange[0].toDate(),
+        dateRange[1].toDate()
+      )
+
+      if (response.status === 200) {
+        setStats(response.data)
+      }
+    } catch (error) {
+      console.error('Error fetching key metrics:', error)
+      message.error('Không thể tải dữ liệu thống kê')
+    } finally {
+      setStatsLoading(false)
+    }
+  }
+
+  // Auto-fetch khi dateRange thay đổi
+  useEffect(() => {
+    fetchKeyMetrics()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange])
+
+  // Refresh all data
+  const handleRefresh = async () => {
+    setLoading(true)
+    await fetchKeyMetrics()
+    // TODO: Fetch other data (revenue chart, top dishes, etc.)
+    setLoading(false)
+  }
+
+  // MetricCard Component - Reusable metric card với Tailwind
+  const MetricCard = ({ icon: Icon, title, value, trend, trendLabel, valueSize = 'large' }) => {
+    // Parse trend value để xác định màu
+    const trendValue = parseFloat(trend)
+    const isPositive = trendValue >= 0
+    const trendColor = isPositive ? 'text-green-500' : 'text-red-500'
+    const arrowRotation = isPositive ? 'rotate(180 6 6)' : 'rotate(0 6 6)'
+
+    return (
+      <Card
+        bordered={false}
+        className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+        bodyStyle={{
+          padding: '24px',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between'
+        }}
+        hoverable
+      >
+        <div className="flex items-start justify-between">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center flex-shrink-0">
+            <Icon size={22} strokeWidth={2} color="#1890ff" />
+          </div>
+          <Text className="text-gray-500 text-xs font-medium tracking-wide mt-1">
+            {title}
+          </Text>
+        </div>
+        <div>
+          <Title
+            level={2}
+            className={`text-gray-800 ${valueSize === 'large' ? 'text-3xl' : 'text-2xl'} font-semibold leading-none tracking-tight`}
+            style={{ margin: '12px 0 4px 0' }}
+          >
+            {value}
+          </Title>
+          <div className="flex items-center gap-1">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path
+                d="M6 2L6 10M6 2L9 5M6 2L3 5"
+                stroke={isPositive ? '#52c41a' : '#ff4d4f'}
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                transform={arrowRotation}
+              />
+            </svg>
+            <Text className={`${trendColor} text-xs font-medium`}>{trend}</Text>
+            <Text className="text-gray-400 text-xs">{trendLabel}</Text>
+          </div>
+        </div>
+      </Card>
+    )
+  }
+
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f5f5' }}>
       <AppSidebar collapsed={collapsed} currentPageKey="homes" />
@@ -195,354 +313,86 @@ const Home = () => {
             overflow: 'auto'
           }}
         >
-          {/* Time Range Selector */}
-          <div className="mb-6">
-            <Segmented
-              value={timeRange}
-              onChange={setTimeRange}
-              options={[
-                { label: 'Hôm nay', value: 'today' },
-                { label: 'Tuần này', value: 'week' },
-                { label: 'Tháng này', value: 'month' }
-              ]}
-              size="large"
-              style={{
-                background: '#fff',
-                padding: '2px',
-                borderRadius: '8px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-              }}
+          {/* Date Range Filter & Refresh */}
+          <div className="mb-6 flex items-center gap-3 flex-wrap">
+            <CustomDateRangePicker
+              value={dateRange}
+              onChange={setDateRange}
             />
+            <Button
+              type="primary"
+              icon={<RefreshCw size={16} />}
+              loading={loading}
+              onClick={handleRefresh}
+              className="rounded-lg h-10 flex items-center gap-1.5"
+            >
+              Làm mới
+            </Button>
           </div>
 
           {/* Key Metrics Cards - Japanese Minimalist Design */}
-          <Row gutter={[20, 20]} className="mb-6">
-            {/* Card 1: Đơn hàng */}
-            <Col xs={24} sm={12} lg={6}>
-              <Card
-                bordered={false}
-                style={{
-                  borderRadius: '16px',
-                  background: '#fff',
-                  border: '1px solid #f0f0f0',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.03), 0 2px 6px rgba(0,0,0,0.02)',
-                  height: '160px',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  overflow: 'hidden'
-                }}
-                bodyStyle={{
-                  padding: '24px',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between'
-                }}
-                hoverable
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                  <div style={{
-                    width: '48px',
-                    height: '48px',
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, #e6f4ff 0%, #bae0ff 100%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    <ShoppingCart size={22} strokeWidth={2} color="#1890ff" />
-                  </div>
-                  <Text style={{
-                    color: '#8c8c8c',
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    letterSpacing: '0.3px',
-                    marginTop: '4px'
-                  }}>
-                    Đơn hàng
-                  </Text>
-                </div>
-                <div>
-                  <Title
-                    level={2}
-                    style={{
-                      color: '#262626',
-                      margin: '12px 0 4px 0',
-                      fontSize: '32px',
-                      fontWeight: 600,
-                      lineHeight: 1,
-                      letterSpacing: '-0.5px'
-                    }}
-                  >
-                    {todayStats.orders}
-                  </Title>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                      <path d="M6 2L6 10M6 2L9 5M6 2L3 5" stroke="#52c41a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" transform="rotate(180 6 6)" />
-                    </svg>
-                    <Text style={{ color: '#52c41a', fontSize: '12px', fontWeight: 500 }}>
-                      23%
-                    </Text>
-                    <Text style={{ color: '#bfbfbf', fontSize: '12px' }}>
-                      từ hôm qua
-                    </Text>
-                  </div>
-                </div>
-              </Card>
-            </Col>
-
-            {/* Card 2: Doanh thu */}
-            <Col xs={24} sm={12} lg={6}>
-              <Card
-                bordered={false}
-                style={{
-                  borderRadius: '16px',
-                  background: '#fff',
-                  border: '1px solid #f0f0f0',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.03), 0 2px 6px rgba(0,0,0,0.02)',
-                  height: '160px',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  overflow: 'hidden'
-                }}
-                bodyStyle={{
-                  padding: '24px',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between'
-                }}
-                hoverable
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                  <div style={{
-                    width: '48px',
-                    height: '48px',
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, #e6f4ff 0%, #bae0ff 100%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    <DollarSign size={22} strokeWidth={2} color="#1890ff" />
-                  </div>
-                  <Text style={{
-                    color: '#8c8c8c',
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    letterSpacing: '0.3px',
-                    marginTop: '4px'
-                  }}>
-                    Doanh thu
-                  </Text>
-                </div>
-                <div>
-                  <Title
-                    level={2}
-                    style={{
-                      color: '#262626',
-                      margin: '12px 0 4px 0',
-                      fontSize: '24px',
-                      fontWeight: 600,
-                      lineHeight: 1,
-                      letterSpacing: '-0.3px'
-                    }}
-                  >
-                    {formatCurrency(todayStats.revenue)}
-                  </Title>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                      <path d="M6 2L6 10M6 2L9 5M6 2L3 5" stroke="#52c41a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" transform="rotate(180 6 6)" />
-                    </svg>
-                    <Text style={{ color: '#52c41a', fontSize: '12px', fontWeight: 500 }}>
-                      18%
-                    </Text>
-                    <Text style={{ color: '#bfbfbf', fontSize: '12px' }}>
-                      từ hôm qua
-                    </Text>
-                  </div>
-                </div>
-              </Card>
-            </Col>
-
-            {/* Card 3: Khách hàng */}
-            <Col xs={24} sm={12} lg={6}>
-              <Card
-                bordered={false}
-                style={{
-                  borderRadius: '16px',
-                  background: '#fff',
-                  border: '1px solid #f0f0f0',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.03), 0 2px 6px rgba(0,0,0,0.02)',
-                  height: '160px',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  overflow: 'hidden'
-                }}
-                bodyStyle={{
-                  padding: '24px',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between'
-                }}
-                hoverable
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                  <div style={{
-                    width: '48px',
-                    height: '48px',
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, #e6f4ff 0%, #bae0ff 100%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    <Users size={22} strokeWidth={2} color="#1890ff" />
-                  </div>
-                  <Text style={{
-                    color: '#8c8c8c',
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    letterSpacing: '0.3px',
-                    marginTop: '4px'
-                  }}>
-                    Khách hàng
-                  </Text>
-                </div>
-                <div>
-                  <Title
-                    level={2}
-                    style={{
-                      color: '#262626',
-                      margin: '12px 0 4px 0',
-                      fontSize: '32px',
-                      fontWeight: 600,
-                      lineHeight: 1,
-                      letterSpacing: '-0.5px'
-                    }}
-                  >
-                    {todayStats.customers}
-                  </Title>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                      <path d="M6 2L6 10M6 2L9 5M6 2L3 5" stroke="#52c41a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" transform="rotate(180 6 6)" />
-                    </svg>
-                    <Text style={{ color: '#52c41a', fontSize: '12px', fontWeight: 500 }}>
-                      15%
-                    </Text>
-                    <Text style={{ color: '#bfbfbf', fontSize: '12px' }}>
-                      từ hôm qua
-                    </Text>
-                  </div>
-                </div>
-              </Card>
-            </Col>
-
-            {/* Card 4: Trung bình/đơn */}
-            <Col xs={24} sm={12} lg={6}>
-              <Card
-                bordered={false}
-                style={{
-                  borderRadius: '16px',
-                  background: '#fff',
-                  border: '1px solid #f0f0f0',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.03), 0 2px 6px rgba(0,0,0,0.02)',
-                  height: '160px',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  overflow: 'hidden'
-                }}
-                bodyStyle={{
-                  padding: '24px',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between'
-                }}
-                hoverable
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                  <div style={{
-                    width: '48px',
-                    height: '48px',
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, #e6f4ff 0%, #bae0ff 100%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    <TrendingUp size={22} strokeWidth={2} color="#1890ff" />
-                  </div>
-                  <Text style={{
-                    color: '#8c8c8c',
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    letterSpacing: '0.3px',
-                    marginTop: '4px'
-                  }}>
-                    Trung bình/đơn
-                  </Text>
-                </div>
-                <div>
-                  <Title
-                    level={2}
-                    style={{
-                      color: '#262626',
-                      margin: '12px 0 4px 0',
-                      fontSize: '24px',
-                      fontWeight: 600,
-                      lineHeight: 1,
-                      letterSpacing: '-0.3px'
-                    }}
-                  >
-                    {formatCurrency(todayStats.avgOrderValue)}
-                  </Title>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                      <path d="M6 2L6 10M6 2L9 5M6 2L3 5" stroke="#52c41a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" transform="rotate(180 6 6)" />
-                    </svg>
-                    <Text style={{ color: '#52c41a', fontSize: '12px', fontWeight: 500 }}>
-                      8%
-                    </Text>
-                    <Text style={{ color: '#bfbfbf', fontSize: '12px' }}>
-                      từ hôm qua
-                    </Text>
-                  </div>
-                </div>
-              </Card>
-            </Col>
-          </Row>
+          <Spin spinning={statsLoading}>
+            <Row gutter={[20, 20]} className="mb-6">
+              <Col xs={24} sm={12} lg={6}>
+                <MetricCard
+                  icon={ShoppingCart}
+                  title="Đơn hàng"
+                  value={stats.orders.value}
+                  trend={`${stats.orders.growth > 0 ? '+' : ''}${stats.orders.growth}%`}
+                  trendLabel="từ kỳ trước"
+                  valueSize="large"
+                />
+              </Col>
+              <Col xs={24} sm={12} lg={6}>
+                <MetricCard
+                  icon={DollarSign}
+                  title="Doanh thu"
+                  value={formatCurrency(stats.revenue.value)}
+                  trend={`${stats.revenue.growth > 0 ? '+' : ''}${stats.revenue.growth}%`}
+                  trendLabel="từ kỳ trước"
+                  valueSize="medium"
+                />
+              </Col>
+              <Col xs={24} sm={12} lg={6}>
+                <MetricCard
+                  icon={Users}
+                  title="Khách hàng"
+                  value={stats.customers.value}
+                  trend={`${stats.customers.growth > 0 ? '+' : ''}${stats.customers.growth}%`}
+                  trendLabel="từ kỳ trước"
+                  valueSize="large"
+                />
+              </Col>
+              <Col xs={24} sm={12} lg={6}>
+                <MetricCard
+                  icon={TrendingUp}
+                  title="Trung bình/đơn"
+                  value={formatCurrency(stats.avgOrderValue.value)}
+                  trend={`${stats.avgOrderValue.growth > 0 ? '+' : ''}${stats.avgOrderValue.growth}%`}
+                  trendLabel="từ kỳ trước"
+                  valueSize="medium"
+                />
+              </Col>
+            </Row>
+          </Spin>
 
           {/* Revenue Statistics Chart */}
           <Row gutter={[20, 20]} className="mb-6">
             <Col xs={24} lg={16}>
               <Card
                 bordered={false}
-                style={{
-                  borderRadius: '16px',
-                  border: '1px solid #f0f0f0',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.03), 0 2px 6px rgba(0,0,0,0.02)'
-                }}
+                className="rounded-2xl border border-gray-100 shadow-sm"
                 title={
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: '10px',
-                        background: 'linear-gradient(135deg, #e6f4ff 0%, #bae0ff 100%)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
+                  <div className="flex items-center justify-between flex-wrap gap-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
                         <TrendingUp size={18} strokeWidth={2} color="#1890ff" />
                       </div>
                       <div>
-                        <Text strong style={{ fontSize: '16px', color: '#262626', display: 'block', lineHeight: 1.3 }}>
+                        <Text strong className="text-base text-gray-800 block leading-tight">
                           Thống kê doanh thu
                         </Text>
-                        <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>
+                        <Text className="text-xs text-gray-500">
                           {revenueViewType === 'hour' && 'Theo giờ trong ngày'}
                           {revenueViewType === 'day' && 'Theo ngày trong tuần'}
                           {revenueViewType === 'month' && 'Theo tháng trong năm'}
@@ -550,7 +400,7 @@ const Home = () => {
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div className="flex gap-3 items-center flex-wrap">
                       {/* View Type Filter */}
                       <Segmented
                         value={revenueViewType}
@@ -558,16 +408,16 @@ const Home = () => {
                         options={[
                           {
                             label: (
-                              <div style={{ padding: '2px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <div className="py-0.5 px-2 flex items-center gap-1">
                                 <Clock size={14} strokeWidth={2} />
-                                <span style={{ fontSize: '13px' }}>Giờ</span>
+                                <span className="text-xs">Giờ</span>
                               </div>
                             ),
                             value: 'hour'
                           },
                           {
                             label: (
-                              <div style={{ padding: '2px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <div className="py-0.5 px-2 flex items-center gap-1">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                   <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
                                   <line x1="16" y1="2" x2="16" y2="6" />
@@ -591,18 +441,14 @@ const Home = () => {
                                   <line x1="12" y1="14" x2="12" y2="14" />
                                   <line x1="16" y1="14" x2="16" y2="14" />
                                 </svg>
-                                <span style={{ fontSize: '13px' }}>Tháng</span>
+                                <span className="text-xs">Tháng</span>
                               </div>
                             ),
                             value: 'month'
                           }
                         ]}
                         size="middle"
-                        style={{
-                          background: '#fafafa',
-                          borderRadius: '8px',
-                          padding: '2px'
-                        }}
+                        className="bg-gray-50 rounded-lg p-0.5"
                       />
 
                       {/* Chart Type Filter */}
@@ -612,36 +458,32 @@ const Home = () => {
                         options={[
                           {
                             label: (
-                              <div style={{ padding: '2px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <div className="py-0.5 px-2 flex items-center gap-1">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                   <path d="M3 12 L7 8 L13 14 L21 6" />
                                   <path d="M3 22 L21 22" strokeLinecap="round" />
                                 </svg>
-                                <span style={{ fontSize: '13px' }}>Diện tích</span>
+                                <span className="text-xs">Diện tích</span>
                               </div>
                             ),
                             value: 'area'
                           },
                           {
                             label: (
-                              <div style={{ padding: '2px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <div className="py-0.5 px-2 flex items-center gap-1">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                   <rect x="6" y="14" width="4" height="8" />
                                   <rect x="14" y="8" width="4" height="14" />
                                   <line x1="3" y1="22" x2="21" y2="22" strokeLinecap="round" />
                                 </svg>
-                                <span style={{ fontSize: '13px' }}>Cột</span>
+                                <span className="text-xs">Cột</span>
                               </div>
                             ),
                             value: 'bar'
                           }
                         ]}
                         size="middle"
-                        style={{
-                          background: '#fafafa',
-                          borderRadius: '8px',
-                          padding: '2px'
-                        }}
+                        className="bg-gray-50 rounded-lg p-0.5"
                       />
                     </div>
                   </div>
