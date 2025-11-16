@@ -34,7 +34,7 @@ export async function createCallStaffNotification(qrSessionId, message = null) {
             title: `${tableName} đang gọi nhân viên`,
             message: message || `Khách hàng ở ${tableName} cần hỗ trợ`,
             priority: "high",
-            action_url: `/management/tables/${session.table_id}`,
+            action_url: `/main/tables?tableId=${session.table_id}&openPanel=true`,
             metadata: {
                 tableId: session.table_id,
                 tableName: session.table_number,

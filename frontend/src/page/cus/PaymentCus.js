@@ -20,6 +20,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import LoyaltyRegistrationModal from "../../components/LoyaltyRegistrationModal";
 import notificationService from "../../services/notificationService";
+import { updateSessionCustomer, saveCustomerInfo } from "../../utils/sessionUtils"; // 🎯 Import session utilities
 
 const { Header, Content } = Layout;
 const { Title, Text } = Typography;
@@ -45,6 +46,21 @@ if (typeof document !== 'undefined') {
 // Format giá tiền
 const formatPrice = (price) => {
     return Math.round(price).toLocaleString('vi-VN');
+};
+
+// ✅ Helper function to update session status in localStorage
+const updateSessionStatus = (newStatus) => {
+    try {
+        const sessionData = localStorage.getItem('qr_session');
+        if (sessionData) {
+            const session = JSON.parse(sessionData);
+            session.status = newStatus;
+            localStorage.setItem('qr_session', JSON.stringify(session));
+            console.log(`✅ Updated session status to: ${newStatus}`);
+        }
+    } catch (error) {
+        console.error('❌ Error updating session status:', error);
+    }
 };
 
 export default function PaymentPage() {
@@ -77,6 +93,9 @@ export default function PaymentPage() {
 
     // ✅ Waiting for Confirmation Modal State
     const [waitingModalVisible, setWaitingModalVisible] = useState(false);
+    const [pollingInterval, setPollingInterval] = useState(null);
+    const [timeoutId, setTimeoutId] = useState(null);
+    const [elapsedTime, setElapsedTime] = useState(0);
 
     // ✅ Loyalty Points State - Fetch from API
     const [customerPoints, setCustomerPoints] = useState(0);
@@ -87,6 +106,102 @@ export default function PaymentPage() {
     const [isLoyaltyModalVisible, setIsLoyaltyModalVisible] = useState(false);
     const [isLoyaltyLoading, setIsLoyaltyLoading] = useState(false);
     const [form] = Form.useForm();
+
+    // ✅ Session status state - Check if already paid
+    const [sessionStatus, setSessionStatus] = useState(null);
+    const [checkingSession, setCheckingSession] = useState(true);
+
+    // ✅ Check session status on mount - Handle case where admin paid before customer clicks
+    useEffect(() => {
+        const checkSessionStatus = async () => {
+            try {
+                const sessionData = localStorage.getItem("qr_session");
+                if (!sessionData) {
+                    console.warn('⚠️ No session found');
+                    setCheckingSession(false);
+                    setSessionStatus('ACTIVE'); // Default to ACTIVE
+                    return;
+                }
+
+                const { session_id } = JSON.parse(sessionData);
+
+                if (!session_id) {
+                    console.warn('⚠️ Invalid session_id');
+                    setCheckingSession(false);
+                    setSessionStatus('ACTIVE');
+                    return;
+                }
+
+                // Get session status from API
+                const response = await axios.get(`${REACT_APP_API_URL}/qr-sessions/${session_id}/validate`);
+                const status = response.data.data?.status;
+
+                console.log('📊 Session status:', status);
+                setSessionStatus(status || 'ACTIVE');
+
+                // ✅ If session is COMPLETED, means admin already confirmed payment
+                if (status === 'COMPLETED') {
+                    console.log('✅ Session already paid by admin!');
+
+                    // Show modal immediately
+                    modal.info({
+                        title: '✅ Đơn hàng đã được thanh toán',
+                        content: (
+                            <div style={{ padding: '12px 0' }}>
+                                <p style={{ marginBottom: 16, color: '#52c41a', fontSize: 15 }}>
+                                    Nhân viên đã xác nhận thanh toán đơn hàng của bạn.
+                                </p>
+                                <p style={{ color: '#666', fontSize: 13 }}>
+                                    Cảm ơn bạn đã sử dụng dịch vụ!
+                                </p>
+                            </div>
+                        ),
+                        centered: true,
+                        okText: 'Về trang chủ',
+                        okButtonProps: {
+                            style: {
+                                background: 'linear-gradient(135deg, #226533 0%, #2d8e47 100%)',
+                                border: 'none',
+                                borderRadius: '10px',
+                                height: '44px',
+                                fontWeight: 600,
+                            }
+                        },
+                        onOk: () => {
+                            updateSessionStatus('COMPLETED');
+                            localStorage.removeItem('cart');
+                            navigate('/cus/homes');
+                        }
+                    });
+
+                    // Auto-redirect after 5 seconds
+                    setTimeout(() => {
+                        updateSessionStatus('COMPLETED');
+                        localStorage.removeItem('cart');
+                        navigate('/cus/homes');
+                    }, 5000);
+                }
+
+                setCheckingSession(false);
+            } catch (error) {
+                console.error('❌ Error checking session status:', error);
+
+                // ✅ Handle 404 - session not found (probably expired or invalid)
+                if (error.response?.status === 404) {
+                    console.warn('⚠️ Session not found (404) - Treating as ACTIVE session');
+                    setSessionStatus('ACTIVE'); // Allow payment to proceed
+                } else {
+                    // Other errors - still allow payment
+                    console.warn('⚠️ Error checking session - Defaulting to ACTIVE');
+                    setSessionStatus('ACTIVE');
+                }
+
+                setCheckingSession(false);
+            }
+        };
+
+        checkSessionStatus();
+    }, [navigate, modal]);
 
     // ✅ Fetch customer loyalty points - ALWAYS from API (Real-time)
     const fetchCustomerPoints = React.useCallback(async () => {
@@ -228,9 +343,20 @@ export default function PaymentPage() {
                 }
             }
 
+            // ✅ Update session status to COMPLETED
+            setSessionStatus('COMPLETED');
+
+            // ✅ Clear polling và timeout (vì đã nhận được kết quả)
+            if (pollingInterval) clearInterval(pollingInterval);
+            if (timeoutId) clearTimeout(timeoutId);
+
             // Close waiting modal if visible
             setWaitingModalVisible(false);
             setLoading(false);
+
+            // ✅ Đóng QR modal nếu đang hiển thị (cho BANKING)
+            setQrModalVisible(false);
+            setQrLoading(false);
 
             // ✅ Extract order IDs for review
             // ordersConfirmed from socket is array of objects: [{ id, status, totalPrice }, ...]
@@ -241,38 +367,63 @@ export default function PaymentPage() {
 
             const hasReviewed = checkIfReviewed(orderIdsForReview);
 
+            // ✅ State for countdown timer
+            let countdown = 30;
+            let countdownElement = null;
+
             // Show success modal with auto-redirect
             const successModal = modal.success({
-                title: '🎉 Thanh toán thành công!',
-                width: 460,
+                title: (
+                    <div style={{
+                        textAlign: 'center',
+                        fontSize: 18,
+                        fontWeight: 600,
+                        color: '#52c41a'
+                    }}>
+                        Thanh toán thành công!
+                    </div>
+                ),
+                width: 440,
                 centered: true,
+                icon: null,
                 content: (
-                    <div style={{ padding: '20px 0' }}>
+                    <div style={{ padding: '12px 0' }}>
+                        {/* Success Message */}
                         <div style={{
-                            fontSize: '15px',
+                            fontSize: '14px',
                             marginBottom: '20px',
                             textAlign: 'center',
-                            color: '#52c41a',
-                            fontWeight: 500
+                            color: '#666',
+                            lineHeight: 1.6
                         }}>
                             {paymentMessage || `Cảm ơn quý khách! Tổng tiền: ${formatPrice(paidAmount)}₫`}
                         </div>
 
                         {/* Payment Details */}
                         <div style={{
-                            backgroundColor: '#f5f5f5',
+                            backgroundColor: '#fafafa',
                             padding: '16px',
                             borderRadius: '12px',
                             marginBottom: '16px',
-                            border: '1px solid #e8f4e8'
+                            border: '1px solid #e8e8e8'
                         }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                                <span style={{ color: '#666', fontSize: '13px' }}>Phiên:</span>
-                                <span style={{ fontWeight: 600, fontSize: '13px' }}>#{sessionId}</span>
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                marginBottom: '10px'
+                            }}>
+                                <span style={{ color: '#8c8c8c', fontSize: '13px' }}>Phiên:</span>
+                                <span style={{ fontWeight: 600, fontSize: '13px', color: '#333' }}>#{sessionId}</span>
                             </div>
 
                             {ordersConfirmed && ordersConfirmed.length > 0 && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    marginBottom: '10px'
+                                }}>
                                     <span style={{ color: '#52c41a', fontSize: '13px' }}>✓ Đơn đã thanh toán:</span>
                                     <span style={{ fontWeight: 600, color: '#52c41a', fontSize: '13px' }}>
                                         {ordersConfirmed.length} đơn
@@ -281,7 +432,12 @@ export default function PaymentPage() {
                             )}
 
                             {ordersCancelled && ordersCancelled.length > 0 && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    marginBottom: '10px'
+                                }}>
                                     <span style={{ color: '#ff4d4f', fontSize: '13px' }}>✗ Đơn đã hủy:</span>
                                     <span style={{ fontWeight: 600, color: '#ff4d4f', fontSize: '13px' }}>
                                         {ordersCancelled.length} đơn
@@ -290,14 +446,15 @@ export default function PaymentPage() {
                             )}
 
                             <div style={{
-                                borderTop: '1px solid #d9d9d9',
+                                borderTop: '1px solid #e8e8e8',
                                 paddingTop: '12px',
                                 marginTop: '12px',
                                 display: 'flex',
-                                justifyContent: 'space-between'
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
                             }}>
-                                <span style={{ fontSize: '15px', fontWeight: 600 }}>Tổng thanh toán:</span>
-                                <span style={{ fontSize: '18px', fontWeight: 700, color: '#52c41a' }}>
+                                <span style={{ fontSize: '15px', fontWeight: 600, color: '#333' }}>Tổng thanh toán:</span>
+                                <span style={{ fontSize: '20px', fontWeight: 700, color: '#52c41a' }}>
                                     {formatPrice(paidAmount)}₫
                                 </span>
                             </div>
@@ -307,37 +464,43 @@ export default function PaymentPage() {
                         {!hasReviewed && (
                             <div style={{
                                 background: 'linear-gradient(135deg, #fff7e6 0%, #fffbf0 100%)',
-                                padding: '14px 16px',
-                                borderRadius: '12px',
+                                padding: '12px 14px',
+                                borderRadius: '10px',
                                 marginBottom: '16px',
                                 border: '1px solid #ffd591',
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: 12,
+                                gap: 10,
                             }}>
                                 <div style={{
-                                    fontSize: 28,
+                                    fontSize: 24,
                                     lineHeight: 1,
                                 }}>⭐</div>
                                 <div style={{ flex: 1 }}>
-                                    <Text strong style={{ fontSize: 13, display: 'block', color: '#d46b08' }}>
+                                    <div style={{ fontSize: 13, fontWeight: 600, color: '#d46b08', marginBottom: 2 }}>
                                         Chia sẻ trải nghiệm của bạn nhé!
-                                    </Text>
-                                    <Text style={{ fontSize: 11, color: '#fa8c16' }}>
+                                    </div>
+                                    <div style={{ fontSize: 11, color: '#fa8c16' }}>
                                         Chỉ mất 30 giây để đánh giá
-                                    </Text>
+                                    </div>
                                 </div>
                             </div>
                         )}
 
                         {/* Countdown message */}
-                        <div style={{
-                            textAlign: 'center',
-                            color: '#8c8c8c',
-                            fontSize: '13px',
-                            fontStyle: 'italic'
-                        }}>
-                            Tự động chuyển về trang chủ sau 30 giây...
+                        <div
+                            ref={(el) => { countdownElement = el; }}
+                            style={{
+                                textAlign: 'center',
+                                color: '#8c8c8c',
+                                fontSize: '13px',
+                                fontStyle: 'italic',
+                                padding: '8px',
+                                background: '#f5f5f5',
+                                borderRadius: '8px'
+                            }}
+                        >
+                            Tự động chuyển về trang chủ sau <strong style={{ color: '#226533' }}>{countdown}</strong> giây...
                         </div>
                     </div>
                 ),
@@ -346,14 +509,14 @@ export default function PaymentPage() {
                     style: {
                         background: 'linear-gradient(135deg, #226533 0%, #2d8e47 100%)',
                         border: 'none',
-                        borderRadius: '8px',
-                        height: '40px',
+                        borderRadius: '10px',
+                        height: '44px',
                         fontWeight: 600,
-                        width: '100%',
+                        fontSize: '15px',
                     }
                 } : undefined,
                 footer: !hasReviewed ? (
-                    <div style={{ display: 'flex', gap: 10, padding: '8px 0 0' }}>
+                    <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
                         <Button
                             size="large"
                             onClick={() => {
@@ -364,7 +527,7 @@ export default function PaymentPage() {
                             }}
                             style={{
                                 flex: 1,
-                                height: 46,
+                                height: 48,
                                 borderRadius: 10,
                                 fontSize: 14,
                                 fontWeight: 600,
@@ -373,7 +536,7 @@ export default function PaymentPage() {
                                 background: '#fff',
                             }}
                         >
-                            ⭐ Đánh giá
+                            ⭐ Đánh giá ngay
                         </Button>
 
                         <Button
@@ -381,13 +544,13 @@ export default function PaymentPage() {
                             size="large"
                             onClick={() => {
                                 successModal.destroy();
-                                localStorage.removeItem('qr_session');
+                                updateSessionStatus('COMPLETED');
                                 localStorage.removeItem('cart');
                                 navigate('/cus/homes');
                             }}
                             style={{
                                 flex: 1,
-                                height: 46,
+                                height: 48,
                                 borderRadius: 10,
                                 fontSize: 14,
                                 fontWeight: 600,
@@ -400,8 +563,8 @@ export default function PaymentPage() {
                     </div>
                 ) : undefined,
                 onOk: () => {
-                    // Clear session data
-                    localStorage.removeItem('qr_session');
+                    // Update session status to COMPLETED
+                    updateSessionStatus('COMPLETED');
                     localStorage.removeItem('cart');
 
                     // Redirect to home
@@ -409,17 +572,41 @@ export default function PaymentPage() {
                 }
             });
 
-            // Auto-redirect after 3 seconds
+            // ✅ Start countdown timer
+            const countdownInterval = setInterval(() => {
+                countdown -= 1;
+
+                // Update countdown text
+                if (countdownElement) {
+                    countdownElement.innerHTML = `Tự động chuyển về trang chủ sau <strong style="color: #226533">${countdown}</strong> giây...`;
+                }
+
+                // When countdown reaches 0, redirect
+                if (countdown <= 0) {
+                    clearInterval(countdownInterval);
+                    successModal.destroy();
+
+                    // Update session status to COMPLETED
+                    updateSessionStatus('COMPLETED');
+                    localStorage.removeItem('cart');
+
+                    // Redirect to home
+                    navigate('/cus/homes');
+                }
+            }, 1000);
+
+            // Auto-redirect after 30 seconds (backup)
             setTimeout(() => {
+                clearInterval(countdownInterval);
                 successModal.destroy();
 
-                // Clear session data
-                localStorage.removeItem('qr_session');
+                // Update session status to COMPLETED
+                updateSessionStatus('COMPLETED');
                 localStorage.removeItem('cart');
 
                 // Redirect to home
                 navigate('/cus/homes');
-            }, 3000000);
+            }, 30000);
         };
 
         // Register listener (returns cleanup function)
@@ -440,11 +627,15 @@ export default function PaymentPage() {
     // ✅ Dùng confirmedTotal thay vì initialTotal để chỉ tính đơn đã xác nhận
     const totalAmount = confirmedTotal;
 
-    // Tính số điểm tối đa có thể dùng (không vượt quá tổng tiền và điểm hiện có)
-    const maxPointsCanUse = Math.min(customerPoints, totalAmount);
+    // 🎯 Tính số tiền giảm từ điểm: 100 điểm = 10,000đ
+    const calculateDiscount = (points) => {
+        if (points <= 0) return 0;
+        const discount = Math.floor((points / 100) * 10000);
+        return Math.min(discount, totalAmount); // Không vượt quá tổng tiền
+    };
 
-    // Số tiền giảm từ điểm (1000 điểm = 1000đ)
-    const pointsDiscount = usePoints ? maxPointsCanUse : 0;
+    // Số tiền giảm từ điểm (100 điểm = 10,000đ)
+    const pointsDiscount = usePoints ? calculateDiscount(customerPoints) : 0;
 
     // Số tiền cần thanh toán sau khi trừ điểm (đây là số tiền cuối cùng)
     const finalAmount = totalAmount - pointsDiscount;
@@ -492,6 +683,28 @@ export default function PaymentPage() {
                 return;
             }
 
+            // Lấy thông tin session
+            const sessionData = localStorage.getItem("qr_session");
+            if (!sessionData) {
+                message.error("Không tìm thấy thông tin phiên!");
+                return;
+            }
+
+            const { session_id } = JSON.parse(sessionData);
+
+            // ✅ Tạo payment records cho tất cả đơn hàng đã xác nhận
+            try {
+                await axios.post(`${REACT_APP_API_URL}/payment/session`, {
+                    sessionId: session_id,
+                    method: paymentMethod,
+                    orderIds: confirmedOrders.map(o => o.id)
+                });
+                console.log('✅ Payment records created for all confirmed orders');
+            } catch (error) {
+                console.error('⚠️ Failed to create payment records:', error);
+                // Tiếp tục flow để không block user
+            }
+
             // Nếu chọn thanh toán bằng TIỀN MẶT → Gửi notification cho staff
             if (paymentMethod === 'CASH') {
                 await handleCashPayment();
@@ -520,14 +733,21 @@ export default function PaymentPage() {
 
             const { table_id, session_id } = JSON.parse(sessionData);
 
+            // 🎯 Tạo message hiển thị cho admin
+            let paymentMessage = `Khách hàng ở bàn ${table_id} yêu cầu thanh toán ${formatPrice(finalAmount)}đ bằng tiền mặt.`;
+
+            if (usePoints && pointsDiscount > 0) {
+                paymentMessage = `Khách hàng ở bàn ${table_id} yêu cầu thanh toán ${formatPrice(totalAmount)}đ (dùng ${formatPrice(customerPoints)} điểm giảm ${formatPrice(pointsDiscount)}đ → còn ${formatPrice(finalAmount)}đ).`;
+            }
+
             // Tạo notification cho staff
             const notificationData = {
                 target_type: 'STAFF', // Gửi cho tất cả staff
                 type: 'PAYMENT', // Loại notification
-                title: `💰 Yêu cầu thanh toán tiền mặt - Bàn ${table_id}`,
-                message: `Khách hàng ở bàn ${table_id} yêu cầu thanh toán ${formatPrice(finalAmount)}đ bằng tiền mặt.`,
+                title: `Yêu cầu thanh toán tiền mặt - Bàn ${table_id}`,
+                message: paymentMessage,
                 priority: 'high', // Ưu tiên cao
-                action_url: `/management/orders?table=${table_id}`,
+                action_url: `/main/tables?tableId=${table_id}&openPanel=true`,
                 metadata: JSON.stringify({
                     table_id,
                     session_id,
@@ -535,7 +755,9 @@ export default function PaymentPage() {
                     amount: finalAmount,
                     discount_points: pointsDiscount,
                     original_amount: totalAmount,
-                    order_ids: confirmedOrders.map(o => o.id) // ✅ Chỉ gửi ID của đơn đã xác nhận
+                    order_ids: confirmedOrders.map(o => o.id), // ✅ Chỉ gửi ID của đơn đã xác nhận
+                    use_all_points: usePoints, // 🎯 Truyền flag dùng điểm
+                    customer_points: customerPoints // 🎯 Số điểm customer có
                 })
             };
 
@@ -545,12 +767,15 @@ export default function PaymentPage() {
             // ✅ Hiển thị modal đang chờ xác nhận
             setWaitingModalVisible(true);
 
+            // ✅ Bắt đầu polling để check trạng thái
+            startPaymentPolling();
+
             message.info({
                 content: '📨 Đã gửi yêu cầu thanh toán đến nhân viên',
                 duration: 3
             });
 
-            // ✅ Đợi event 'session_paid' từ Socket.IO
+            // ✅ Đợi event 'session_paid' từ Socket.IO HOẶC polling phát hiện
             // Listener đã được đăng ký trong useEffect
             // Sẽ tự động đóng modal và redirect khi admin xác nhận
 
@@ -602,7 +827,7 @@ export default function PaymentPage() {
                     setQrLoading(false);
                 }
 
-                return; // Không tự động quay về, đợi user đóng modal
+                return; // Hiển thị QR, chờ user click "Xác nhận thanh toán"
             }
 
             // CARD hoặc phương thức khác
@@ -672,6 +897,195 @@ export default function PaymentPage() {
         }
     };
 
+    // Polling để check trạng thái payment (không phụ thuộc Socket.IO)
+    const checkPaymentStatus = React.useCallback(async () => {
+        try {
+            const sessionData = localStorage.getItem("qr_session");
+            if (!sessionData) return false;
+
+            const { session_id } = JSON.parse(sessionData);
+            if (!session_id) return false;
+
+            // Check session status
+            const response = await axios.get(`${REACT_APP_API_URL}/qr-sessions/${session_id}/validate`);
+            const status = response.data.data?.status;
+
+            // Nếu session đã COMPLETED → Thanh toán thành công
+            if (status === 'COMPLETED') {
+                console.log('✅ Session completed - Payment successful (detected by polling)');
+
+                // ✅ Update session status state
+                setSessionStatus('COMPLETED');
+
+                // Clear polling và timeout
+                if (pollingInterval) clearInterval(pollingInterval);
+                if (timeoutId) clearTimeout(timeoutId);
+
+                // Đóng modal chờ và QR
+                setWaitingModalVisible(false);
+                setQrModalVisible(false);
+                setLoading(false);
+
+                // Hiển thị success modal
+                modal.success({
+                    title: '🎉 Thanh toán thành công!',
+                    content: 'Giao dịch của bạn đã được xác nhận.',
+                    onOk: () => {
+                        updateSessionStatus('COMPLETED');
+                        localStorage.removeItem('cart');
+                        navigate('/cus/homes');
+                    }
+                });
+
+                return true; // Payment completed
+            }
+
+            return false; // Still pending
+        } catch (error) {
+            // ✅ Handle 404 gracefully - session might be expired
+            if (error.response?.status === 404) {
+                console.warn('⚠️ Session not found during polling (404) - might be expired');
+            } else {
+                console.error('❌ Polling error:', error);
+            }
+            return false; // Continue polling
+        }
+    }, [pollingInterval, timeoutId, modal, navigate]);
+
+    // Hủy yêu cầu thanh toán
+    const handleCancelPayment = React.useCallback(async () => {
+        try {
+            // Clear polling và timeout
+            if (pollingInterval) clearInterval(pollingInterval);
+            if (timeoutId) clearTimeout(timeoutId);
+
+            // Đóng modals
+            setWaitingModalVisible(false);
+            setQrModalVisible(false);
+            setLoading(false);
+
+            const sessionData = localStorage.getItem("qr_session");
+            if (sessionData) {
+                const { session_id } = JSON.parse(sessionData);
+
+                // Gọi API hủy payments
+                try {
+                    await axios.put(`${REACT_APP_API_URL}/payment/session/${session_id}/cancel`);
+                    console.log('✅ Payment cancelled successfully');
+                } catch (error) {
+                    console.error('Failed to cancel payment:', error);
+                }
+            }
+
+            message.info('Đã hủy yêu cầu thanh toán');
+        } catch (error) {
+            console.error('Cancel payment error:', error);
+        }
+    }, [pollingInterval, timeoutId, message]);
+
+    // Start polling khi bắt đầu chờ xác nhận
+    const startPaymentPolling = React.useCallback(() => {
+        // Clear existing interval/timeout
+        if (pollingInterval) clearInterval(pollingInterval);
+        if (timeoutId) clearTimeout(timeoutId);
+
+        setElapsedTime(0);
+
+        // Polling mỗi 3 giây
+        const interval = setInterval(async () => {
+            setElapsedTime(prev => prev + 3);
+            const completed = await checkPaymentStatus();
+            if (completed) {
+                clearInterval(interval);
+            }
+        }, 3000);
+
+        // Timeout sau 5 phút (300 giây)
+        const timeout = setTimeout(() => {
+            clearInterval(interval);
+            setWaitingModalVisible(false);
+            setQrModalVisible(false);
+            setLoading(false);
+
+            modal.warning({
+                title: '⏱️ Hết thời gian chờ',
+                content: (
+                    <div>
+                        <p>Yêu cầu thanh toán đã quá thời gian chờ (5 phút).</p>
+                        <p>Vui lòng thử lại hoặc liên hệ nhân viên.</p>
+                    </div>
+                ),
+                onOk: () => {
+                    handleCancelPayment();
+                }
+            });
+        }, 300000); // 5 phút
+
+        setPollingInterval(interval);
+        setTimeoutId(timeout);
+    }, [checkPaymentStatus, handleCancelPayment, modal]);
+
+    // Cleanup khi unmount
+    useEffect(() => {
+        return () => {
+            if (pollingInterval) clearInterval(pollingInterval);
+            if (timeoutId) clearTimeout(timeoutId);
+        };
+    }, [pollingInterval, timeoutId]);
+
+    // Xác nhận thanh toán BANKING - Gửi notification cho admin
+    const handleConfirmBankingPayment = async () => {
+        try {
+            // Lấy thông tin session
+            const sessionData = localStorage.getItem("qr_session");
+            if (!sessionData) {
+                message.error("Không tìm thấy thông tin phiên!");
+                return;
+            }
+
+            const { table_id, session_id } = JSON.parse(sessionData);
+
+            // Gửi notification đến staff
+            await axios.post(`${REACT_APP_API_URL}/notifications`, {
+                target_type: 'STAFF',
+                type: 'PAYMENT',
+                title: `💳 Yêu cầu xác nhận thanh toán chuyển khoản - Bàn ${table_id}`,
+                message: `Khách hàng ở bàn ${table_id} đã chuyển khoản ${formatPrice(finalAmount)}đ. Vui lòng kiểm tra giao dịch và xác nhận.`,
+                priority: 'high',
+                action_url: `/main/tables?tableId=${table_id}&openPanel=true`,
+                metadata: JSON.stringify({
+                    table_id,
+                    session_id,
+                    payment_method: 'BANKING',
+                    amount: finalAmount,
+                    discount_points: pointsDiscount,
+                    original_amount: totalAmount,
+                    order_ids: confirmedOrders.map(o => o.id)
+                })
+            });
+
+            console.log('✅ Banking payment confirmation sent to staff');
+
+            // Đóng QR modal
+            setQrModalVisible(false);
+
+            // Hiển thị modal "Đang chờ xác nhận"
+            setWaitingModalVisible(true);
+
+            // ✅ Bắt đầu polling để check trạng thái
+            startPaymentPolling();
+
+            message.info({
+                content: '📨 Đã gửi yêu cầu xác nhận thanh toán đến nhân viên',
+                duration: 3
+            });
+
+        } catch (error) {
+            console.error("Confirm banking payment error:", error);
+            message.error("Không thể gửi yêu cầu xác nhận!");
+        }
+    };
+
     // Đóng modal QR
     const handleCloseQRModal = () => {
         setQrModalVisible(false);
@@ -693,21 +1107,18 @@ export default function PaymentPage() {
             if (response.status === 201 || response.status === 200) {
                 const customerData = response.data.data;
 
-                // Save to localStorage
-                const customerInfoData = {
-                    id: customerData.id,
-                    phone: customerData.phone,
-                    name: customerData.name || null,
-                    loyalty_points: customerData.loyalty_points || 0,
-                };
-                localStorage.setItem('loyalty_customer', JSON.stringify(customerInfoData));
+                // 🎯 Save customer info using utility function
+                saveCustomerInfo(customerData);
 
-                // Update state to reflect new customer
+                // ✅ Update state to reflect new customer immediately
                 setCustomerInfo({
                     name: customerData.name || null,
                     phone: customerData.phone,
                 });
-                setCustomerPoints(customerData.loyalty_points || 0);
+                setCustomerPoints(customerData.points || 0);
+
+                // 🎯 UPDATE qr_session với customer_id using utility function
+                await updateSessionCustomer(customerData.id);
 
                 message.success({
                     content: response.status === 201
@@ -866,61 +1277,73 @@ export default function PaymentPage() {
                     >
                         {loadingPoints ? (
                             <Spin size="small" tip="Đang tải điểm..." />
-                        ) : customerPoints > 0 ? (
-                            <>
-                                <div>
-                                    <Text style={{ fontSize: 14, color: "#333", display: "block" }}>
-                                        Dùng {formatPrice(customerPoints)} điểm
-                                    </Text>
-                                    <Text style={{ fontSize: 12, color: "#999" }}>
-                                        Giảm {formatPrice(maxPointsCanUse)}đ
-                                    </Text>
-                                </div>
+                        ) : customerInfo ? (
+                            // ✅ Đã có thông tin loyalty (đã đăng ký)
+                            customerPoints > 0 ? (
+                                // Có điểm → Hiển thị toggle
+                                <>
+                                    <div>
+                                        <Text style={{ fontSize: 14, color: "#333", display: "block" }}>
+                                            Dùng {formatPrice(customerPoints)} điểm
+                                        </Text>
+                                        <Text style={{ fontSize: 12, color: "#999" }}>
+                                            Giảm {formatPrice(pointsDiscount)}đ
+                                        </Text>
+                                    </div>
 
-                                {/* Toggle Switch */}
-                                <label
-                                    style={{
-                                        position: "relative",
-                                        display: "inline-block",
-                                        width: 44,
-                                        height: 24,
-                                        cursor: "pointer",
-                                    }}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={usePoints}
-                                        onChange={(e) => setUsePoints(e.target.checked)}
-                                        style={{ opacity: 0, width: 0, height: 0 }}
-                                    />
-                                    <span
+                                    {/* Toggle Switch */}
+                                    <label
                                         style={{
-                                            position: "absolute",
-                                            top: 0,
-                                            left: 0,
-                                            right: 0,
-                                            bottom: 0,
-                                            backgroundColor: usePoints ? "#226533" : "#d9d9d9",
-                                            borderRadius: 24,
-                                            transition: "0.3s",
+                                            position: "relative",
+                                            display: "inline-block",
+                                            width: 44,
+                                            height: 24,
+                                            cursor: "pointer",
                                         }}
                                     >
+                                        <input
+                                            type="checkbox"
+                                            checked={usePoints}
+                                            onChange={(e) => setUsePoints(e.target.checked)}
+                                            style={{ opacity: 0, width: 0, height: 0 }}
+                                        />
                                         <span
                                             style={{
                                                 position: "absolute",
-                                                height: 18,
-                                                width: 18,
-                                                left: usePoints ? 23 : 3,
-                                                bottom: 3,
-                                                backgroundColor: "white",
-                                                borderRadius: "50%",
+                                                top: 0,
+                                                left: 0,
+                                                right: 0,
+                                                bottom: 0,
+                                                backgroundColor: usePoints ? "#226533" : "#d9d9d9",
+                                                borderRadius: 24,
                                                 transition: "0.3s",
                                             }}
-                                        />
-                                    </span>
-                                </label>
-                            </>
+                                        >
+                                            <span
+                                                style={{
+                                                    position: "absolute",
+                                                    height: 18,
+                                                    width: 18,
+                                                    left: usePoints ? 23 : 3,
+                                                    bottom: 3,
+                                                    backgroundColor: "white",
+                                                    borderRadius: "50%",
+                                                    transition: "0.3s",
+                                                }}
+                                            />
+                                        </span>
+                                    </label>
+                                </>
+                            ) : (
+                                // Đã đăng ký nhưng chưa có điểm → Hiển thị thông báo nhẹ
+                                <div style={{ width: '100%' }}>
+                                    <Text style={{ fontSize: 13, color: "#999", fontStyle: "italic" }}>
+                                        💡 Bạn chưa có điểm tích lũy. Tiếp tục sử dụng dịch vụ để tích điểm!
+                                    </Text>
+                                </div>
+                            )
                         ) : (
+                            // ✅ Chưa đăng ký → Hiển thị call-to-action đăng ký
                             <div style={{ width: '100%' }}>
                                 <Text style={{ fontSize: 13, color: "#999", fontStyle: "italic" }}>
                                     💡 Bạn chưa có điểm tích lũy.{' '}
@@ -1012,7 +1435,7 @@ export default function PaymentPage() {
                 </div>
             </Content>
 
-            {/* Footer với 2 nút */}
+            {/* Footer với nút thanh toán */}
             <div
                 style={{
                     position: "fixed",
@@ -1028,39 +1451,62 @@ export default function PaymentPage() {
                     zIndex: 1000,
                 }}
             >
-                {/* <Button
-                    size="large"
-                    style={{
-                        flex: 1,
-                        height: 44,
-                        borderRadius: 10,
-                        fontSize: 15,
-                        fontWeight: 600,
-                        border: "1px solid #226533",
-                        color: "#226533",
-                    }}
-                    onClick={handlePaymentLater}
-                >
-                    Hủy
-                </Button> */}
-                <Button
-                    type="primary"
-                    size="large"
-                    loading={loading}
-                    style={{
-                        flex: 1,
-                        height: 44,
-                        borderRadius: 10,
-                        fontSize: 15,
-                        fontWeight: 600,
-                        background: "linear-gradient(135deg, #226533 0%, #2d8e47 100%)",
-                        border: "none",
-                        boxShadow: "0 4px 12px rgba(34, 101, 51, 0.3)",
-                    }}
-                    onClick={handlePayment}
-                >
-                    Hoàn thành
-                </Button>
+                {/* ✅ Show different button states based on session status */}
+                {checkingSession ? (
+                    <Button
+                        type="primary"
+                        size="large"
+                        loading
+                        disabled
+                        style={{
+                            flex: 1,
+                            height: 44,
+                            borderRadius: 10,
+                            fontSize: 15,
+                            fontWeight: 600,
+                        }}
+                    >
+                        Đang kiểm tra...
+                    </Button>
+                ) : sessionStatus === 'COMPLETED' ? (
+                    <Button
+                        type="primary"
+                        size="large"
+                        disabled
+                        style={{
+                            flex: 1,
+                            height: 44,
+                            borderRadius: 10,
+                            fontSize: 15,
+                            fontWeight: 600,
+                            background: "#52c41a",
+                            border: "none",
+                            opacity: 0.7,
+                        }}
+                    >
+                        ✅ Đã thanh toán
+                    </Button>
+                ) : (
+                    <Button
+                        type="primary"
+                        size="large"
+                        loading={loading}
+                        disabled={loading || sessionStatus === 'COMPLETED'}
+                        style={{
+                            flex: 1,
+                            height: 44,
+                            borderRadius: 10,
+                            fontSize: 15,
+                            fontWeight: 600,
+                            background: "linear-gradient(135deg, #226533 0%, #2d8e47 100%)",
+                            border: "none",
+                            boxShadow: "0 4px 12px rgba(34, 101, 51, 0.3)",
+                        }}
+                        onClick={handlePayment}
+                    >
+                        Hoàn thành
+                    </Button>
+                )}
             </div>
 
             {/* ========================================
@@ -1090,7 +1536,24 @@ export default function PaymentPage() {
                             <p className="text-xs text-gray-600 leading-relaxed">
                                 Đang chờ xác nhận từ nhân viên
                             </p>
+                            <p className="text-xs text-gray-500 mt-2">
+                                {Math.floor(elapsedTime / 60)}:{String(elapsedTime % 60).padStart(2, '0')} / 5:00
+                            </p>
                         </div>
+
+                        {/* Nút Hủy */}
+                        <Button
+                            onClick={handleCancelPayment}
+                            style={{
+                                marginTop: 24,
+                                borderRadius: 8,
+                                height: 40,
+                                paddingLeft: 24,
+                                paddingRight: 24,
+                            }}
+                        >
+                            Hủy yêu cầu
+                        </Button>
                     </div>
 
                     {/* Minimal CSS */}
@@ -1348,7 +1811,7 @@ export default function PaymentPage() {
                                 <Button
                                     type="primary"
                                     size="large"
-                                    onClick={handleCloseQRModal}
+                                    onClick={handleConfirmBankingPayment}
                                     style={{
                                         height: 48,
                                         borderRadius: 12,
@@ -1368,7 +1831,7 @@ export default function PaymentPage() {
                                         e.target.style.boxShadow = '0 4px 16px rgba(34, 101, 51, 0.3)';
                                     }}
                                 >
-                                    Xác nhận thanh toán
+                                    Tôi đã chuyển khoản
                                 </Button>
                             </div>
                         </div>

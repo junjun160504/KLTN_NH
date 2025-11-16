@@ -1,6 +1,7 @@
 import express from 'express';
 import {
     loginAdmin,
+    validateTokenController,
     getLoginAdmin,
     registerAdminController,
     // CRUD controllers
@@ -30,6 +31,9 @@ router.post('/login', loginAdmin);
 // ============================================
 // PROTECTED ROUTES (Authentication required)
 // ============================================
+
+// Validate token - Check if token is still valid
+router.get('/validate', verifyToken, validateTokenController);
 
 // OWNER ONLY - Register new admin
 router.post('/register-admin', verifyToken, verifyRole(['OWNER']), registerAdminController);

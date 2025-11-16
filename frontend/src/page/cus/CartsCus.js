@@ -190,9 +190,12 @@ const REACT_APP_API_URL = process.env.REACT_APP_API_URL; export default function
 
       // Validate session is still active
       if (status !== "ACTIVE") {
-        message.error("Phiên đặt bàn đã kết thúc. Vui lòng quét lại QR!");
-        localStorage.removeItem("qr_session");
-        navigate("/cus/qr-scan");
+        if (status === "COMPLETED") {
+          message.error("Phiên đã thanh toán xong. Vui lòng quét QR mới để đặt hàng!");
+        } else {
+          message.error("Phiên đặt bàn đã kết thúc. Vui lòng quét lại QR!");
+        }
+        navigate("/cus/homes"); // Navigate to homes instead of qr-scan
         return;
       }
 

@@ -18,6 +18,34 @@ export async function loginAdmin(req, res) {
         });
     }
 }
+
+/**
+ * Validate token - Check if current token is still valid
+ * Uses verifyToken middleware, so if we reach here, token is valid
+ */
+export async function validateTokenController(req, res) {
+    try {
+        // Token đã được verify bởi middleware verifyToken
+        // req.user chứa thông tin user từ token
+        res.status(200).json({
+            status: 200,
+            valid: true,
+            user: {
+                id: req.user.id,
+                username: req.user.username,
+                role: req.user.role,
+                name: req.user.name
+            }
+        });
+    } catch (err) {
+        console.error('validateToken error:', err);
+        res.status(401).json({
+            status: 401,
+            valid: false,
+            message: 'Token validation failed'
+        });
+    }
+}
 export async function getLoginAdmin(req, res) {
     try {
         const logins = await adminService.getLogins();

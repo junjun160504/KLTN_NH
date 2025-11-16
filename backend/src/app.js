@@ -23,6 +23,7 @@ import menuItem from './routes/menuItem.routes.js';
 import notificationRoutes from './routes/notification.routes.js'; // Notification system
 import employeeRoutes from './routes/employee.routes.js';     // Employee management
 import dashboardRoutes from './routes/dashboard.routes.js';   // Dashboard analytics
+import pointRoutes from './routes/point.routes.js';           // Point system
 
 const app = express();
 app.use(cors());
@@ -52,6 +53,7 @@ app.use('/api/menu-item', menuItem);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/points', pointRoutes);
 
 
 app.get('/', (req, res) => res.send('Restaurant API running...'));

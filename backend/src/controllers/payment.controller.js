@@ -86,7 +86,7 @@ export async function listPayments(req, res) {
 
 export async function paymentByAdmin(req, res) {
   try {
-    const { sessionId, adminId } = req.body;
+    const { sessionId, adminId, useAllPoints = false } = req.body;
 
     // validate sessionId is active
     const session = await validateSession(sessionId);
@@ -94,7 +94,12 @@ export async function paymentByAdmin(req, res) {
       return res.status(400).json({ status: 400, message: "Invalid or expired session" });
     }
 
-    const result = await paymentService.payOrderByAdmin({ sessionId, adminId });
+    const result = await paymentService.payOrderByAdmin({
+      sessionId,
+      adminId,
+      useAllPoints
+    });
+
     if (!result.success) {
       return res.status(400).json({ status: 400, message: result.message });
     }
@@ -119,3 +124,49 @@ export async function notifyForUser(req, res) {
   }
 }
 
+// Tạo payment records cho session (từ customer)
+export async function createSessionPayments(req, res) {
+  try {
+    const { sessionId, method, orderIds } = req.body;
+
+    // Validate input
+    if (!sessionId || !method || !orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+      return res.status(400).json({
+        status: 400,
+        message: 'Missing required fields: sessionId, method, orderIds'
+      });
+    }
+
+    const result = await paymentService.createSessionPayments({
+      sessionId,
+      method,
+      orderIds
+    });
+
+    res.status(200).json({ status: 200, data: result });
+  } catch (err) {
+    console.error("createSessionPayments error:", err);
+    res.status(500).json({ status: 500, message: err.message });
+  }
+}
+
+// Hủy payment records cho session
+export async function cancelSessionPayments(req, res) {
+  try {
+    const { sessionId } = req.params;
+
+    if (!sessionId) {
+      return res.status(400).json({
+        status: 400,
+        message: 'Missing sessionId parameter'
+      });
+    }
+
+    const result = await paymentService.cancelSessionPayments(sessionId);
+
+    res.status(200).json({ status: 200, data: result });
+  } catch (err) {
+    console.error("cancelSessionPayments error:", err);
+    res.status(500).json({ status: 500, message: err.message });
+  }
+}

@@ -8,22 +8,23 @@ import {
   deleteQR,
   scanQR
 } from "../controllers/qr.controller.js";
+import { verifyToken } from "../middlewares/auth.middleware.js";
 
 const router = express.Router();
 
-// QR Generation Routes
-router.post("/generate/:tableId", generateQR);           // Generate QR for specific table
-router.post("/generate-all", generateAllQRs);            // Generate QR for all active tables
+// QR Generation Routes (Admin only)
+router.post("/generate/:tableId", verifyToken, generateQR);           // Generate QR for specific table
+router.post("/generate-all", verifyToken, generateAllQRs);            // Generate QR for all active tables
 
-// QR Validation Routes  
+// QR Validation Routes (Public - customer scan)
 router.post("/validate", validateQR);                    // Validate QR URL from request body
 router.get("/scan", scanQR);                            // Validate QR from query params (for frontend)
 
-// QR Information Routes
-router.get("/info/:tableId", getQRInfo);                // Get QR info for specific table
-router.get("/download/:tableId", downloadQRImage);       // Download QR image file
+// QR Information Routes (Admin only)
+router.get("/info/:tableId", verifyToken, getQRInfo);                // Get QR info for specific table
+router.get("/download/:tableId", verifyToken, downloadQRImage);       // Download QR image file
 
-// QR Management Routes
-router.delete("/:tableId", deleteQR);                   // Delete QR for specific table
+// QR Management Routes (Admin only)
+router.delete("/:tableId", verifyToken, deleteQR);                   // Delete QR for specific table
 
 export default router;

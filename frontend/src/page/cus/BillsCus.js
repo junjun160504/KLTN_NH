@@ -137,7 +137,7 @@ const STATUS_CONFIG = {
 export default function CustomerBillPage() {
   const navigate = useNavigate();
   const { session } = useSession(); // ✅ Get session from context
-  const { message } = App.useApp(); // ✅ Use hook for notification and message
+  const { message, modal } = App.useApp(); // ✅ Use hook for notification, message, and modal
   const hasShownWarning = useRef(false); // ✅ Track if warning shown (doesn't trigger re-render)
 
   // ✅ State
@@ -176,7 +176,7 @@ export default function CustomerBillPage() {
 
   // ✅ Delete item from NEW order
   const handleDeleteItem = async (orderId, itemId, itemName) => {
-    Modal.confirm({
+    modal.confirm({
       title: 'Xác nhận xóa món',
       content: `Bạn có chắc muốn xóa "${itemName}" khỏi đơn hàng?`,
       okText: 'Xóa',
@@ -198,7 +198,9 @@ export default function CustomerBillPage() {
 
   // ✅ Cancel entire NEW order
   const handleCancelOrder = async (orderId) => {
-    Modal.confirm({
+    console.log('🔴 handleCancelOrder called with orderId:', orderId);
+
+    modal.confirm({
       title: 'Xác nhận hủy đơn',
       content: 'Bạn có chắc muốn hủy toàn bộ đơn hàng này?',
       okText: 'Hủy đơn',
@@ -206,13 +208,18 @@ export default function CustomerBillPage() {
       okButtonProps: { danger: true },
       onOk: async () => {
         try {
-          await axios.put(`${REACT_APP_API_URL}/orders/${orderId}/cancel`);
+          console.log('📤 Calling API to cancel order:', orderId);
+          const response = await axios.put(`${REACT_APP_API_URL}/orders/${orderId}/cancel`, {
+            reason: 'Khách hàng hủy đơn' // Optional reason
+          });
+          console.log('✅ Cancel order response:', response.data);
 
           message.success('Đã hủy đơn hàng thành công');
           fetchOrders(true); // Silent refresh
         } catch (error) {
-          console.error('Error cancelling order:', error);
-          message.error('Không thể hủy đơn. Vui lòng thử lại!');
+          console.error('❌ Error cancelling order:', error);
+          console.error('Error details:', error.response?.data);
+          message.error(error.response?.data?.message || 'Không thể hủy đơn. Vui lòng thử lại!');
         }
       }
     });
@@ -509,14 +516,14 @@ export default function CustomerBillPage() {
                           </div>
                         )}
 
-                        {/* Right: Review Button for IN_PROGRESS orders */}
-                        {order.status === 'IN_PROGRESS' && (
+                        {/* Right: Review Button for IN_PROGRESS and PAID orders */}
+                        {(order.status === 'IN_PROGRESS' || order.status === 'PAID') && (
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <Button
                               type="primary"
                               size="small"
                               onClick={() => navigate('/cus/reviews', {
-                                state: { orderIds: [order.id] } // ✅ Pass as array for flexibility
+                                state: { orderIds: [order.id] }
                               })}
                               className="flex items-center justify-center"
                               style={{
@@ -524,10 +531,14 @@ export default function CustomerBillPage() {
                                 fontSize: DESIGN_TOKENS.fontSize.xs,
                                 fontWeight: 500,
                                 height: 'auto',
-                                background: `linear-gradient(135deg, ${DESIGN_TOKENS.colors.warning} 0%, #ff9800 100%)`,
+                                background: order.status === 'PAID'
+                                  ? `linear-gradient(135deg, ${DESIGN_TOKENS.colors.success} 0%, #73d13d 100%)`
+                                  : `linear-gradient(135deg, ${DESIGN_TOKENS.colors.warning} 0%, #ff9800 100%)`,
                                 border: 'none',
                                 borderRadius: DESIGN_TOKENS.radius.sm,
-                                boxShadow: '0 2px 6px rgba(250, 140, 22, 0.25)',
+                                boxShadow: order.status === 'PAID'
+                                  ? '0 2px 6px rgba(82, 196, 26, 0.25)'
+                                  : '0 2px 6px rgba(250, 140, 22, 0.25)',
                               }}
                             >
                               Đánh giá

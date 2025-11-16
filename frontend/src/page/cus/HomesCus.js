@@ -26,13 +26,16 @@ import { useNavigate } from "react-router-dom";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import { useQRHandler } from "../../hooks/useQRHandler"; // ✅ Import QR handler
+import { useSession } from "../../contexts/SessionContext"; // ✅ Import session context
 import LoyaltyRegistrationModal from "../../components/LoyaltyRegistrationModal";
+import { updateSessionCustomer, saveCustomerInfo } from "../../utils/sessionUtils"; // 🎯 Import session utilities
 const { Header, Content, Footer } = Layout;
 const { Title, Text } = Typography;
 
 export default function HomecsPage() {
   const navigate = useNavigate();
   const { modal, message } = App.useApp(); // ✅ Use App hook for modal and message
+  const { session } = useSession(); // ✅ Get session from context
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [tableNumber, setTableNumber] = useState(null); // ✅ State for actual table number
@@ -67,6 +70,26 @@ export default function HomecsPage() {
   // Use useCallback to prevent recreating functions on every render
   const handleQRSuccess = useCallback((sessionData) => {
     message.success(`Đã quét QR thành công!`);
+
+    // ✅ Clear loyalty customer info when scanning new QR (new session)
+    // This allows new customer to register without being locked to previous customer's info
+    localStorage.removeItem('loyalty_customer');
+    setLoyaltyCustomer(null);
+    console.log('🔄 Cleared loyalty customer info for new session');
+
+    // ✅ Clear restaurant review from old session
+    // Pattern: restaurant_review_session_* (will be recreated with new session_id)
+    const restaurantReviewKeys = Object.keys(localStorage).filter(key =>
+      key.startsWith('restaurant_review_session_')
+    );
+    restaurantReviewKeys.forEach(key => {
+      localStorage.removeItem(key);
+      console.log(`🔄 Cleared old restaurant review: ${key}`);
+    });
+
+    // ✅ Note: qr_session is automatically overwritten by useQRHandler with new session data
+    // No need to manually remove old session - it gets replaced automatically
+
     fetchTableNumber();
     // ✅ Fetch table number again after QR scan
   }, [message, fetchTableNumber]);
@@ -163,20 +186,17 @@ export default function HomecsPage() {
       if (response.status === 201 || response.status === 200) {
         const customerData = response.data.data;
 
-        // Save to localStorage for future use
-        const customerInfo = {
-          id: customerData.id,
-          phone: customerData.phone,
-          name: customerData.name || null, // ✅ Save name
-          loyalty_points: customerData.loyalty_points || 0,
-        };
-        localStorage.setItem('loyalty_customer', JSON.stringify(customerInfo));
-        setLoyaltyCustomer(customerInfo); // ✅ Update state
+        // 🎯 Save customer info using utility function
+        const customerInfo = saveCustomerInfo(customerData);
+        setLoyaltyCustomer(customerInfo);
+
+        // 🎯 UPDATE qr_session với customer_id using utility function
+        await updateSessionCustomer(customerData.id);
 
         message.success({
           content: response.status === 201
             ? 'Đăng ký thành công!'
-            : 'Cập nhật thông tin thành công!',
+            : 'Ghi nhận thông tin thành công!',
           duration: 3,
         });
 
@@ -254,7 +274,7 @@ export default function HomecsPage() {
                 </div>
                 <div className="bg-yellow-50 rounded-lg p-3 border border-yellow-200">
                   <p className="text-xs text-gray-600 m-0">
-                    💡 <strong>1000 điểm</strong> cho mỗi <strong>1000₫</strong> chi tiêu
+                    💡 <strong>1 điểm</strong> cho mỗi <strong>10,000₫</strong> chi tiêu | <strong>100 điểm</strong> = <strong>10,000₫</strong> giảm giá
                   </p>
                 </div>
               </div>
@@ -340,7 +360,7 @@ export default function HomecsPage() {
 
         <Text strong style={{ fontSize: 16, color: "#333" }}>
           {greeting}
-          {tableNumber && (
+          {tableNumber && session?.status === 'ACTIVE' && (
             <>
               {" • Bàn "}
               <Tag

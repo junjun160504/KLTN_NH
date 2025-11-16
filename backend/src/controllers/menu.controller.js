@@ -1,5 +1,5 @@
 import * as menuService from "../services/menu.service.js";
-import { deleteOldImage } from "../middlewares/imageUpload.middleware.js";
+import { deleteFromCloudinary } from "../config/cloudinary.js";
 import fs from 'fs';
 
 // Lấy danh sách món (theo tên hoặc all)
@@ -14,7 +14,7 @@ export async function getMenuItems(req, res) {
   }
 }
 
-// Thêm món mới (admin)
+// Thêm món mới (admin) - Upload to Cloudinary
 export async function createMenuItem(req, res) {
   try {
     // Parse category nếu là JSON string (từ FormData)
@@ -27,16 +27,16 @@ export async function createMenuItem(req, res) {
       }
     }
 
-    // Get image path from multer (if uploaded file)
-    // Priority: uploaded file > image_url từ body
-    const image_url = req.file
-      ? `/uploads/menu-items/${req.file.filename}`
-      : req.body.image_url || null;
+    // Get Cloudinary URL from middleware (processCloudinaryUpload)
+    // Priority: Cloudinary upload > image_url từ body
+    const image_url = req.file?.cloudinary_url || req.body.image_url || null;
+    const cloudinary_public_id = req.file?.cloudinary_public_id || null;
 
     const newItem = await menuService.addMenuItem({
       ...req.body,
       category,
-      image_url
+      image_url,
+      cloudinary_public_id
     });
 
     res.status(201).json({
@@ -45,13 +45,13 @@ export async function createMenuItem(req, res) {
       message: 'Thêm món ăn thành công'
     });
   } catch (err) {
-    // Delete uploaded file if error occurs
-    if (req.file && req.file.path) {
+    // Rollback: Delete uploaded image from Cloudinary if DB insert fails
+    if (req.file?.cloudinary_public_id) {
       try {
-        fs.unlinkSync(req.file.path);
-        console.log('🗑️ Deleted uploaded file due to error');
-      } catch (unlinkErr) {
-        console.error('Error deleting file:', unlinkErr);
+        await deleteFromCloudinary(req.file.cloudinary_public_id);
+        console.log('🔄 Rollback: Deleted image from Cloudinary');
+      } catch (deleteErr) {
+        console.error('Failed to delete image during rollback:', deleteErr);
       }
     }
 
@@ -111,7 +111,7 @@ export async function getMenuItemDetail(req, res) {
 
 // ================ MENU ITEM CRUD CONTROLLERS ================
 
-// Cập nhật món ăn (Update)
+// Cập nhật món ăn (Update) - Cloudinary
 export async function updateMenuItem(req, res) {
   try {
     const { id } = req.params;
@@ -128,9 +128,9 @@ export async function updateMenuItem(req, res) {
 
     // Validation: Kiểm tra price nếu có
     if (price !== undefined && (isNaN(price) || price < 0)) {
-      // Delete uploaded file if validation fails
-      if (req.file && req.file.path) {
-        fs.unlinkSync(req.file.path);
+      // Rollback: Delete uploaded image from Cloudinary if validation fails
+      if (req.file?.cloudinary_public_id) {
+        await deleteFromCloudinary(req.file.cloudinary_public_id);
       }
 
       return res.status(400).json({
@@ -139,29 +139,39 @@ export async function updateMenuItem(req, res) {
       });
     }
 
-    // Get old item to retrieve old image path
+    // Get old item to retrieve old image info
     const oldItem = await menuService.getMenuItemById(id);
 
-    // Get new image path from multer (if uploaded file)
-    // Priority: uploaded file > image_url từ body > keep old image
-    let newImageUrl = image_url;
-    if (req.file) {
-      newImageUrl = `/uploads/menu-items/${req.file.filename}`;
-
-      // Delete old image if exists and is local file
-      if (oldItem && oldItem.image_url && oldItem.image_url.startsWith('/uploads/')) {
-        deleteOldImage(oldItem.image_url);
-      }
-    }
-
-    const updatedItem = await menuService.updateMenuItem(id, {
+    // Prepare update data
+    const updateData = {
       name,
       price,
       description,
       category,
-      image_url: newImageUrl,
       is_available
-    });
+    };
+
+    // Handle image upload
+    if (req.file?.cloudinary_url) {
+      // New image uploaded to Cloudinary
+      updateData.image_url = req.file.cloudinary_url;
+      updateData.cloudinary_public_id = req.file.cloudinary_public_id;
+
+      // Delete old image from Cloudinary
+      if (oldItem?.cloudinary_public_id) {
+        try {
+          await deleteFromCloudinary(oldItem.cloudinary_public_id);
+          console.log('🗑️ Deleted old image from Cloudinary');
+        } catch (deleteErr) {
+          console.error('Failed to delete old image:', deleteErr);
+        }
+      }
+    } else if (image_url) {
+      // Keep existing or use provided URL
+      updateData.image_url = image_url;
+    }
+
+    const updatedItem = await menuService.updateMenuItem(id, updateData);
 
     res.json({
       status: 200,
@@ -169,13 +179,13 @@ export async function updateMenuItem(req, res) {
       data: updatedItem
     });
   } catch (err) {
-    // Delete uploaded file if error occurs
-    if (req.file && req.file.path) {
+    // Rollback: Delete uploaded image from Cloudinary if update fails
+    if (req.file?.cloudinary_public_id) {
       try {
-        fs.unlinkSync(req.file.path);
-        console.log('🗑️ Deleted uploaded file due to error');
-      } catch (unlinkErr) {
-        console.error('Error deleting file:', unlinkErr);
+        await deleteFromCloudinary(req.file.cloudinary_public_id);
+        console.log('🔄 Rollback: Deleted image from Cloudinary');
+      } catch (deleteErr) {
+        console.error('Failed to delete image during rollback:', deleteErr);
       }
     }
 
@@ -223,11 +233,27 @@ export async function deleteMenuItem(req, res) {
   }
 }
 
-// Xóa vĩnh viễn món ăn (Hard Delete)
+// Xóa vĩnh viễn món ăn (Hard Delete) - Also delete from Cloudinary
 export async function hardDeleteMenuItem(req, res) {
   try {
     const { id } = req.params;
+
+    // Get item để lấy cloudinary_public_id
+    const item = await menuService.getMenuItemById(id);
+
+    // Delete from database
     const result = await menuService.hardDeleteMenuItem(id);
+
+    // Delete from Cloudinary if exists
+    if (item?.cloudinary_public_id) {
+      try {
+        await deleteFromCloudinary(item.cloudinary_public_id);
+        console.log('🗑️ Deleted image from Cloudinary');
+      } catch (deleteErr) {
+        console.error('Failed to delete image from Cloudinary:', deleteErr);
+        // Continue anyway, DB already deleted
+      }
+    }
 
     res.json({
       status: 200,

@@ -289,7 +289,7 @@ export async function updateItemQuantity(req, res) {
 export async function cancelOrder(req, res) {
   try {
     const { orderId } = req.params;
-    const { reason } = req.body;
+    const { reason } = req.body || {}; // ✅ Safe destructuring
 
     if (!orderId) {
       return res.status(400).json({

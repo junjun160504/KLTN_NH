@@ -44,7 +44,6 @@ export default function CustomerReviewAllPage() {
   const [submittedAt, setSubmittedAt] = useState(null);
 
   // ✅ Popup
-  const [thankYouVisible, setThankYouVisible] = useState(false);
   const [warningVisible, setWarningVisible] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -54,8 +53,10 @@ export default function CustomerReviewAllPage() {
     return `review_draft_order_${orderId}`;
   }, []);
 
-  // ✅ Key chung cho đánh giá nhà hàng (không phụ thuộc orderIds)
-  const RESTAURANT_REVIEW_KEY = 'restaurant_review_common';
+  // ✅ Key cho đánh giá nhà hàng theo session_id (mỗi phiên có đánh giá riêng)
+  const getRestaurantReviewKey = useCallback(() => {
+    return qrSessionId ? `restaurant_review_session_${qrSessionId}` : 'restaurant_review_common';
+  }, [qrSessionId]);
 
   // ✅ Load saved review from localStorage
   // Strategy: Load reviews from each order separately, then merge
@@ -86,8 +87,9 @@ export default function CustomerReviewAllPage() {
         }
       });
 
-      // Load đánh giá nhà hàng từ key chung
-      const restaurantReview = localStorage.getItem(RESTAURANT_REVIEW_KEY);
+      // Load đánh giá nhà hàng từ key theo session (mỗi phiên riêng biệt)
+      const restaurantReviewKey = getRestaurantReviewKey();
+      const restaurantReview = localStorage.getItem(restaurantReviewKey);
       let storeRatingData = 0;
       let storeFeedbackData = "";
 
@@ -95,7 +97,7 @@ export default function CustomerReviewAllPage() {
         const parsed = JSON.parse(restaurantReview);
         storeRatingData = parsed.rating || 0;
         storeFeedbackData = parsed.feedback || "";
-        console.log('📥 Loaded restaurant review from localStorage:', parsed);
+        console.log('📥 Loaded restaurant review from localStorage (session-specific):', parsed);
       }
 
       return {
@@ -109,7 +111,7 @@ export default function CustomerReviewAllPage() {
       console.error('Error loading saved review:', error);
     }
     return null;
-  }, [orderIds, getReviewStorageKeyForOrder, RESTAURANT_REVIEW_KEY]);
+  }, [orderIds, getReviewStorageKeyForOrder, getRestaurantReviewKey]);
 
   // ✅ Save review to localStorage (auto-save)
   // Strategy: Save each order's item reviews separately to avoid data loss
@@ -146,18 +148,19 @@ export default function CustomerReviewAllPage() {
         console.log(`💾 Auto-saved reviews for order ${orderId}`);
       });
 
-      // Save đánh giá nhà hàng vào key chung
+      // Save đánh giá nhà hàng vào key theo session (mỗi phiên riêng)
+      const restaurantReviewKey = getRestaurantReviewKey();
       const restaurantReviewData = {
         rating: storeRating,
         feedback: storeFeedback,
         timestamp: Date.now(),
       };
-      localStorage.setItem(RESTAURANT_REVIEW_KEY, JSON.stringify(restaurantReviewData));
-      console.log('💾 Auto-saved restaurant review to localStorage (shared)');
+      localStorage.setItem(restaurantReviewKey, JSON.stringify(restaurantReviewData));
+      console.log('💾 Auto-saved restaurant review to localStorage (session-specific):', restaurantReviewKey);
     } catch (error) {
       console.error('Error saving review to localStorage:', error);
     }
-  }, [orderIds, orderItems, itemReviews, storeRating, storeFeedback, isSubmitted, submittedAt, getReviewStorageKeyForOrder, RESTAURANT_REVIEW_KEY]);
+  }, [orderIds, orderItems, itemReviews, storeRating, storeFeedback, isSubmitted, submittedAt, getReviewStorageKeyForOrder, getRestaurantReviewKey]);
 
   // ✅ Clear saved review from localStorage (after submit)
   const clearSavedReview = useCallback(() => {
@@ -265,7 +268,8 @@ export default function CustomerReviewAllPage() {
 
       return () => clearTimeout(timeoutId);
     }
-  }, [itemReviews, storeRating, storeFeedback, orderItems.length, saveReviewToLocalStorage]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemReviews, storeRating, storeFeedback, orderItems.length]);
 
   // Handle rating change for specific item
   const handleRateFood = (itemId, value) => {
@@ -285,12 +289,12 @@ export default function CustomerReviewAllPage() {
 
   // Submit reviews
   const handleSubmit = async () => {
-    // Check if at least one review is provided
+    // ✅ Check if at least one rating is provided (rating is REQUIRED, note is optional)
     const hasItemReview = Object.values(itemReviews).some(
-      review => review.rating > 0 || review.note.trim() !== ""
+      review => review.rating > 0
     );
 
-    const hasStoreReview = storeRating > 0 || storeFeedback.trim() !== "";
+    const hasStoreReview = storeRating > 0;
 
     if (!hasItemReview && !hasStoreReview) {
       setWarningVisible(true);
@@ -303,8 +307,9 @@ export default function CustomerReviewAllPage() {
       // ========================================
       // SUBMIT ITEM REVIEWS (món ăn)
       // ========================================
+      // ✅ Only submit items with rating > 0 (rating is required, note is optional)
       const itemReviewsToSubmit = Object.entries(itemReviews)
-        .filter(([_, review]) => review.rating > 0 || review.note.trim() !== "")
+        .filter(([_, review]) => review.rating > 0)
         .map(([orderItemId, review]) => {
           // Find the corresponding order_item to get menu_item_id
           const orderItem = orderItems.find(item => item.id === parseInt(orderItemId));
@@ -376,10 +381,13 @@ export default function CustomerReviewAllPage() {
       if (failCount > 0) {
         message.warning(`Đã gửi ${successCount}/${itemReviewsToSubmit.length} đánh giá món ăn thành công`);
       } else {
-        message.success('Đã gửi đánh giá thành công!');
+        message.success('Cảm ơn bạn đã đánh giá! 🎉', 3);
       }
 
-      setThankYouVisible(true);
+      // Navigate back after short delay (keep reviews in localStorage for history)
+      setTimeout(() => {
+        navigate(-1);
+      }, 1500);
 
     } catch (error) {
       console.error("Error submitting reviews:", error);
@@ -508,56 +516,13 @@ export default function CustomerReviewAllPage() {
           </div>
         ) : (
           <>
-            {/* ---- SUBMISSION STATUS BANNER ---- */}
-            {isSubmitted && (
-              <div
-                style={{
-                  background: "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)",
-                  border: "1px solid #bae6fd",
-                  borderRadius: 12,
-                  padding: "12px 16px",
-                  marginBottom: 16,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                }}
-              >
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: "50%",
-                    background: "#0ea5e9",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 20,
-                    flexShrink: 0,
-                  }}
-                >
-                  ✅
-                </div>
-                <div style={{ flex: 1 }}>
-                  <Text strong style={{ fontSize: 14, color: "#0369a1", display: "block" }}>
-                    Đánh giá đã được gửi
-                  </Text>
-                  <Text style={{ fontSize: 12, color: "#0369a1" }}>
-                    {submittedAt
-                      ? `Gửi lúc ${new Date(submittedAt).toLocaleString('vi-VN')}`
-                      : 'Bạn có thể chỉnh sửa và gửi lại'
-                    }
-                  </Text>
-                </div>
-              </div>
-            )}
-
             {/* ---- ĐÁNH GIÁ MÓN ĂN ---- */}
             <div className="mb-6">
               <Title level={5} style={{ marginBottom: 12, color: "#226533", fontSize: 15 }}>
-                Đánh giá món ăn
+                Đánh giá món ăn <span style={{ color: "#ff4d4f" }}>*</span>
               </Title>
               <Text type="secondary" style={{ fontSize: 12, display: "block", marginBottom: 16 }}>
-                Đánh giá chất lượng từng món để giúp chúng tôi cải thiện
+                Đánh giá số sao là bắt buộc, góp ý thêm là tùy chọn
               </Text>
 
               <List
@@ -614,7 +579,7 @@ export default function CustomerReviewAllPage() {
                           {/* Note Input */}
                           <Input.TextArea
                             rows={2}
-                            placeholder="Món ăn có ngon không..."
+                            placeholder="Góp ý thêm (không bắt buộc)..."
                             value={review.note}
                             onChange={(e) => handleNoteFood(item.id, e.target.value)}
                             style={{
@@ -645,7 +610,7 @@ export default function CustomerReviewAllPage() {
                 Đánh giá nhà hàng
               </Title>
               <Text type="secondary" style={{ fontSize: 12, display: "block", marginBottom: 12 }}>
-                Chia sẻ thêm về trải nghiệm của bạn với nhà hàng
+                Đánh giá số sao nếu muốn, góp ý thêm là tùy chọn
               </Text>
 
               {/* Restaurant Rating */}
@@ -660,7 +625,7 @@ export default function CustomerReviewAllPage() {
               {/* Restaurant Feedback */}
               <TextArea
                 rows={4}
-                placeholder="Chia sẻ thêm về trải nghiệm của bạn với nhà hàng..."
+                placeholder="Góp ý thêm (không bắt buộc)..."
                 value={storeFeedback}
                 onChange={(e) => setStoreFeedback(e.target.value)}
                 style={{
@@ -706,64 +671,9 @@ export default function CustomerReviewAllPage() {
             height: 48,
           }}
         >
-          {isSubmitted ? '🔄 Cập nhật đánh giá' : 'Gửi đánh giá'}
+          {isSubmitted ? 'Cập nhật đánh giá' : 'Gửi đánh giá'}
         </Button>
       </div>
-
-      {/* -------- POPUP CẢM ƠN -------- */}
-      <Modal
-        open={thankYouVisible}
-        onCancel={() => {
-          setThankYouVisible(false);
-          navigate("/cus/homes");
-        }}
-        footer={null}
-        centered
-        width={360}
-      >
-        <div style={{ textAlign: "center", padding: "20px 12px" }}>
-          <div
-            style={{
-              width: 80,
-              height: 80,
-              margin: "0 auto 20px",
-              background: "linear-gradient(135deg, #226533 0%, #2d8e47 100%)",
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 40,
-            }}
-          >
-            🎉
-          </div>
-          <Title level={4} style={{ color: "#226533", marginBottom: 8 }}>
-            {isSubmitted ? 'Đã cập nhật đánh giá!' : 'Cảm ơn bạn đã đánh giá!'}
-          </Title>
-          <Text style={{ fontSize: 14, color: "#666" }}>
-            {isSubmitted
-              ? 'Đánh giá của bạn đã được cập nhật thành công 💚'
-              : 'Ý kiến của bạn giúp chúng tôi phục vụ tốt hơn 💚'
-            }
-          </Text>
-          <Button
-            type="primary"
-            size="large"
-            block
-            onClick={() => navigate("/cus/homes")}
-            style={{
-              marginTop: 24,
-              background: "linear-gradient(135deg, #226533 0%, #2d8e47 100%)",
-              border: "none",
-              borderRadius: 10,
-              fontWeight: 600,
-              height: 44,
-            }}
-          >
-            Về trang chủ
-          </Button>
-        </div>
-      </Modal>
 
       {/* -------- POPUP CẢNH BÁO -------- */}
       <Modal
@@ -790,10 +700,10 @@ export default function CustomerReviewAllPage() {
             ⚠️
           </div>
           <Title level={5} style={{ color: "#fa8c16", marginBottom: 8 }}>
-            Hãy đánh giá cho chúng tôi nhé!
+            Vui lòng đánh giá số sao!
           </Title>
           <Text style={{ fontSize: 13, color: "#666" }}>
-            Đánh giá của bạn rất quan trọng để chúng tôi cải thiện dịch vụ
+            Bạn cần đánh giá ít nhất 1 sao cho món ăn hoặc nhà hàng để gửi đánh giá
           </Text>
           <Button
             type="primary"

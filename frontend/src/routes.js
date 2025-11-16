@@ -22,6 +22,7 @@ import ReviewcsPage from "./page/cus/ReviewsCus";
 import FoodReviewcsPage from "./page/cus/FoodReviewsCus";
 import LoyaltycsPage from "./page/cus/LoyaltysCus";
 import FoodDetailcsPage from "./page/cus/FoodDetailsCus";
+import NotFoundPage from "./page/NotFound";
 
 // Import AdminLayout and ProtectedAdminRoute
 import AdminLayout from "./layouts/AdminLayout";
@@ -39,7 +40,11 @@ const routes = [
 
   {
     path: "/main/order-old",
-    element: <OrderPage />,
+    element: (
+      <ProtectedAdminRoute>
+        <AdminLayout><OrderPage /></AdminLayout>
+      </ProtectedAdminRoute>
+    ),
   },
 
   // Admin routes - Wrapped với ProtectedAdminRoute và AdminLayout
@@ -180,6 +185,12 @@ const routes = [
   {
     path: "/cus/fooddetails/:id",
     element: <CustomerLayout><FoodDetailcsPage /></CustomerLayout>,
+  },
+
+  // 404 Not Found - Must be last route (catch-all)
+  {
+    path: "*",
+    element: <NotFoundPage />,
   }
 ];
 

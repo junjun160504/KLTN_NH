@@ -32,7 +32,7 @@ export async function validateSession(sessionId) {
                 valid: false,
                 reason: 'SESSION_COMPLETED',
                 message: 'Session đã kết thúc (khách đã thanh toán)',
-                shouldClear: true // Frontend nên xóa localStorage
+                shouldClear: false // ✅ Không xóa - customer cần xem bills và reviews
             };
         }
 
@@ -145,5 +145,82 @@ export async function validateAndStartSession({ qrUrl, customer_id }) {
 // Đóng session khi thanh toán xong
 export async function closeSession(sessionId) {
     await query("UPDATE qr_sessions SET status = 'COMPLETED' WHERE id = ?", [sessionId]);
+
+    // ✅ Get session info to send notification
+    const [sessionData] = await query(
+        "SELECT qs.*, t.table_number FROM qr_sessions qs JOIN tables t ON qs.table_id = t.id WHERE qs.id = ?",
+        [sessionId]
+    );
+
+    // ✅ Emit notification to customer that session has ended
+    if (sessionData) {
+        const { emitNotification } = await import('../sockets/notification.socket.js');
+
+        emitNotification({
+            target_type: 'CUSTOMER',
+            type: 'session_ended',
+            title: `Phiên đã kết thúc - Bàn ${sessionData.table_number}`,
+            message: `Phiên của bạn đã được kết thúc bởi nhà hàng.`,
+            priority: 'high',
+            metadata: JSON.stringify({
+                sessionId: sessionData.id,
+                tableId: sessionData.table_id,
+                tableNumber: sessionData.table_number
+            })
+        });
+
+        console.log(`✅ Emitted session_ended notification for session ${sessionId}`);
+    }
+
     return { id: sessionId, status: "COMPLETED" };
 }
+
+/**
+ * Update customer_id cho qr_session
+ * Gọi sau khi customer đăng ký/đăng nhập
+ */
+export async function updateSessionCustomer(sessionId, customerId) {
+    // Validate session exists and is active
+    const [session] = await query(
+        "SELECT * FROM qr_sessions WHERE id = ? AND status = 'ACTIVE'",
+        [sessionId]
+    );
+
+    if (!session) {
+        throw new Error("Session not found or already closed");
+    }
+
+    // Update customer_id
+    await query(
+        "UPDATE qr_sessions SET customer_id = ?, updated_at = NOW() WHERE id = ?",
+        [customerId, sessionId]
+    );
+
+    // Return updated session
+    const [updated] = await query(
+        "SELECT * FROM qr_sessions WHERE id = ?",
+        [sessionId]
+    );
+
+    return updated;
+}
+
+/**
+ * Get session by ID (with customer info if available)
+ * Dùng cho admin khi cần lấy thông tin session để thanh toán
+ */
+export async function getSessionById(sessionId) {
+    const [session] = await query(
+        `SELECT 
+            qs.*,
+            t.table_number,
+            t.is_active as table_is_active
+        FROM qr_sessions qs
+        LEFT JOIN tables t ON qs.table_id = t.id
+        WHERE qs.id = ?`,
+        [sessionId]
+    );
+
+    return session;
+}
+

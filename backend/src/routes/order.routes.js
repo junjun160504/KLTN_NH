@@ -12,6 +12,7 @@ import {
   cancelOrder,
   createOrderByAdmin, // NEW: Admin create order
 } from "../controllers/order.controller.js";
+import { verifyToken } from "../middlewares/auth.middleware.js";
 
 const router = express.Router();
 
@@ -22,7 +23,7 @@ const router = express.Router();
  * Admin tạo order cho khách hàng tại quầy (không cần QR session)
  * Body: { table_id, items: [{menu_item_id, quantity, note}], customer_phone? }
  */
-router.post("/admin/create", createOrderByAdmin);
+router.post("/admin/create", verifyToken, createOrderByAdmin);
 
 // ========== CUSTOMER ROUTES ==========
 

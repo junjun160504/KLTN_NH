@@ -6,29 +6,45 @@ import {
   getPayment,
   listPayments,
   paymentByAdmin,
-  notifyForUser
+  notifyForUser,
+  createSessionPayments,
+  cancelSessionPayments
 } from "../controllers/payment.controller.js";
+import { verifyToken } from "../middlewares/auth.middleware.js";
 
 const router = express.Router();
 
-// Thanh toán
-router.post("/", processPayment);
+// ========== POST ROUTES (static paths first) ==========
 
-// Callback Napas/VietQR
+// Payment by admin (Admin) - MUST be before POST /
+router.post("/admin", verifyToken, paymentByAdmin);
+
+// Tạo payment records cho session (Customer - Public)
+router.post("/session", createSessionPayments);
+
+// Hoàn tiền (Admin)
+router.post("/refund", verifyToken, refundPayment);
+
+// Callback Napas/VietQR (Public)
 router.post("/callback", callbackPayment);
 
-// Hoàn tiền
-router.post("/refund", refundPayment);
-
-// Lấy 1 giao dịch
-router.get("/:id", getPayment);
-
-// Danh sách giao dịch
-router.get("/", listPayments);
-
-// Payment by admin 
-router.post("/admin", paymentByAdmin);
-
+// Notification (Internal)
 router.post("/noti", notifyForUser);
+
+// Thanh toán (Customer - Public) - Default POST
+router.post("/", processPayment);
+
+// ========== GET ROUTES ==========
+
+// Danh sách giao dịch (Admin) - MUST be before GET /:id
+router.get("/", verifyToken, listPayments);
+
+// Lấy 1 giao dịch (Admin)
+router.get("/:id", verifyToken, getPayment);
+
+// ========== PUT ROUTES ==========
+
+// Hủy payment records cho session (Customer - Public)
+router.put("/session/:sessionId/cancel", cancelSessionPayments);
 
 export default router;

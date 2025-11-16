@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import useSidebarCollapse from '../../../hooks/useSidebarCollapse'
 import {
   Layout,
@@ -40,6 +41,7 @@ import OrderList from '../../../components/management/OrderList'
 import { Switch } from 'antd'
 import { useAuth } from '../../../contexts/AuthContext'
 import { printInvoice } from '../../../components/InvoicePrinter'
+import { getImageUrl } from '../../../utils/imageUrlHelper'
 
 const { Content } = Layout
 const { Text, Title } = Typography
@@ -140,6 +142,8 @@ const TablesPage = () => {
   const [modal, contextHolder] = Modal.useModal()
   const { message } = App.useApp() // Use App hook for message
   const { user } = useAuth() // Get current logged-in admin
+  const location = useLocation()
+  const navigate = useNavigate()
 
   const [collapsed, setCollapsed] = useSidebarCollapse()
   const [pageTitle] = useState('Quản lý bàn')
@@ -175,6 +179,9 @@ const TablesPage = () => {
   const [selectedTable, setSelectedTable] = useState(null)
   const [currentOrderItems, setCurrentOrderItems] = useState([])
   const [loadingOrders, setLoadingOrders] = useState(false)
+
+  // 🎯 State để lưu lựa chọn của customer về việc dùng điểm (từ URL params)
+  const [customerWantsUsePoints, setCustomerWantsUsePoints] = useState(false)
 
   // Note editing state - track which notes have been modified
   const [editingNotes, setEditingNotes] = useState({})
@@ -362,8 +369,27 @@ const TablesPage = () => {
     fetchMenuItems(categoryId === 'all' ? null : categoryId)
   }
 
+  // Helper function to compare order items (wrapped in useCallback)
+  const areOrderItemsEqual = useCallback((oldItems, newItems) => {
+    if (oldItems.length !== newItems.length) return false
+
+    // Sort by order_item_id for consistent comparison
+    const sortedOld = [...oldItems].sort((a, b) => (a.order_item_id || 0) - (b.order_item_id || 0))
+    const sortedNew = [...newItems].sort((a, b) => (a.order_item_id || 0) - (b.order_item_id || 0))
+
+    // Compare each item
+    return sortedOld.every((oldItem, index) => {
+      const newItem = sortedNew[index]
+      return (
+        oldItem.order_item_id === newItem.order_item_id &&
+        oldItem.quantity === newItem.quantity &&
+        oldItem.order_status === newItem.order_status
+      )
+    })
+  }, [])
+
   // ================= Fetch Orders by Table =================
-  const fetchOrdersByTable = async (tableId, forceUpdate = false) => {
+  const fetchOrdersByTable = useCallback(async (tableId, forceUpdate = false) => {
     try {
       setLoadingOrders(true)
       const response = await axios.get(`${REACT_APP_API_URL}/orders/table/${tableId}`)
@@ -405,26 +431,7 @@ const TablesPage = () => {
     } finally {
       setLoadingOrders(false)
     }
-  }
-
-  // Helper function to compare order items (wrapped in useCallback)
-  const areOrderItemsEqual = useCallback((oldItems, newItems) => {
-    if (oldItems.length !== newItems.length) return false
-
-    // Sort by order_item_id for consistent comparison
-    const sortedOld = [...oldItems].sort((a, b) => (a.order_item_id || 0) - (b.order_item_id || 0))
-    const sortedNew = [...newItems].sort((a, b) => (a.order_item_id || 0) - (b.order_item_id || 0))
-
-    // Compare each item
-    return sortedOld.every((oldItem, index) => {
-      const newItem = sortedNew[index]
-      return (
-        oldItem.order_item_id === newItem.order_item_id &&
-        oldItem.quantity === newItem.quantity &&
-        oldItem.order_status === newItem.order_status
-      )
-    })
-  }, [])
+  }, [currentOrderItems, areOrderItemsEqual, message])
 
 
   // ================= Table Card Actions =================
@@ -445,7 +452,7 @@ const TablesPage = () => {
       return
     }
 
-    const qrImageUrl = `${replaceUrlServer(REACT_APP_API_URL)}${table.qr_code_url}`
+    const qrImageUrl = getQRImageUrl(table.qr_code_url)
 
     // Tạo iframe ẩn
     const iframe = document.createElement('iframe')
@@ -559,7 +566,7 @@ const TablesPage = () => {
 
     // Generate HTML cho tất cả QR
     const qrPages = tablesWithQR.map((table) => {
-      const qrImageUrl = `${replaceUrlServer(REACT_APP_API_URL)}${table.qr_code_url}`
+      const qrImageUrl = getQRImageUrl(table.qr_code_url)
       return `
         <div class="qr-container">
           <h1>🍽️ Nhà hàng</h1>
@@ -1297,6 +1304,51 @@ const TablesPage = () => {
     // Get session info
     const sessionId = orders[0]?.qr_session_id
 
+    // 🎯 Lấy thông tin customer và điểm từ session
+    let customerPoints = 0
+    let customerPhone = null
+    let customerName = null
+
+    try {
+      const sessionResponse = await axios.get(`${REACT_APP_API_URL}/qr-sessions/${sessionId}`)
+      const customerId = sessionResponse.data?.data?.customer_id
+
+      if (customerId) {
+        const customerResponse = await axios.get(`${REACT_APP_API_URL}/customers/${customerId}`)
+        customerPoints = customerResponse.data?.data?.points || 0
+        customerPhone = customerResponse.data?.data?.phone || null
+        customerName = customerResponse.data?.data?.name || null
+      }
+    } catch (error) {
+      console.log('Không lấy được thông tin điểm:', error)
+    }
+
+    // 🎯 Tính discount nếu dùng hết điểm
+    const calculateDiscount = (points) => {
+      if (points <= 0) return 0
+      const discount = Math.floor((points / 100) * 10000)
+      return Math.min(discount, totalAmount) // Không vượt quá tổng tiền
+    }
+
+    const maxDiscount = calculateDiscount(customerPoints)
+
+    // 🎯 Sử dụng state đã lưu từ khi mở order panel (không đọc từ URL vì đã bị clear)
+    // customerWantsUsePoints được set khi click notification và mở panel
+    const customerWantsPoints = customerWantsUsePoints
+
+    // 🎯 Sử dụng ref để lưu giá trị toggle (vì modal không re-render)
+    let usePointsValue = customerWantsPoints
+
+    const handleTogglePoints = (checked) => {
+      usePointsValue = checked
+      // Update hiển thị số tiền
+      const amountElement = document.getElementById('modal-final-amount')
+      if (amountElement) {
+        const finalAmount = totalAmount - (checked ? maxDiscount : 0)
+        amountElement.textContent = `${Number(finalAmount)?.toLocaleString('vi-VN')}₫`
+      }
+    }
+
     // Show confirmation modal with Japanese design (Tailwind CSS)
     modal.confirm({
       title: null,
@@ -1386,13 +1438,50 @@ const TablesPage = () => {
             {/* Divider */}
             <div className="h-px bg-gradient-to-r from-transparent via-[#d9d9d9] to-transparent my-3" />
 
+            {/* 🎯 LOYALTY POINTS SECTION */}
+            {customerPoints > 0 && (
+              <>
+                <div className="bg-[#fff7e6] rounded-lg p-3 mb-3 border border-[#ffd591]">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-[13px] text-[#d46b08] font-semibold">
+                      💎 Điểm tích lũy: {customerPoints?.toLocaleString('vi-VN')} điểm
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="text-xs text-[#ad6800] mb-1">
+                        Dùng hết điểm giảm:
+                      </div>
+                      <div className="text-sm font-semibold text-[#d46b08]">
+                        -{maxDiscount?.toLocaleString('vi-VN')}₫
+                      </div>
+                    </div>
+
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        id="use-points-toggle"
+                        defaultChecked={customerWantsPoints}
+                        onChange={(e) => handleTogglePoints(e.target.checked)}
+                      />
+                      <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#d46b08]"></div>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="h-px bg-gradient-to-r from-transparent via-[#d9d9d9] to-transparent my-3" />
+              </>
+            )}
+
             {/* Total Amount */}
             <div className="flex justify-between items-center">
               <span className="text-sm text-[#262626] font-semibold">
                 Tổng thanh toán
               </span>
-              <div className="text-2xl font-bold text-[#52c41a] tracking-tight">
-                {Number(totalAmount)?.toLocaleString('vi-VN')}₫
+              <div id="modal-final-amount" className="text-2xl font-bold text-[#52c41a] tracking-tight">
+                {Number(customerWantsPoints ? totalAmount - maxDiscount : totalAmount)?.toLocaleString('vi-VN')}₫
               </div>
             </div>
           </div>
@@ -1452,21 +1541,36 @@ const TablesPage = () => {
 
           const sessionId = orders[0].qr_session_id
 
-          // Call payment API
+          // 🎯 Lấy giá trị từ ref (không phải từ DOM)
+          const shouldUsePoints = usePointsValue
+
+          // 🎯 Call payment API with useAllPoints flag
           const response = await axios.post(`${REACT_APP_API_URL}/payment/admin`, {
             sessionId,
-            adminId: user.id
+            adminId: user.id,
+            useAllPoints: shouldUsePoints // 🎯 Truyền flag dùng điểm
           })
 
           if (response.data.status === 200) {
-            const result = response.data.data
+            const paymentResult = response.data.data
+
+            // 🎯 Hiển thị thông báo thành công với thông tin điểm
+            let successMessage = 'Thanh toán thành công!'
+
+            if (paymentResult.pointsUsed > 0) {
+              successMessage = `Thanh toán thành công! Đã dùng ${paymentResult.pointsUsed} điểm (giảm ${paymentResult.discountFromPoints?.toLocaleString('vi-VN')}₫)`
+            }
+
+            if (paymentResult.pointsEarned > 0) {
+              successMessage += ` | Tích thêm ${paymentResult.pointsEarned} điểm`
+            }
 
             // Show success message with details
             message.success({
               content: (
                 <div>
                   <div style={{ fontWeight: 'bold', marginBottom: 4 }}>
-                    Thanh toán thành công!
+                    {successMessage}
                   </div>
                 </div>
               ),
@@ -1597,6 +1701,43 @@ const TablesPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // ✅ Auto-open order panel when navigating from notification
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const tableId = params.get('tableId')
+    const shouldOpenPanel = params.get('openPanel') === 'true'
+    const useAllPoints = params.get('useAllPoints') === 'true' // 🎯 Đọc useAllPoints từ URL
+
+    if (tableId && shouldOpenPanel && tables.length > 0) {
+      // Find table by ID
+      const targetTable = tables.find(t => t.id === parseInt(tableId))
+
+      if (targetTable) {
+        console.log('📱 Opening order panel for table:', targetTable.table_number)
+        console.log('💎 Customer wants to use points:', useAllPoints)
+
+        // 🎯 Lưu lựa chọn của customer vào state
+        setCustomerWantsUsePoints(useAllPoints)
+
+        // Open order panel
+        setSelectedTable(targetTable)
+        setOrderPanelOpen(true)
+        setEditingNotes({})
+
+        // Fetch orders for this table
+        fetchOrdersByTable(targetTable.id)
+
+        // Clean URL params after opening
+        navigate(location.pathname, { replace: true })
+      } else {
+        console.warn('⚠️ Table not found:', tableId)
+        message.warning('Không tìm thấy bàn')
+        // Clean URL params
+        navigate(location.pathname, { replace: true })
+      }
+    }
+  }, [location.search, tables, navigate, location.pathname, message, fetchOrdersByTable])
+
   // Auto-refresh orders khi modal đang mở và có thay đổi từ polling
   useEffect(() => {
     if (!orderPanelOpen || !selectedTable) return
@@ -1644,6 +1785,11 @@ const TablesPage = () => {
 
   const replaceUrlServer = (url) => {
     return url.replace('/api', '')
+  }
+
+  // Helper to get QR image URL (handle both local and Cloudinary)
+  const getQRImageUrl = (qrCodeUrl) => {
+    return getImageUrl(qrCodeUrl)
   }
 
   // ================= Order Status Tag =================
@@ -2348,7 +2494,7 @@ const TablesPage = () => {
                         {/* QR Code Image */}
                         <div className="relative">
                           <img
-                            src={`${replaceUrlServer(REACT_APP_API_URL)}${newQRUrl || editingTable.qr_code_url}`}
+                            src={getQRImageUrl(newQRUrl || editingTable.qr_code_url)}
                             alt="Current QR"
                             className="w-48 h-48 border-2 border-gray-300 rounded-lg shadow-sm"
                           />

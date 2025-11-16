@@ -245,6 +245,15 @@ export default function CustomerMenuPage() {
   }, []);
 
   const handleSetCart = (food) => {
+    // ✅ Check if session is COMPLETED
+    if (session?.status === 'COMPLETED') {
+      message.warning({
+        content: 'Phiên đã kết thúc. Vui lòng quét QR mới để đặt món!',
+        duration: 3,
+      });
+      return;
+    }
+
     // Lấy tableId từ SessionContext thay vì sessionStorage
     const tableId = session?.table_id;
 

@@ -20,6 +20,7 @@ import axios from "axios";
 import { useSelector, useDispatch } from "react-redux";
 import { addToCart } from "../../redux/slices/cartSlice";
 import CustomerFooterNav from "../../components/CustomerFooterNav";
+import { useSession } from "../../contexts/SessionContext";
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
@@ -43,6 +44,7 @@ export default function FoodDetailPage() {
   const { id } = useParams();
   const dispatch = useDispatch();
   const { message } = App.useApp(); // ✅ Use App hook for message
+  const { session } = useSession(); // ✅ Get session from context
 
   // Redux cart
   const order = useSelector((state) => state.cart.order);
@@ -81,6 +83,25 @@ export default function FoodDetailPage() {
   // Handle add to cart
   const handleAddToCart = () => {
     if (!menuItem) return;
+
+    // ✅ Check if session is COMPLETED
+    if (session?.status === 'COMPLETED') {
+      message.warning({
+        content: 'Phiên đã kết thúc. Vui lòng quét QR mới để đặt món!',
+        duration: 3,
+      });
+      return;
+    }
+
+    // ✅ Check if no active session
+    if (!session || !session.session_id) {
+      message.warning({
+        content: 'Vui lòng quét QR trước khi đặt món!',
+        duration: 3,
+      });
+      navigate('/cus/homes');
+      return;
+    }
 
     // Get existing order from sessionStorage
     const savedOrder = JSON.parse(sessionStorage.getItem("order")) || {

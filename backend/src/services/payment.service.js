@@ -2,6 +2,7 @@ import { pool, query } from "../config/db.js";
 import { buildVietQR } from "../utils/vietqr.js";
 import { closeSession } from "./qrSession.service.js";
 import { notifyPaymentCompleted } from "./simpleNotification.service.js";
+import * as pointService from "./point.service.js";
 
 // 1. Thanh toán
 export async function payOrder({ order_id, method, print_bill }) {
@@ -33,7 +34,7 @@ export async function payOrder({ order_id, method, print_bill }) {
 
     // ✅ Kiểm tra đã có payment pending cho order này chưa
     const [existingPayments] = await pool.query(
-      "SELECT id, payment_status, method, amount FROM payments WHERE order_id = ? AND payment_status IN ('PENDING', 'PROCESSING')",
+      "SELECT id, payment_status, method, amount FROM payments WHERE order_id = ? AND payment_status = 'PENDING'",
       [order_id]
     );
 
@@ -316,8 +317,130 @@ export async function listPayments({ qr_session_id, from, to }) {
   return rows;
 }
 
+// 6. Tạo payment records cho session (từ customer)
+export async function createSessionPayments({ sessionId, method, orderIds }) {
+  const connect = await pool.getConnection();
 
-export async function payOrderByAdmin({ sessionId, adminId }) {
+  try {
+    await connect.beginTransaction();
+
+    const createdPayments = [];
+
+    // Tạo payment record cho từng order
+    for (const orderId of orderIds) {
+      // Lấy thông tin order
+      const [orders] = await connect.query(
+        'SELECT id, total_price FROM orders WHERE id = ?',
+        [orderId]
+      );
+
+      if (orders.length === 0) {
+        throw new Error(`Order ${orderId} not found`);
+      }
+
+      const order = orders[0];
+      const amount = Number(order.total_price);
+
+      // Kiểm tra đã có payment pending chưa
+      const [existingPayments] = await connect.query(
+        'SELECT id FROM payments WHERE order_id = ? AND payment_status = ?',
+        [orderId, 'PENDING']
+      );
+
+      if (existingPayments.length > 0) {
+        console.log(`Payment already exists for order ${orderId}, skipping...`);
+        createdPayments.push({
+          payment_id: existingPayments[0].id,
+          order_id: orderId,
+          amount,
+          is_existing: true
+        });
+        continue;
+      }
+
+      // Tạo payment record mới với status PENDING
+      const [result] = await connect.query(
+        `INSERT INTO payments (order_id, method, amount, payment_status, printed_bill)
+         VALUES (?, ?, ?, 'PENDING', 0)`,
+        [orderId, method, amount]
+      );
+
+      createdPayments.push({
+        payment_id: result.insertId,
+        order_id: orderId,
+        amount,
+        is_existing: false
+      });
+
+      console.log(`✅ Created payment ${result.insertId} for order ${orderId}`);
+    }
+
+    await connect.commit();
+
+    return {
+      success: true,
+      session_id: sessionId,
+      method,
+      payments: createdPayments,
+      total_amount: createdPayments.reduce((sum, p) => sum + p.amount, 0)
+    };
+  } catch (error) {
+    await connect.rollback();
+    console.error('createSessionPayments error:', error);
+    throw error;
+  } finally {
+    connect.release();
+  }
+}
+
+// 7. Hủy payment records cho session (từ customer hoặc timeout)
+export async function cancelSessionPayments(sessionId) {
+  const connect = await pool.getConnection();
+
+  try {
+    await connect.beginTransaction();
+
+    // Lấy tất cả orders của session
+    const [orders] = await connect.query(
+      'SELECT id FROM orders WHERE qr_session_id = ?',
+      [sessionId]
+    );
+
+    if (orders.length === 0) {
+      throw new Error('No orders found for this session');
+    }
+
+    const orderIds = orders.map(o => o.id);
+    const placeholders = orderIds.map(() => '?').join(',');
+
+    // Hủy tất cả payments PENDING của các orders này
+    const [result] = await connect.query(
+      `UPDATE payments 
+       SET payment_status = 'FAILED', updated_at = NOW()
+       WHERE order_id IN (${placeholders}) AND payment_status = 'PENDING'`,
+      orderIds
+    );
+
+    await connect.commit();
+
+    console.log(`✅ Cancelled ${result.affectedRows} pending payments for session ${sessionId}`);
+
+    return {
+      success: true,
+      session_id: sessionId,
+      cancelled_payments: result.affectedRows
+    };
+  } catch (error) {
+    await connect.rollback();
+    console.error('cancelSessionPayments error:', error);
+    throw error;
+  } finally {
+    connect.release();
+  }
+}
+
+
+export async function payOrderByAdmin({ sessionId, adminId, useAllPoints = false }) {
   const connect = await pool.getConnection();
 
   try {
@@ -328,6 +451,9 @@ export async function payOrderByAdmin({ sessionId, adminId }) {
     if (sessions.length === 0) {
       throw new Error("Session not found or already completed");
     }
+
+    const session = sessions[0];
+    const customerId = session.customer_id;
 
     // Get all orders for this session
     const sqlFindOrder = `SELECT * FROM orders WHERE qr_session_id = ?`;
@@ -351,6 +477,19 @@ export async function payOrderByAdmin({ sessionId, adminId }) {
     await connect.beginTransaction();
 
     try {
+      // 🎯 LOGIC ĐỔI ĐIỂM (NẾU CUSTOMER CHỌN)
+      let pointsUsed = 0;
+      let discountFromPoints = 0;
+
+      if (useAllPoints && customerId) {
+        console.log('💎 Customer chọn đổi hết điểm...');
+        const pointResult = await pointService.redeemAllPoints(customerId, totalAmount, connect);
+        pointsUsed = pointResult.points_used;
+        discountFromPoints = pointResult.discount_amount;
+      }
+
+      const finalAmount = totalAmount - discountFromPoints;
+
       // 1. Cancel NEW orders
       if (ordersToCancel.length > 0) {
         const orderIdsToCancel = ordersToCancel.map(item => item.id);
@@ -360,6 +499,13 @@ export async function payOrderByAdmin({ sessionId, adminId }) {
           SET status = 'CANCELLED', admin_id = ?, updated_at = NOW()
           WHERE id IN (${placeholders})
         `, [adminId, ...orderIdsToCancel]);
+
+        // Cancel payment records for cancelled orders (set to FAILED)
+        await connect.query(`
+          UPDATE payments
+          SET payment_status = 'FAILED', updated_at = NOW()
+          WHERE order_id IN (${placeholders}) AND payment_status = 'PENDING'
+        `, [...orderIdsToCancel]);
       }
 
       // 2. Mark IN_PROGRESS and DONE orders as PAID
@@ -371,6 +517,24 @@ export async function payOrderByAdmin({ sessionId, adminId }) {
           SET status = 'PAID', admin_id = ?, updated_at = NOW()
           WHERE id IN (${placeholders})
         `, [adminId, ...orderIdsToConfirm]);
+
+        // Update payment records to PAID
+        await connect.query(`
+          UPDATE payments
+          SET payment_status = 'PAID', confirmed_at = NOW(), updated_at = NOW()
+          WHERE order_id IN (${placeholders}) AND payment_status = 'PENDING'
+        `, [...orderIdsToConfirm]);
+      }
+
+      // 🎉 LOGIC TÍCH ĐIỂM TỰ ĐỘNG (SAU KHI THANH TOÁN)
+      let pointsEarned = 0;
+      let newPointsBalance = 0;
+
+      if (customerId && finalAmount > 0) {
+        console.log('🎉 Tích điểm tự động cho customer...');
+        const earnResult = await pointService.earnPointsFromPayment(customerId, finalAmount, connect);
+        pointsEarned = earnResult.points_earned;
+        newPointsBalance = earnResult.points_balance;
       }
 
       // 3. Close session as COMPLETED
@@ -388,7 +552,12 @@ export async function payOrderByAdmin({ sessionId, adminId }) {
         await notifyPaymentCompleted(sessionId, {
           ordersConfirmed: ordersToConfirm,
           ordersCancelled: ordersToCancel,
-          totalAmount
+          totalAmount,
+          pointsUsed,
+          discountFromPoints,
+          finalAmount,
+          pointsEarned,
+          newPointsBalance
         });
         console.log('✅ Payment notification sent to customer');
       } catch (notifyError) {
@@ -409,6 +578,11 @@ export async function payOrderByAdmin({ sessionId, adminId }) {
           status: 'CANCELLED'
         })),
         totalAmount,
+        pointsUsed,
+        discountFromPoints,
+        finalAmount,
+        pointsEarned,
+        newPointsBalance,
         sessionId,
         sessionStatus: 'COMPLETED'
       };

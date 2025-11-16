@@ -79,6 +79,29 @@ export const authService = {
     },
 
     /**
+     * Check if token is expired (decode JWT and check exp)
+     * Returns true if expired, false if still valid
+     */
+    isTokenExpired: () => {
+        const token = authService.getToken();
+        if (!token) return true;
+
+        try {
+            // Decode JWT (base64 decode phần payload)
+            const payload = JSON.parse(atob(token.split('.')[1]));
+
+            // JWT exp là Unix timestamp (seconds)
+            // Date.now() là milliseconds nên chia 1000
+            const currentTime = Date.now() / 1000;
+
+            return payload.exp < currentTime;
+        } catch (error) {
+            console.error('Token decode error:', error);
+            return true; // Nếu decode lỗi, coi như expired
+        }
+    },
+
+    /**
      * Get user from storage
      */
     getUser: () => {
@@ -94,7 +117,17 @@ export const authService = {
      * Check if user is authenticated
      */
     isAuthenticated: () => {
-        return !!authService.getToken();
+        const token = authService.getToken();
+        if (!token) return false;
+
+        // Quick check: Is token expired?
+        if (authService.isTokenExpired()) {
+            console.warn('⚠️ Token expired');
+            authService.logout();
+            return false;
+        }
+
+        return true;
     },
 
     /**
@@ -118,24 +151,25 @@ export const authService = {
         const token = authService.getToken();
         if (!token) return false;
 
-        // Optional: Call API to validate token
-        // try {
-        //     const response = await axios.get(`${API_URL}/admin/validate`);
-        //     return response.data.valid;
-        // } catch (error) {
-        //     console.error('Token validation failed:', error);
-        //     return false;
-        // }
-
-        // For now, just check if token exists
-        return true;
+        try {
+            const response = await axios.get(`${API_URL}/admin/validate`, {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            });
+            return response.data.valid === true;
+        } catch (error) {
+            // Token invalid/expired - backend trả về 401 hoặc 403
+            console.error('Token validation failed:', error.response?.status || error.message);
+            return false;
+        }
     },
 
     /**
      * Setup axios interceptor
      */
     setupInterceptor: () => {
-        // Request interceptor
+        // Request interceptor - Chỉ attach token vào header
         axios.interceptors.request.use(
             (config) => {
                 const token = authService.getToken();
@@ -147,22 +181,23 @@ export const authService = {
             (error) => Promise.reject(error)
         );
 
-        // Response interceptor
+        // Response interceptor - Backend là source of truth cho token validation
         axios.interceptors.response.use(
             (response) => response,
             (error) => {
-                // ⚠️ CHỈ redirect khi là lỗi 401 từ authenticated request
+                // ⚠️ CHỈ redirect khi là lỗi 401/403 từ authenticated request
                 // KHÔNG redirect nếu là login request thất bại
-                if (error.response?.status === 401) {
+                if (error.response?.status === 401 || error.response?.status === 403) {
                     const isLoginRequest = error.config?.url?.includes('/admin/login');
+                    const isValidateRequest = error.config?.url?.includes('/admin/validate');
 
-                    // Nếu KHÔNG phải login request → nghĩa là token expired
-                    if (!isLoginRequest) {
-                        console.warn('⚠️ Token expired or invalid, redirecting to login...');
+                    // Nếu KHÔNG phải login/validate request → token expired/invalid
+                    if (!isLoginRequest && !isValidateRequest) {
+                        console.warn('⚠️ Token expired or invalid (401/403), redirecting to login...');
                         authService.logout();
                         window.location.href = '/main/login';
                     }
-                    // Nếu là login request → để Login component xử lý error
+                    // Nếu là login/validate request → để component xử lý error
                 }
                 return Promise.reject(error);
             }

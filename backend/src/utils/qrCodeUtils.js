@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import QRCode from 'qrcode';
 import fs from 'fs';
 import path from 'path';
+import { uploadQRToCloudinary, deleteFromCloudinary } from '../config/cloudinary.js';
 
 /**
  * QR Code Generation Utilities for Table Management
@@ -100,32 +101,53 @@ class QRCodeUtils {
   }
 
   /**
-   * Generate and save QR code for table
+   * Generate and upload QR code to Cloudinary
    * @param {number} tableId - Table ID
    * @param {object} options - QR options
    * @returns {Promise<object>} QR generation result
    */
   static async generateTableQR(tableId, options = {}) {
     try {
-      // Generate QR buffer
+      // 1. Generate QR buffer
       const qrBuffer = await this.generateQRBuffer(tableId, options);
 
-      // Save to file system
-      const imagePath = await this.saveQRImage(tableId, qrBuffer);
+      // 2. Upload to Cloudinary instead of local storage
+      const cloudinaryResult = await uploadQRToCloudinary(qrBuffer, tableId);
 
-      // Generate QR URL for validation
+      // 3. Generate QR URL for validation
       const qrUrl = this.generateQRUrl(tableId);
       const sessionToken = this.generateSessionToken(tableId);
 
       return {
         tableId,
         qrUrl,
-        imagePath,
+        imagePath: cloudinaryResult.secure_url, // Cloudinary HTTPS URL
+        cloudinary_public_id: cloudinaryResult.public_id, // For deletion
         sessionToken,
         generatedAt: new Date().toISOString()
       };
     } catch (error) {
       throw new Error(`QR generation failed for table ${tableId}: ${error.message}`);
+    }
+  }
+
+  /**
+   * Delete QR code from Cloudinary
+   * @param {number} tableId - Table ID
+   * @param {string} publicId - Cloudinary public_id
+   * @returns {Promise<object>} Deletion result
+   */
+  static async deleteTableQR(tableId, publicId) {
+    try {
+      if (publicId) {
+        await deleteFromCloudinary(publicId);
+        console.log(`✅ Deleted QR for table ${tableId} from Cloudinary`);
+        return { success: true, tableId };
+      }
+      return { success: false, error: 'No public_id provided' };
+    } catch (error) {
+      console.error(`❌ Failed to delete QR for table ${tableId}:`, error);
+      return { success: false, error: error.message };
     }
   }
 
