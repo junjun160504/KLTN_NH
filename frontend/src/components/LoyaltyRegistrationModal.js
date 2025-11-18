@@ -66,7 +66,7 @@ export default function LoyaltyRegistrationModal({
           ]}
         >
           <Input
-            prefix={<UserOutlined className="text-purple-500" />}
+            prefix={<UserOutlined className="text-gray-800" />}
             placeholder="Nguyễn Văn A"
             size="large"
             className="rounded-lg"
@@ -77,8 +77,8 @@ export default function LoyaltyRegistrationModal({
         <Form.Item
           name="phone"
           label={
-            <span className="text-sm font-medium text-gray-700">
-              Số điện thoại <span className="text-red-500">*</span>
+            <span className="text-sm font-medium text-gray-800">
+              Số điện thoại <span className="text-red-500"></span>
             </span>
           }
           rules={[
@@ -101,7 +101,7 @@ export default function LoyaltyRegistrationModal({
         {/* Info Box */}
         <div className="bg-purple-50 rounded-lg p-3 mb-4 border border-purple-100">
           <p className="text-xs text-gray-600 m-0">
-            💎 <strong>1 điểm</strong> cho mỗi <strong>10.000₫</strong> chi tiêu
+            💎 <strong>100 điểm</strong> cho mỗi <strong>10.000₫</strong> chi tiêu
           </p>
         </div>
 

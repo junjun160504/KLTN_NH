@@ -354,7 +354,7 @@ export default function HomecsPage() {
         <div style={{ marginBottom: 12 }}>
           <EnvironmentFilled style={{ color: "#ff4d4f", marginRight: 4 }} />
           <Text style={{ fontSize: 14, color: "#666" }}>
-            Số 13 Mai Hắc Đế, phường Nguyễn Du, quận Hai Bà Trưng
+            Số 2, ngõ 69 Chùa Láng, Hà Nội
           </Text>
         </div>
 

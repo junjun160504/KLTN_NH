@@ -131,13 +131,15 @@ export async function createOrderByAdmin({ table_id, items, admin_id, customer_p
       isNewOrder = true;
     }
 
-    // 5. Validate menu items and prepare batch insert data
-    const orderItems = [];
+    // 5. Validate menu items and smart insert/update (same logic as createOrder)
+    let totalAddedPrice = 0;
+
     for (const item of items) {
       if (!item.menu_item_id || !item.quantity || item.quantity < 1) {
         throw new Error("Invalid item data: menu_item_id and quantity (>0) are required");
       }
 
+      // Validate menu item exists and available
       const [[menuItem]] = await connection.query(
         "SELECT * FROM menu_items WHERE id = ? AND is_available = true",
         [item.menu_item_id]
@@ -147,46 +149,77 @@ export async function createOrderByAdmin({ table_id, items, admin_id, customer_p
         throw new Error(`Menu item ${item.menu_item_id} not found or unavailable`);
       }
 
-      orderItems.push([
-        orderId,
-        item.menu_item_id,
-        item.quantity,
-        item.note || null,
-        menuItem.price
-      ]);
+      // ✅ CHECK: Món đã tồn tại trong order này chưa?
+      const [[existingOrderItem]] = await connection.query(
+        `SELECT id, quantity, unit_price 
+         FROM order_items 
+         WHERE order_id = ? AND menu_item_id = ?`,
+        [orderId, item.menu_item_id]
+      );
+
+      if (existingOrderItem) {
+        // ✅ Món đã có → UPDATE quantity và note
+        const newQuantity = existingOrderItem.quantity + item.quantity;
+        const priceAdded = item.quantity * existingOrderItem.unit_price;
+
+        await connection.query(
+          `UPDATE order_items 
+           SET quantity = ?, 
+               note = COALESCE(?, note),
+               updated_at = NOW()
+           WHERE id = ?`,
+          [newQuantity, item.note, existingOrderItem.id]
+        );
+
+        totalAddedPrice += priceAdded;
+        console.log(`✅ [ADMIN] Updated existing item #${existingOrderItem.id}: ${existingOrderItem.quantity} → ${newQuantity}`);
+
+      } else {
+        // ✅ Món chưa có → INSERT mới
+        const priceAdded = item.quantity * menuItem.price;
+
+        await connection.query(
+          `INSERT INTO order_items 
+           (order_id, menu_item_id, quantity, note, unit_price)
+           VALUES (?, ?, ?, ?, ?)`,
+          [orderId, item.menu_item_id, item.quantity, item.note || null, menuItem.price]
+        );
+
+        totalAddedPrice += priceAdded;
+        console.log(`✅ [ADMIN] Inserted new item: menu_item_id=${item.menu_item_id}, qty=${item.quantity}`);
+      }
     }
 
-    // 6. Batch insert all order items
-    await connection.query(
-      `INSERT INTO order_items 
-       (order_id, menu_item_id, quantity, note, unit_price)
-       VALUES ?`,
-      [orderItems]
-    );
-
-    // 7. Manual calculate total_price
-    const totalPrice = orderItems.reduce((sum, item) => {
-      return sum + (item[2] * item[4]); // quantity * unit_price
-    }, 0);
-
-    // 8. Update total_price vào orders table
+    // 6. Update total_price vào orders table
     await connection.query(
       `UPDATE orders 
        SET total_price = total_price + ? 
        WHERE id = ?`,
-      [totalPrice, orderId]
+      [totalAddedPrice, orderId]
     );
 
     await connection.commit();
 
-    // 9. Get complete order data
+    // 7. Get complete order data
     const orderData = await getOrderById(orderId);
 
-    // 10. Send notification to STAFF
+    // 8. Send notification to STAFF (optional - admin already knows)
     try {
-      const itemNames = items.map((item, index) => {
-        const orderItem = orderItems[index];
-        return `${item.quantity}x món (giá: ${orderItem[4].toLocaleString()}đ)`;
+      // ✅ Lấy thông tin items từ database (sau khi update/insert)
+      const [updatedItems] = await connection.query(
+        `SELECT oi.*, mi.name 
+         FROM order_items oi
+         JOIN menu_items mi ON oi.menu_item_id = mi.id
+         WHERE oi.order_id = ?
+         ORDER BY oi.created_at DESC`,
+        [orderId]
+      );
+
+      const itemNames = items.map(item => {
+        const dbItem = updatedItems.find(i => i.menu_item_id === item.menu_item_id);
+        return dbItem
+          ? `${item.quantity}x ${dbItem.name} (${dbItem.unit_price.toLocaleString()}đ)`
+          : `${item.quantity}x món`;
       }).join(', ');
 
       const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -255,13 +288,15 @@ export async function createOrder({ qr_session_id, items }) {
       console.log(`✅ Created new order #${orderId} (previous order was not NEW or doesn't exist)`);
     }
 
-    // 3. Validate menu items and prepare batch insert data
-    const orderItems = [];
+    // 3. Validate menu items and smart insert/update
+    let totalAddedPrice = 0;
+
     for (const item of items) {
       if (!item.menu_item_id || !item.quantity || item.quantity < 1) {
         throw new Error("Invalid item data: menu_item_id and quantity (>0) are required");
       }
 
+      // Validate menu item exists and available
       const [[menuItem]] = await connection.query(
         "SELECT * FROM menu_items WHERE id = ? AND is_available = true",
         [item.menu_item_id]
@@ -271,42 +306,60 @@ export async function createOrder({ qr_session_id, items }) {
         throw new Error(`Menu item ${item.menu_item_id} not found or unavailable`);
       }
 
-      orderItems.push([
-        orderId,
-        item.menu_item_id,
-        item.quantity,
-        item.note || null,
-        menuItem.price
-      ]);
+      // ✅ CHECK: Món đã tồn tại trong order này chưa?
+      const [[existingOrderItem]] = await connection.query(
+        `SELECT id, quantity, unit_price 
+         FROM order_items 
+         WHERE order_id = ? AND menu_item_id = ?`,
+        [orderId, item.menu_item_id]
+      );
+
+      if (existingOrderItem) {
+        // ✅ Món đã có → UPDATE quantity và note
+        const newQuantity = existingOrderItem.quantity + item.quantity;
+        const priceAdded = item.quantity * existingOrderItem.unit_price;
+
+        await connection.query(
+          `UPDATE order_items 
+           SET quantity = ?, 
+               note = COALESCE(?, note)
+           WHERE id = ?`,
+          [newQuantity, item.note, existingOrderItem.id]
+        );
+
+        totalAddedPrice += priceAdded;
+        console.log(`✅ Updated existing item #${existingOrderItem.id}: ${existingOrderItem.quantity} → ${newQuantity}`);
+
+      } else {
+        // ✅ Món chưa có → INSERT mới
+        const priceAdded = item.quantity * menuItem.price;
+
+        await connection.query(
+          `INSERT INTO order_items 
+           (order_id, menu_item_id, quantity, note, unit_price)
+           VALUES (?, ?, ?, ?, ?)`,
+          [orderId, item.menu_item_id, item.quantity, item.note || null, menuItem.price]
+        );
+
+        totalAddedPrice += priceAdded;
+        console.log(`✅ Inserted new item: menu_item_id=${item.menu_item_id}, qty=${item.quantity}`);
+      }
     }
 
-    // 4. Batch insert all order items
-    await connection.query(
-      `INSERT INTO order_items 
-       (order_id, menu_item_id, quantity, note, unit_price)
-       VALUES ?`,
-      [orderItems]
-    );
-
-    // 5. Manual calculate total_price (không rely vào trigger)
-    const totalPrice = orderItems.reduce((sum, item) => {
-      return sum + (item[2] * item[4]); // quantity * unit_price
-    }, 0);
-
-    // 6. Update total_price vào orders table
+    // 4. Update total_price vào orders table
     await connection.query(
       `UPDATE orders 
        SET total_price = total_price + ? 
        WHERE id = ?`,
-      [totalPrice, orderId]
+      [totalAddedPrice, orderId]
     );
 
     await connection.commit();
 
-    // 6. Get complete order data for notification
+    // 5. Get complete order data for notification
     const orderData = await getOrderById(orderId);
 
-    // 7. Lấy thông tin bàn
+    // 6. Lấy thông tin bàn
     const [[tableInfo]] = await connection.query(
       `SELECT t.id, t.table_number 
        FROM qr_sessions qs 
@@ -315,11 +368,23 @@ export async function createOrder({ qr_session_id, items }) {
       [qr_session_id]
     );
 
-    // 8. Tạo notification cho STAFF
+    // 7. Tạo notification cho STAFF
     try {
-      const itemNames = items.map((item, index) => {
-        const orderItem = orderItems[index];
-        return `${item.quantity}x món (giá: ${orderItem[4].toLocaleString()}đ)`;
+      // ✅ Lấy thông tin items từ database (sau khi update/insert)
+      const [updatedItems] = await connection.query(
+        `SELECT oi.*, mi.name 
+         FROM order_items oi
+         JOIN menu_items mi ON oi.menu_item_id = mi.id
+         WHERE oi.order_id = ?
+         ORDER BY oi.created_at DESC`,
+        [orderId]
+      );
+
+      const itemNames = items.map(item => {
+        const dbItem = updatedItems.find(i => i.menu_item_id === item.menu_item_id);
+        return dbItem
+          ? `${item.quantity}x ${dbItem.name} (${dbItem.unit_price.toLocaleString()}đ)`
+          : `${item.quantity}x món`;
       }).join(', ');
 
       const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -371,7 +436,7 @@ export async function createOrder({ qr_session_id, items }) {
       console.error('⚠️ Failed to send notification:', notifError);
     }
 
-    // 9. Return complete order with items
+    // 8. Return complete order with items
     return orderData;
 
   } catch (err) {

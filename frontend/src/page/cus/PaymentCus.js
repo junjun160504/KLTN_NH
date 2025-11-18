@@ -77,8 +77,10 @@ export default function PaymentPage() {
     const confirmedOrders = unpaidOrders.filter(order => order.status !== 'NEW');
 
     // ✅ Tính lại tổng tiền chỉ từ các đơn đã xác nhận
+    // 🔢 Đảm bảo total_price là number để tránh NaN
     const confirmedTotal = confirmedOrders.reduce((sum, order) => {
-        return sum + (order.total_price || 0);
+        const price = parseFloat(order.total_price) || 0;
+        return sum + price;
     }, 0);
 
     // State
@@ -370,6 +372,20 @@ export default function PaymentPage() {
             // ✅ State for countdown timer
             let countdown = 30;
             let countdownElement = null;
+            let countdownInterval = null; // ✅ Store interval ID to clear later
+            let autoRedirectTimeout = null; // ✅ Store timeout ID to clear later
+
+            // ✅ Cleanup function to stop all timers
+            const stopAllTimers = () => {
+                if (countdownInterval) {
+                    clearInterval(countdownInterval);
+                    countdownInterval = null;
+                }
+                if (autoRedirectTimeout) {
+                    clearTimeout(autoRedirectTimeout);
+                    autoRedirectTimeout = null;
+                }
+            };
 
             // Show success modal with auto-redirect
             const successModal = modal.success({
@@ -520,6 +536,7 @@ export default function PaymentPage() {
                         <Button
                             size="large"
                             onClick={() => {
+                                stopAllTimers(); // ✅ CRITICAL: Stop timers before navigating
                                 successModal.destroy();
                                 navigate('/cus/reviews', {
                                     state: { orderIds: orderIdsForReview }
@@ -543,6 +560,7 @@ export default function PaymentPage() {
                             type="primary"
                             size="large"
                             onClick={() => {
+                                stopAllTimers(); // ✅ CRITICAL: Stop timers before navigating
                                 successModal.destroy();
                                 updateSessionStatus('COMPLETED');
                                 localStorage.removeItem('cart');
@@ -563,6 +581,7 @@ export default function PaymentPage() {
                     </div>
                 ) : undefined,
                 onOk: () => {
+                    stopAllTimers(); // ✅ CRITICAL: Stop timers before navigating
                     // Update session status to COMPLETED
                     updateSessionStatus('COMPLETED');
                     localStorage.removeItem('cart');
@@ -573,7 +592,7 @@ export default function PaymentPage() {
             });
 
             // ✅ Start countdown timer
-            const countdownInterval = setInterval(() => {
+            countdownInterval = setInterval(() => {
                 countdown -= 1;
 
                 // Update countdown text
@@ -596,8 +615,8 @@ export default function PaymentPage() {
             }, 1000);
 
             // Auto-redirect after 30 seconds (backup)
-            setTimeout(() => {
-                clearInterval(countdownInterval);
+            autoRedirectTimeout = setTimeout(() => {
+                stopAllTimers(); // ✅ Clean up before redirecting
                 successModal.destroy();
 
                 // Update session status to COMPLETED
@@ -625,20 +644,24 @@ export default function PaymentPage() {
 
     // Tính toán
     // ✅ Dùng confirmedTotal thay vì initialTotal để chỉ tính đơn đã xác nhận
-    const totalAmount = confirmedTotal;
+    // 🔢 Đảm bảo totalAmount là number
+    const totalAmount = Number(confirmedTotal) || 0;
 
     // 🎯 Tính số tiền giảm từ điểm: 100 điểm = 10,000đ
     const calculateDiscount = (points) => {
-        if (points <= 0) return 0;
-        const discount = Math.floor((points / 100) * 10000);
+        const numPoints = Number(points) || 0;
+        if (numPoints <= 0) return 0;
+        const discount = Math.floor((numPoints / 100) * 10000);
         return Math.min(discount, totalAmount); // Không vượt quá tổng tiền
     };
 
     // Số tiền giảm từ điểm (100 điểm = 10,000đ)
-    const pointsDiscount = usePoints ? calculateDiscount(customerPoints) : 0;
+    // 🔢 Đảm bảo customerPoints là number
+    const pointsDiscount = usePoints ? calculateDiscount(Number(customerPoints) || 0) : 0;
 
     // Số tiền cần thanh toán sau khi trừ điểm (đây là số tiền cuối cùng)
-    const finalAmount = totalAmount - pointsDiscount;
+    // 🔢 Đảm bảo kết quả là number
+    const finalAmount = Number(totalAmount - pointsDiscount) || 0;
 
     // Phương thức thanh toán
     const paymentMethods = [
@@ -668,6 +691,16 @@ export default function PaymentPage() {
     const handlePayment = async () => {
         try {
             setLoading(true);
+
+            // 🔒 Kiểm tra session đã thanh toán chưa (admin có thể đã xác nhận trước)
+            if (sessionStatus === 'COMPLETED') {
+                message.warning({
+                    content: "⚠️ Phiên này đã được thanh toán rồi!",
+                    duration: 3
+                });
+                setLoading(false);
+                return;
+            }
 
             // ✅ Kiểm tra có đơn hàng đã xác nhận không
             if (confirmedOrders.length === 0) {

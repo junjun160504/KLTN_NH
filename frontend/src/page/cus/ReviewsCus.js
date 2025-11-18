@@ -323,44 +323,56 @@ export default function CustomerReviewAllPage() {
             item_id: orderItem.menu_item_id,        // ✅ Map orderItemId → menu_item_id
             qr_session_id: qrSessionId,             // ✅ Add qr_session_id
             rating: review.rating || 0,
-            comment: review.note.trim() || null
+            comment: review.note?.trim() || null
           };
         })
         .filter(review => review !== null); // Remove nulls
 
-      console.log("📤 Submitting item reviews:", itemReviewsToSubmit);
+      console.log("📤 Submitting item reviews (UPSERT):", itemReviewsToSubmit);
 
-      // Call API for each item review
+      // ✅ Call API for each item review (backend will handle UPSERT)
       const itemReviewPromises = itemReviewsToSubmit.map(reviewData =>
         axios.post(`${REACT_APP_API_URL}/review/menu`, reviewData)
+          .then(response => {
+            const isUpdate = response.data.data?.isUpdate;
+            console.log(`✅ ${isUpdate ? 'Updated' : 'Created'} review for item ${reviewData.item_id}`);
+            return { success: true, isUpdate, data: reviewData };
+          })
           .catch(error => {
             console.error(`Failed to submit review for item ${reviewData.item_id}:`, error);
-            return { error: true, data: reviewData };
+            return { success: false, error: true, data: reviewData };
           })
       );
 
       const itemReviewResults = await Promise.all(itemReviewPromises);
 
-      const successCount = itemReviewResults.filter(r => !r.error).length;
+      const successCount = itemReviewResults.filter(r => r.success).length;
       const failCount = itemReviewResults.filter(r => r.error).length;
+      const updateCount = itemReviewResults.filter(r => r.success && r.isUpdate).length;
+      const createCount = itemReviewResults.filter(r => r.success && !r.isUpdate).length;
 
-      console.log(`✅ Item reviews: ${successCount} success, ${failCount} failed`);
+      console.log(`✅ Item reviews: ${createCount} created, ${updateCount} updated, ${failCount} failed`);
 
       // ========================================
       // SUBMIT RESTAURANT REVIEW (nhà hàng)
       // ========================================
+      let restaurantReviewSuccess = false;
+      let restaurantIsUpdate = false;
+
       if (hasStoreReview && qrSessionId) {
         const restaurantReviewData = {
           qr_session_id: qrSessionId,
           rating: storeRating,
-          comment: storeFeedback.trim() || null
+          comment: storeFeedback?.trim() || null
         };
 
-        console.log("📤 Submitting restaurant review:", restaurantReviewData);
+        console.log("📤 Submitting restaurant review (UPSERT):", restaurantReviewData);
 
         try {
-          await axios.post(`${REACT_APP_API_URL}/review`, restaurantReviewData);
-          console.log("✅ Restaurant review submitted");
+          const response = await axios.post(`${REACT_APP_API_URL}/review`, restaurantReviewData);
+          restaurantIsUpdate = response.data.data?.isUpdate;
+          restaurantReviewSuccess = true;
+          console.log(`✅ ${restaurantIsUpdate ? 'Updated' : 'Created'} restaurant review`);
         } catch (error) {
           console.error("Failed to submit restaurant review:", error);
           // Don't throw, continue to show success for item reviews
@@ -378,15 +390,21 @@ export default function CustomerReviewAllPage() {
       // Auto-save will trigger and save the submitted state
       // User can come back and edit later
 
+      // ✅ Show smart success message
       if (failCount > 0) {
         message.warning(`Đã gửi ${successCount}/${itemReviewsToSubmit.length} đánh giá món ăn thành công`);
+      } else if (updateCount > 0 || restaurantIsUpdate) {
+        // If any review was updated, show update message
+        message.success('Đã cập nhật đánh giá thành công! 🎉', 3);
       } else {
+        // All new reviews
         message.success('Cảm ơn bạn đã đánh giá! 🎉', 3);
       }
 
-      // Navigate back after short delay (keep reviews in localStorage for history)
+      // ✅ Navigate to Bills page after review (better UX than navigate(-1))
+      // User can see their orders and optionally continue to payment or home
       setTimeout(() => {
-        navigate(-1);
+        navigate('/cus/bills');
       }, 1500);
 
     } catch (error) {
@@ -445,7 +463,7 @@ export default function CustomerReviewAllPage() {
         <Button
           type="text"
           icon={<ArrowLeftOutlined />}
-          onClick={() => navigate(-1)}
+          onClick={() => navigate('/cus/bills')}
           style={{
             position: "absolute",
             left: 12,
@@ -467,7 +485,7 @@ export default function CustomerReviewAllPage() {
         </Title>
 
         {/* Clear Draft Button */}
-        {!loading && orderItems.length > 0 && (
+        {/* {!loading && orderItems.length > 0 && (
           <Button
             type="text"
             onClick={handleClearDraft}
@@ -483,7 +501,7 @@ export default function CustomerReviewAllPage() {
           >
             Xóa nháp
           </Button>
-        )}
+        )} */}
       </Header>
 
       {/* -------- CONTENT -------- */}

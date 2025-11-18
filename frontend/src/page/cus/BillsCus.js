@@ -794,12 +794,6 @@ export default function CustomerBillPage() {
                   ({totalQty} món)
                 </Text>
               </div>
-              <Text
-                type="secondary"
-                style={{ fontSize: DESIGN_TOKENS.fontSize.sm }}
-              >
-                Giảm giá: -0đ
-              </Text>
             </div>
 
             {/* Right: Payment Button */}
