@@ -19,6 +19,12 @@ const CustomDateRangePicker = ({ value, onChange, className }) => {
     // Sử dụng minutes từ 00:00 (0 minutes) đến 23:59 (1439 minutes)
     const [startMinutes, setStartMinutes] = useState(0); // 00:00
     const [endMinutes, setEndMinutes] = useState(1439); // 23:59
+    // State để control việc mở/đóng dropdown
+    const [open, setOpen] = useState(false);
+    // Flag để prevent auto-close khi chọn xong dates
+    const [shouldPreventClose, setShouldPreventClose] = useState(true);
+    // State để control calendar view (tháng nào đang hiển thị)
+    const [activeStartMonth, setActiveStartMonth] = useState(null);
 
     // Convert minutes to HH:mm format
     const minutesToTime = (minutes) => {
@@ -66,6 +72,12 @@ const CustomDateRangePicker = ({ value, onChange, className }) => {
             ];
 
             onChange?.(finalRange);
+            setShouldPreventClose(false); // Cho phép đóng dropdown
+            // Đóng dropdown sau một chút để state update
+            setTimeout(() => {
+                setOpen(false);
+                setShouldPreventClose(true); // Reset flag
+            }, 0);
         }
     };
 
@@ -214,15 +226,49 @@ const CustomDateRangePicker = ({ value, onChange, className }) => {
             </style>
             <RangePicker
                 value={internalValue}
-                onChange={(dates) => {
+                open={open}
+                defaultPickerValue={activeStartMonth ? [activeStartMonth, activeStartMonth.add(1, 'month')] : undefined}
+                onOpenChange={(isOpen, mode) => {
+                    // Nếu đang trong chế độ prevent close và RangePicker muốn đóng
+                    if (!isOpen && shouldPreventClose) {
+                        // KHÔNG cho phép đóng, keep dropdown mở
+                        return;
+                    }
+                    setOpen(isOpen);
+                }}
+                onCalendarChange={(dates, dateStrings, info) => {
+                    // Khi user đang chọn dates trong calendar
+                    // Update internal state nhưng KHÔNG đóng dropdown
                     if (dates) {
                         setInternalValue(dates);
                         setSelectedPreset('custom');
-                    } else {
+
+                        // Nếu vừa chọn start date (dates[0] có, dates[1] chưa có)
+                        if (dates[0] && !dates[1]) {
+                            // Tự động chuyển calendar sang tháng tiếp theo
+                            const nextMonth = dates[0].add(1, 'month');
+                            setActiveStartMonth(nextMonth);
+                        }
+                        // Nếu đã chọn cả 2 dates, reset về null để calendar tự điều chỉnh
+                        else if (dates[0] && dates[1]) {
+                            setActiveStartMonth(null);
+                        }
+                    }
+                }}
+                onChange={(dates) => {
+                    // onChange chỉ trigger khi RangePicker muốn "commit" value
+                    // Chúng ta KHÔNG làm gì ở đây để prevent auto-close
+                    // Chỉ handle clear
+                    if (!dates) {
                         // Khi clear (dates = null)
                         setInternalValue(null);
                         setSelectedPreset('all');
                         onChange?.(null);
+                        setShouldPreventClose(false);
+                        setTimeout(() => {
+                            setOpen(false);
+                            setShouldPreventClose(true);
+                        }, 0);
                     }
                 }}
                 className={`custom-range-picker ${className || ''}`}
@@ -232,15 +278,9 @@ const CustomDateRangePicker = ({ value, onChange, className }) => {
                 format="DD/MM/YYYY"
                 placeholder={['Tất cả thời gian', 'Tất cả thời gian']}
                 style={{ width: 'auto' }}
-                dropdownClassName="custom-date-range-dropdown"
+                popupClassName="custom-date-range-dropdown"
                 allowClear
-                styles={{
-                    popup: {
-                        root: {
-                            borderRadius: '8px'
-                        }
-                    }
-                }}
+                changeOnBlur={false}
             />
         </>
     );
