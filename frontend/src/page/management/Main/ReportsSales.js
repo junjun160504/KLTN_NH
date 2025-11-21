@@ -1,158 +1,337 @@
 import React, { useState, useEffect } from 'react'
+import dayjs from 'dayjs'
 import AppHeader from '../../../components/AppHeader'
 import AppSidebar from '../../../components/AppSidebar'
+import CustomDateRangePicker from '../../../components/CustomDateRangePicker'
+import useSidebarCollapse from '../../../hooks/useSidebarCollapse'
+import reportSalesService from '../../../services/reportSalesService'
 import {
   Layout,
   Card,
-  Statistic,
   Row,
   Col,
-  Button,
-  DatePicker,
-  Select,
+  Typography,
   Table,
   Tag,
-  Space,
-  Skeleton,
-  Empty,
+  Button,
+  Spin,
+  Segmented,
   message
 } from 'antd'
-import { Line, Bar } from '@ant-design/plots'
 import {
-  CalendarOutlined,
-  FilterOutlined,
-  RiseOutlined,
-  FallOutlined,
-  DollarOutlined,
-  ShoppingCartOutlined,
-  TrophyOutlined,
-  FireOutlined,
-  ThunderboltOutlined,
-  SyncOutlined,
-  DownloadOutlined
-} from '@ant-design/icons'
-import dayjs from 'dayjs'
-import isBetween from 'dayjs/plugin/isBetween'
+  ShoppingCart,
+  DollarSign,
+  Award,
+  Clock,
+  Download,
+  RefreshCw,
+  Package,
+  Users
+} from 'react-feather'
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell
+} from 'recharts'
 import * as XLSX from 'xlsx'
 
-dayjs.extend(isBetween)
-
 const { Content } = Layout
-const { RangePicker } = DatePicker
-const { Option } = Select
+const { Title, Text } = Typography
 
-// Mock dữ liệu - Sẽ thay bằng API thực tế
-const mockProducts = [
-  { date: '2025-10-20', product: 'Phở Bò Tái', category: 'Món chính', quantity: 342, revenue: 4500000, cost: 2700000 },
-  { date: '2025-10-20', product: 'Bún Chả', category: 'Món chính', quantity: 500, revenue: 8000000, cost: 4800000 },
-  { date: '2025-10-20', product: 'Trà Sữa', category: 'Đồ uống', quantity: 280, revenue: 4200000, cost: 2100000 },
-  { date: '2025-10-21', product: 'Cơm Tấm', category: 'Món chính', quantity: 200, revenue: 4000000, cost: 2400000 },
-  { date: '2025-10-21', product: 'Cà Phê', category: 'Đồ uống', quantity: 180, revenue: 2700000, cost: 1350000 },
-  { date: '2025-10-22', product: 'Nem Rán', category: 'Khai vị', quantity: 90, revenue: 1800000, cost: 900000 },
-  { date: '2025-10-22', product: 'Gỏi Cuốn', category: 'Khai vị', quantity: 70, revenue: 1400000, cost: 700000 },
-  { date: '2025-10-22', product: 'Nước Cam', category: 'Đồ uống', quantity: 150, revenue: 3000000, cost: 1500000 },
-  { date: '2025-10-23', product: 'Phở Bò Tái', category: 'Món chính', quantity: 380, revenue: 5016000, cost: 3009600 },
-  { date: '2025-10-23', product: 'Trà Sữa', category: 'Đồ uống', quantity: 320, revenue: 4800000, cost: 2400000 },
-  { date: '2025-10-24', product: 'Bún Chả', category: 'Món chính', quantity: 450, revenue: 7200000, cost: 4320000 },
-  { date: '2025-10-24', product: 'Cà Phê', category: 'Đồ uống', quantity: 200, revenue: 3000000, cost: 1500000 },
-  { date: '2025-10-25', product: 'Cơm Tấm', category: 'Món chính', quantity: 250, revenue: 5000000, cost: 3000000 },
-  { date: '2025-10-25', product: 'Nem Rán', category: 'Khai vị', quantity: 120, revenue: 2400000, cost: 1200000 }
-]
+// ==================== MOCK DATA ====================
+// 1. Mock Xu Hướng Kinh Doanh (linh hoạt theo thời gian)
+const generateMockBusinessTrend = (viewType = 'day', dateRange) => {
+  const data = []
+  const start = dateRange[0]
+  const end = dateRange[1]
 
-const ReportsSalesPage = () => {
-  const [collapsed, setCollapsed] = useState(false)
-  const [pageTitle] = useState('Báo Cáo Bán Hàng')
-  const [filteredSales, setFilteredSales] = useState(mockProducts)
-  const [dateRange, setDateRange] = useState([dayjs().subtract(7, 'day'), dayjs()])
-  const [categoryFilter, setCategoryFilter] = useState('all')
-  const [loading, setLoading] = useState(false)
-  const [quickFilter, setQuickFilter] = useState('week')
+  if (viewType === 'hour') {
+    // 24 giờ trong ngày
+    for (let i = 0; i < 24; i++) {
+      const baseRevenue = 500000 + Math.random() * 1500000
+      const orders = Math.floor(3 + Math.random() * 10)
+      const customers = Math.floor(2 + Math.random() * 8)
 
-  // ====== Quick Filter Presets (Enterprise Standard) ======
-  const applyQuickFilter = (type) => {
-    setQuickFilter(type)
-    const today = dayjs()
-    let start, end
-
-    switch (type) {
-      case 'today':
-        start = today.startOf('day')
-        end = today.endOf('day')
-        break
-      case 'yesterday':
-        start = today.subtract(1, 'day').startOf('day')
-        end = today.subtract(1, 'day').endOf('day')
-        break
-      case 'week':
-        start = today.subtract(7, 'day')
-        end = today
-        break
-      case 'month':
-        start = today.startOf('month')
-        end = today.endOf('month')
-        break
-      case 'quarter':
-        start = today.startOf('quarter')
-        end = today.endOf('quarter')
-        break
-      case 'year':
-        start = today.startOf('year')
-        end = today.endOf('year')
-        break
-      default:
-        start = today.subtract(7, 'day')
-        end = today
+      data.push({
+        date: start.hour(i).format('YYYY-MM-DD HH:00'),
+        label: `${i}h`,
+        revenue: Math.floor(baseRevenue),
+        orders: orders,
+        customers: customers,
+        profit: Math.floor(baseRevenue * 0.35),
+        avgOrderValue: orders > 0 ? Math.floor(baseRevenue / orders) : 0
+      })
     }
+  } else if (viewType === 'day') {
+    // Số ngày giữa dateRange
+    const days = end.diff(start, 'day') + 1
+    for (let i = 0; i < days; i++) {
+      const date = start.add(i, 'day')
+      const baseRevenue = 15000000 + Math.random() * 10000000
+      const orders = Math.floor(80 + Math.random() * 50)
+      const customers = Math.floor(60 + Math.random() * 40)
 
-    setDateRange([start, end])
+      data.push({
+        date: date.format('YYYY-MM-DD'),
+        label: date.format('DD/MM'),
+        revenue: Math.floor(baseRevenue),
+        orders: orders,
+        customers: customers,
+        profit: Math.floor(baseRevenue * 0.35),
+        avgOrderValue: Math.floor(baseRevenue / orders)
+      })
+    }
+  } else if (viewType === 'week') {
+    // Theo tuần
+    const weeks = Math.ceil(end.diff(start, 'week', true))
+    for (let i = 0; i < weeks; i++) {
+      const weekStart = start.add(i, 'week')
+      const baseRevenue = 100000000 + Math.random() * 50000000
+      const orders = Math.floor(500 + Math.random() * 300)
+      const customers = Math.floor(400 + Math.random() * 250)
+
+      data.push({
+        date: weekStart.format('YYYY-MM-DD'),
+        label: `Tuần ${i + 1}`,
+        revenue: Math.floor(baseRevenue),
+        orders: orders,
+        customers: customers,
+        profit: Math.floor(baseRevenue * 0.35),
+        avgOrderValue: Math.floor(baseRevenue / orders)
+      })
+    }
+  } else if (viewType === 'month') {
+    // Theo tháng
+    const months = Math.ceil(end.diff(start, 'month', true))
+    for (let i = 0; i < months; i++) {
+      const monthStart = start.add(i, 'month')
+      const baseRevenue = 400000000 + Math.random() * 200000000
+      const orders = Math.floor(2000 + Math.random() * 1000)
+      const customers = Math.floor(1600 + Math.random() * 800)
+
+      data.push({
+        date: monthStart.format('YYYY-MM-DD'),
+        label: monthStart.format('MM/YYYY'),
+        revenue: Math.floor(baseRevenue),
+        orders: orders,
+        customers: customers,
+        profit: Math.floor(baseRevenue * 0.35),
+        avgOrderValue: Math.floor(baseRevenue / orders)
+      })
+    }
   }
 
-  // ====== Auto filter on mount ======
-  useEffect(() => {
-    handleFilter()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  return data
+}
 
-  // ====== Export to Excel (Enterprise Feature) ======
+const ReportsSalesPage = () => {
+  const [collapsed, setCollapsed] = useSidebarCollapse()
+  const [pageTitle] = useState('Báo Cáo Bán Hàng')
+
+  // Date Range State
+  const [dateRange, setDateRange] = useState([
+    dayjs().subtract(29, 'day').startOf('day'),
+    dayjs().endOf('day')
+  ])
+
+  // Loading States
+  const [loading, setLoading] = useState(false)
+  const [revenueLoading, setRevenueLoading] = useState(false)
+
+  // Data States
+  const [businessTrendData, setBusinessTrendData] = useState([])
+  const [dishRevenueData, setDishRevenueData] = useState([])
+  const [categoryRevenueData, setCategoryRevenueData] = useState([])
+
+  // Summary Metrics from API
+  const [summaryMetrics, setSummaryMetrics] = useState({
+    totalRevenue: 0,
+    totalOrders: 0,
+    totalCustomers: 0,
+    avgOrderValue: 0,
+    growth: { revenue: 0, orders: 0, customers: 0 }
+  })
+
+  // Chart Configuration
+  const [trendChartType, setTrendChartType] = useState('area')
+  const [dishChartType, setDishChartType] = useState('bar')
+  const [trendViewType, setTrendViewType] = useState('day') // 'hour', 'day', 'week', 'month'
+  const [dishLimit, setDishLimit] = useState(15) // Top N món ăn
+
+  // ==================== DATA FETCHING ====================
+  const fetchReportData = async () => {
+    try {
+      setRevenueLoading(true)
+
+      // Fetch Business Trend Data với summary metrics
+      const trendResponse = await reportSalesService.getBusinessTrend(
+        dateRange[0],
+        dateRange[1],
+        trendViewType
+      )
+
+      if (trendResponse.success) {
+        // Transform data từ backend sang chart format
+        const chartData = trendResponse.data.trend.map(item => ({
+          date: item.date,
+          label: item.label,
+          revenue: item.revenue,
+          orders: item.orders,
+          customers: item.customers,
+          avgOrderValue: item.avgOrderValue
+        }))
+
+        setBusinessTrendData(chartData)
+        setSummaryMetrics(trendResponse.data.summary)
+      } else {
+        // Fallback to empty data on error
+        setBusinessTrendData([])
+        setSummaryMetrics({
+          totalRevenue: 0,
+          totalOrders: 0,
+          totalCustomers: 0,
+          avgOrderValue: 0,
+          growth: { revenue: 0, orders: 0, customers: 0 }
+        })
+      }
+
+      // Fetch Dish Revenue Data
+      const dishResponse = await reportSalesService.getDishRevenue(
+        dateRange[0],
+        dateRange[1],
+        dishLimit
+      )
+
+      if (dishResponse.success && Array.isArray(dishResponse.data)) {
+        // Transform data từ backend sang chart format
+        const dishData = dishResponse.data.map(item => ({
+          id: item.id,
+          name: item.name,
+          category: item.category,
+          image: item.image,
+          quantity: item.quantity,
+          revenue: item.revenue,
+          growth: item.growth
+        }))
+        setDishRevenueData(dishData)
+      } else {
+        setDishRevenueData([])
+      }
+
+      // Fetch Category Revenue Data
+      const categoryResponse = await reportSalesService.getCategoryRevenue(
+        dateRange[0],
+        dateRange[1]
+      )
+
+      if (categoryResponse.success && Array.isArray(categoryResponse.data)) {
+        // Transform data từ backend sang chart format
+        const categoryData = categoryResponse.data.map(item => ({
+          id: item.id,
+          category: item.category,
+          name: item.name,
+          quantity: item.quantity,
+          revenue: item.revenue,
+          percentOfTotal: item.percentOfTotal,
+          dishes: item.dishes,
+          color: item.color
+        }))
+        setCategoryRevenueData(categoryData)
+      } else {
+        setCategoryRevenueData([])
+      }
+
+    } catch (error) {
+      console.error('Error fetching report data:', error)
+      message.error('Không thể tải dữ liệu báo cáo. Vui lòng thử lại!')
+
+      // Fallback to empty arrays
+      setBusinessTrendData([])
+      setDishRevenueData([])
+      setCategoryRevenueData([])
+      setSummaryMetrics({
+        totalRevenue: 0,
+        totalOrders: 0,
+        totalCustomers: 0,
+        avgOrderValue: 0,
+        growth: { revenue: 0, orders: 0, customers: 0 }
+      })
+    } finally {
+      setRevenueLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchReportData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange, trendViewType, dishLimit])
+
+  const handleRefresh = async () => {
+    setLoading(true)
+    await fetchReportData()
+    setLoading(false)
+    message.success('Đã làm mới dữ liệu')
+  }
+
+  // ==================== CALCULATIONS ====================
+  // Use summary metrics from API instead of local calculations
+  const totalRevenue = summaryMetrics.totalRevenue || 0
+  const totalOrders = summaryMetrics.totalOrders || 0
+  const totalCustomers = summaryMetrics.totalCustomers || 0
+  const avgOrderValue = summaryMetrics.avgOrderValue || 0
+
+  // Calculate additional metrics for charts if needed
+  const totalProfit = businessTrendData.reduce((sum, item) => sum + (item.profit || 0), 0)
+  const profitMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : 0
+
+  // ==================== EXPORT FUNCTION ====================
   const handleExport = () => {
     try {
-      const exportData = topProducts.map((item, index) => ({
-        'Thứ hạng': index + 1,
-        'Sản phẩm': item.product,
-        'Loại món': item.category,
-        'Số lượng': item.quantity,
-        'Doanh thu (VNĐ)': item.revenue,
-        'Chi phí (VNĐ)': item.cost,
-        'Lợi nhuận (VNĐ)': item.profit,
-        'Tỷ suất LN (%)': ((item.profit / item.revenue) * 100).toFixed(2)
-      }))
-
-      const categoryExport = categoryData.map(item => ({
-        'Loại món': item.category,
-        'Số lượng': item.quantity,
-        'Doanh thu (VNĐ)': item.revenue,
-        'Chi phí (VNĐ)': item.cost,
-        'Lợi nhuận (VNĐ)': item.profit,
-        'Tỷ suất LN (%)': item.profitMargin
-      }))
-
       const summaryData = [
-        { 'Chỉ số': 'Tổng doanh thu', 'Giá trị': totalRevenue.toLocaleString() + ' VNĐ' },
-        { 'Chỉ số': 'Tổng chi phí', 'Giá trị': totalCost.toLocaleString() + ' VNĐ' },
-        { 'Chỉ số': 'Tổng lợi nhuận', 'Giá trị': totalProfit.toLocaleString() + ' VNĐ' },
-        { 'Chỉ số': 'Tỷ suất lợi nhuận', 'Giá trị': profitMargin + '%' },
-        { 'Chỉ số': 'Tổng đơn hàng', 'Giá trị': totalOrders.toLocaleString() + ' món' },
-        { 'Chỉ số': 'Giá trị TB/món', 'Giá trị': avgOrderValue.toLocaleString() + ' VNĐ' }
+        { 'Chỉ số': 'Tổng doanh thu', 'Giá trị': `${totalRevenue.toLocaleString()} VNĐ` },
+        { 'Chỉ số': 'Tổng lợi nhuận', 'Giá trị': `${totalProfit.toLocaleString()} VNĐ` },
+        { 'Chỉ số': 'Tỷ suất lợi nhuận', 'Giá trị': `${profitMargin}%` },
+        { 'Chỉ số': 'Tổng đơn hàng', 'Giá trị': `${totalOrders.toLocaleString()}` },
+        { 'Chỉ số': 'Giá trị TB/đơn', 'Giá trị': `${avgOrderValue.toLocaleString()} VNĐ` },
+        { 'Chỉ số': 'Tổng khách hàng', 'Giá trị': `${totalCustomers.toLocaleString()}` }
       ]
 
-      const wb = XLSX.utils.book_new()
-      const ws1 = XLSX.utils.json_to_sheet(summaryData)
-      const ws2 = XLSX.utils.json_to_sheet(exportData)
-      const ws3 = XLSX.utils.json_to_sheet(categoryExport)
+      const dishData = dishRevenueData.map((item, index) => ({
+        'STT': index + 1,
+        'Tên món': item.name,
+        'Danh mục': item.category,
+        'Số lượng': item.quantity,
+        'Doanh thu': item.revenue,
+        'Chi phí': item.cost,
+        'Lợi nhuận': item.profit,
+        'Tỷ suất LN (%)': item.profitMargin,
+        'Tăng trưởng (%)': item.growth
+      }))
 
-      XLSX.utils.book_append_sheet(wb, ws1, 'Tổng quan')
-      XLSX.utils.book_append_sheet(wb, ws2, 'Top sản phẩm')
-      XLSX.utils.book_append_sheet(wb, ws3, 'Theo loại món')
+      const categoryExport = categoryRevenueData.map(item => ({
+        'Danh mục': item.category,
+        'Số món': item.dishes,
+        'Số lượng bán': item.quantity,
+        'Doanh thu': item.revenue,
+        'Chi phí': item.cost,
+        'Lợi nhuận': item.profit,
+        'Tỷ suất LN (%)': item.profitMargin,
+        'Tỷ trọng (%)': item.percentOfTotal
+      }))
+
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryData), 'Tổng quan')
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dishData), 'Doanh thu món ăn')
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(categoryExport), 'Doanh thu danh mục')
 
       const fileName = `BaoCaoBanHang_${dayjs().format('YYYYMMDD_HHmmss')}.xlsx`
       XLSX.writeFile(wb, fileName)
@@ -164,183 +343,74 @@ const ReportsSalesPage = () => {
     }
   }
 
-  // ====== Bộ lọc ======
-  const handleFilter = () => {
-    setLoading(true)
-    setTimeout(() => {
-      let data = mockProducts
-      if (dateRange && dateRange.length === 2) {
-        const [start, end] = dateRange
-        data = data.filter((s) => {
-          const d = dayjs(s.date)
-          return d.isBetween(start, end, 'day', '[]')
-        })
-      }
-      if (categoryFilter !== 'all') {
-        data = data.filter((s) => s.category === categoryFilter)
-      }
-      setFilteredSales(data)
-      setLoading(false)
-    }, 300)
+  // ==================== HELPER FUNCTIONS ====================
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND'
+    }).format(value)
   }
 
-  // ====== Tính toán thống kê ======
-  const totalRevenue = filteredSales.reduce((sum, s) => sum + s.revenue, 0)
-  const totalCost = filteredSales.reduce((sum, s) => sum + s.cost, 0)
-  const totalProfit = totalRevenue - totalCost
-  const profitMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : 0
-  const totalOrders = filteredSales.reduce((sum, s) => sum + s.quantity, 0)
-  const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0
+  // ==================== METRIC CARD COMPONENT ====================
+  const MetricCard = ({ icon: Icon, title, value, trend, trendLabel, valueSize = 'large', suffix = '' }) => {
+    const trendValue = parseFloat(trend)
+    const isPositive = trendValue >= 0
+    const trendColor = isPositive ? 'text-green-500' : 'text-red-500'
+    const arrowRotation = isPositive ? 'rotate(0 6 6)' : 'rotate(180 6 6)'
 
-  // Top sản phẩm
-  const productStats = filteredSales.reduce((acc, s) => {
-    if (!acc[s.product]) {
-      acc[s.product] = { product: s.product, category: s.category, quantity: 0, revenue: 0, cost: 0 }
-    }
-    acc[s.product].quantity += s.quantity
-    acc[s.product].revenue += s.revenue
-    acc[s.product].cost += s.cost
-    return acc
-  }, {})
-
-  const topProducts = Object.values(productStats)
-    .map(p => ({ ...p, profit: p.revenue - p.cost }))
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 10)
-
-  // Doanh thu theo loại món
-  const categoryRevenue = filteredSales.reduce((acc, s) => {
-    if (!acc[s.category]) {
-      acc[s.category] = { category: s.category, revenue: 0, quantity: 0, cost: 0 }
-    }
-    acc[s.category].revenue += s.revenue
-    acc[s.category].quantity += s.quantity
-    acc[s.category].cost += s.cost
-    return acc
-  }, {})
-
-  const categoryData = Object.values(categoryRevenue).map(c => ({
-    ...c,
-    profit: c.revenue - c.cost,
-    profitMargin: ((c.revenue - c.cost) / c.revenue * 100).toFixed(1)
-  }))
-
-  // Dữ liệu biểu đồ xu hướng
-  const dailyRevenue = filteredSales.reduce((acc, s) => {
-    if (!acc[s.date]) {
-      acc[s.date] = { date: s.date, revenue: 0, quantity: 0 }
-    }
-    acc[s.date].revenue += s.revenue
-    acc[s.date].quantity += s.quantity
-    return acc
-  }, {})
-
-  const trendData = Object.values(dailyRevenue).sort((a, b) =>
-    dayjs(a.date).valueOf() - dayjs(b.date).valueOf()
-  )
-
-  // So sánh với kỳ trước (mock data)
-  const previousRevenue = totalRevenue * 0.85
-  const revenueGrowth = ((totalRevenue - previousRevenue) / previousRevenue * 100).toFixed(1)
-  const isGrowthPositive = revenueGrowth > 0
-
-  // ====== Columns ======
-  const topProductColumns = [
-    {
-      title: <span className="text-xs font-medium text-gray-600">Món</span>,
-      dataIndex: 'product',
-      key: 'product',
-      render: (text, record, index) => (
-        <div className="flex items-center gap-2">
-          <div className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold ${index === 0 ? 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white' :
-            index === 1 ? 'bg-gradient-to-br from-gray-300 to-gray-400 text-white' :
-              index === 2 ? 'bg-gradient-to-br from-orange-300 to-orange-400 text-white' :
-                'bg-gray-100 text-gray-600'
-            }`}>
-            {index + 1}
+    return (
+      <Card
+        bordered={false}
+        className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+        bodyStyle={{
+          padding: '24px',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between'
+        }}
+        hoverable
+      >
+        <div className="flex items-start justify-between">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center flex-shrink-0">
+            <Icon size={22} strokeWidth={2} color="#1890ff" />
           </div>
-          <div>
-            <div className="font-medium text-sm text-gray-800">{text}</div>
-            <div className="text-xs text-gray-500">{record.category}</div>
+          <Text className="text-gray-500 text-xs font-medium tracking-wide mt-1">
+            {title}
+          </Text>
+        </div>
+        <div>
+          <Title
+            level={2}
+            className={`text-gray-800 ${valueSize === 'large' ? 'text-3xl' : 'text-2xl'} font-semibold leading-none tracking-tight`}
+            style={{ margin: '12px 0 4px 0' }}
+          >
+            {value}{suffix}
+          </Title>
+          <div className="flex items-center gap-1">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path
+                d="M6 10L6 2M6 2L9 5M6 2L3 5"
+                stroke={isPositive ? '#52c41a' : '#ff4d4f'}
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                transform={arrowRotation}
+              />
+            </svg>
+            <Text className={`${trendColor} text-xs font-medium`}>{trend}%</Text>
+            <Text className="text-gray-400 text-xs">{trendLabel}</Text>
           </div>
         </div>
-      )
-    },
-    {
-      title: <span className="text-xs font-medium text-gray-600">Số lượng</span>,
-      dataIndex: 'quantity',
-      key: 'quantity',
-      align: 'right',
-      render: (val) => <span className="font-semibold text-blue-600">{val.toLocaleString()}</span>
-    },
-    {
-      title: <span className="text-xs font-medium text-gray-600">Doanh thu</span>,
-      dataIndex: 'revenue',
-      key: 'revenue',
-      align: 'right',
-      render: (val) => <span className="font-semibold text-green-600">{val.toLocaleString()}đ</span>
-    },
-    {
-      title: <span className="text-xs font-medium text-gray-600">Lợi nhuận</span>,
-      dataIndex: 'profit',
-      key: 'profit',
-      align: 'right',
-      render: (val) => (
-        <span className={`font-semibold ${val >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-          {val.toLocaleString()}đ
-        </span>
-      )
-    }
-  ]
+      </Card>
+    )
+  }
 
-  const categoryColumns = [
-    {
-      title: <span className="text-xs font-medium text-gray-600">Loại món</span>,
-      dataIndex: 'category',
-      key: 'category',
-      render: (text) => <span className="font-medium text-gray-800">{text}</span>
-    },
-    {
-      title: <span className="text-xs font-medium text-gray-600">Số lượng</span>,
-      dataIndex: 'quantity',
-      key: 'quantity',
-      align: 'right',
-      render: (val) => <span className="text-gray-700">{val.toLocaleString()}</span>
-    },
-    {
-      title: <span className="text-xs font-medium text-gray-600">Doanh thu</span>,
-      dataIndex: 'revenue',
-      key: 'revenue',
-      align: 'right',
-      render: (val) => <span className="font-semibold text-gray-800">{val.toLocaleString()}đ</span>
-    },
-    {
-      title: <span className="text-xs font-medium text-gray-600">Lợi nhuận</span>,
-      dataIndex: 'profit',
-      key: 'profit',
-      align: 'right',
-      render: (val) => (
-        <span className={`font-semibold ${val >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-          {val.toLocaleString()}đ
-        </span>
-      )
-    },
-    {
-      title: <span className="text-xs font-medium text-gray-600">Tỷ suất LN</span>,
-      dataIndex: 'profitMargin',
-      key: 'profitMargin',
-      align: 'right',
-      render: (val) => (
-        <Tag color={val >= 40 ? 'green' : val >= 30 ? 'blue' : 'orange'} className="font-semibold">
-          {val}%
-        </Tag>
-      )
-    }
-  ]
-
+  // ==================== RENDER ====================
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout style={{ minHeight: '100vh', background: '#f5f5f5' }}>
       <AppSidebar collapsed={collapsed} currentPageKey="report_sales" />
+
       <Layout style={{ marginLeft: collapsed ? 80 : 220 }}>
         <AppHeader
           collapsed={collapsed}
@@ -348,429 +418,610 @@ const ReportsSalesPage = () => {
           pageTitle={pageTitle}
         />
 
-        <Content className="mt-16 p-5 bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/20">
-          {/* Header Section - Enterprise Standard */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-800 tracking-tight mb-1">
-                  Báo Cáo Bán Hàng
-                </h1>
-                <p className="text-sm text-gray-500">
-                  Phân tích hiệu suất kinh doanh toàn diện
-                </p>
-              </div>
-              <Space size="middle">
-                <Button
-                  icon={<DownloadOutlined />}
-                  onClick={handleExport}
-                  className="border-gray-300 hover:border-green-400 hover:text-green-600 transition-all"
-                >
-                  Xuất Excel
-                </Button>
-                <Button
-                  icon={<SyncOutlined spin={loading} />}
-                  onClick={handleFilter}
-                  className="border-gray-300 hover:border-blue-400 transition-all"
-                >
-                  Làm mới
-                </Button>
-              </Space>
+        <Content
+          style={{
+            marginTop: 64,
+            padding: '24px',
+            background: '#f5f5f5',
+            minHeight: 'calc(100vh - 64px)',
+            overflow: 'auto'
+          }}
+        >
+          {/* Header & Filters */}
+          <div className="mb-6 flex justify-between items-start gap-3 flex-wrap">
+            <div>
+              <Title level={2} style={{ margin: 0, fontSize: '24px', fontWeight: 700 }}>
+                Báo Cáo Bán Hàng
+              </Title>
+              <Text className="text-gray-500">
+                Phân tích hiệu suất kinh doanh theo xu hướng, món ăn và danh mục
+              </Text>
             </div>
 
-            {/* Quick Filter Buttons - Enterprise Pattern */}
-            <div className="mb-4">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-medium text-gray-600 mr-2">Khoảng thời gian:</span>
-                <Button
-                  size="small"
-                  type={quickFilter === 'today' ? 'primary' : 'default'}
-                  onClick={() => applyQuickFilter('today')}
-                  className="rounded-lg"
-                >
-                  Hôm nay
-                </Button>
-                <Button
-                  size="small"
-                  type={quickFilter === 'yesterday' ? 'primary' : 'default'}
-                  onClick={() => applyQuickFilter('yesterday')}
-                  className="rounded-lg"
-                >
-                  Hôm qua
-                </Button>
-                <Button
-                  size="small"
-                  type={quickFilter === 'week' ? 'primary' : 'default'}
-                  onClick={() => applyQuickFilter('week')}
-                  className="rounded-lg"
-                >
-                  7 ngày qua
-                </Button>
-                <Button
-                  size="small"
-                  type={quickFilter === 'month' ? 'primary' : 'default'}
-                  onClick={() => applyQuickFilter('month')}
-                  className="rounded-lg"
-                >
-                  Tháng này
-                </Button>
-                <Button
-                  size="small"
-                  type={quickFilter === 'quarter' ? 'primary' : 'default'}
-                  onClick={() => applyQuickFilter('quarter')}
-                  className="rounded-lg"
-                >
-                  Quý này
-                </Button>
-                <Button
-                  size="small"
-                  type={quickFilter === 'year' ? 'primary' : 'default'}
-                  onClick={() => applyQuickFilter('year')}
-                  className="rounded-lg"
-                >
-                  Năm nay
-                </Button>
-              </div>
+            <div className="flex gap-3 items-center">
+              <CustomDateRangePicker
+                value={dateRange}
+                onChange={setDateRange}
+              />
+              <Button
+                icon={<Download size={16} />}
+                onClick={handleExport}
+                className="rounded-lg h-8 flex items-center gap-1.5"
+              >
+                Xuất Excel
+              </Button>
+              <Button
+                type="primary"
+                icon={<RefreshCw size={16} />}
+                loading={loading}
+                onClick={handleRefresh}
+                className="rounded-lg h-8 flex items-center gap-1.5"
+              >
+                Làm mới
+              </Button>
             </div>
-
-            {/* Advanced Filter Bar */}
-            <Card className="shadow-sm border-0 bg-white">
-              <div className="flex items-center gap-4 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <CalendarOutlined className="text-gray-500" />
-                  <span className="text-sm font-medium text-gray-700">Tùy chỉnh:</span>
-                  <RangePicker
-                    value={dateRange}
-                    format="DD/MM/YYYY"
-                    onChange={(dates) => {
-                      setDateRange(dates)
-                      setQuickFilter(null)
-                    }}
-                    className="rounded-lg"
-                    placeholder={['Từ ngày', 'Đến ngày']}
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <FilterOutlined className="text-gray-500" />
-                  <Select
-                    value={categoryFilter}
-                    style={{ width: 200 }}
-                    onChange={setCategoryFilter}
-                    className="rounded-lg"
-                  >
-                    <Option value="all">📋 Tất cả loại món</Option>
-                    <Option value="Món chính">🍜 Món chính</Option>
-                    <Option value="Đồ uống">☕ Đồ uống</Option>
-                    <Option value="Khai vị">🥗 Khai vị</Option>
-                  </Select>
-                </div>
-                <Button
-                  type="primary"
-                  onClick={handleFilter}
-                  loading={loading}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 border-0 rounded-lg px-6 hover:shadow-lg transition-all"
-                >
-                  Áp dụng bộ lọc
-                </Button>
-              </div>
-            </Card>
           </div>
 
-          {/* Loading State */}
-          {loading ? (
-            <Skeleton active paragraph={{ rows: 10 }} />
-          ) : filteredSales.length === 0 ? (
-            /* Empty State */
-            <Card className="text-center py-16">
-              <Empty
-                description={
-                  <span className="text-gray-500">
-                    Không có dữ liệu trong khoảng thời gian đã chọn
-                  </span>
-                }
-              />
-            </Card>
-          ) : (
-            <>
-              {/* KPI Cards - Enterprise Grid */}
-              <Row gutter={[16, 16]} className="mb-6">
-                <Col xs={24} sm={12} lg={6}>
-                  <Card className="border-0 shadow-md hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl">
-                    <Statistic
-                      title={<span className="text-blue-100 text-xs font-medium">Tổng Doanh Thu</span>}
-                      value={totalRevenue}
-                      precision={0}
-                      valueStyle={{ color: '#fff', fontSize: '24px', fontWeight: 'bold' }}
-                      prefix={<DollarOutlined />}
-                      suffix="đ"
-                      formatter={(value) => value.toLocaleString()}
-                    />
-                    <div className="mt-3 flex items-center gap-2 text-xs">
-                      {isGrowthPositive ? (
-                        <>
-                          <RiseOutlined className="text-green-300" />
-                          <span className="text-green-100">+{revenueGrowth}% so với kỳ trước</span>
-                        </>
-                      ) : (
-                        <>
-                          <FallOutlined className="text-red-300" />
-                          <span className="text-red-100">{revenueGrowth}% so với kỳ trước</span>
-                        </>
-                      )}
-                    </div>
-                  </Card>
-                </Col>
-
-                <Col xs={24} sm={12} lg={6}>
-                  <Card className="border-0 shadow-md hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-xl">
-                    <Statistic
-                      title={<span className="text-emerald-100 text-xs font-medium">Lợi Nhuận</span>}
-                      value={totalProfit}
-                      precision={0}
-                      valueStyle={{ color: '#fff', fontSize: '24px', fontWeight: 'bold' }}
-                      prefix={<TrophyOutlined />}
-                      suffix="đ"
-                      formatter={(value) => value.toLocaleString()}
-                    />
-                    <div className="mt-3 text-xs text-emerald-100">
-                      Tỷ suất: <strong className="text-white">{profitMargin}%</strong>
-                    </div>
-                  </Card>
-                </Col>
-
-                <Col xs={24} sm={12} lg={6}>
-                  <Card className="border-0 shadow-md hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-orange-500 to-red-600 text-white rounded-xl">
-                    <Statistic
-                      title={<span className="text-orange-100 text-xs font-medium">Tổng Đơn Hàng</span>}
-                      value={totalOrders}
-                      valueStyle={{ color: '#fff', fontSize: '24px', fontWeight: 'bold' }}
-                      prefix={<ShoppingCartOutlined />}
-                      suffix="món"
-                    />
-                    <div className="mt-3 text-xs text-orange-100">
-                      Giá trị TB: <strong className="text-white">{avgOrderValue.toLocaleString()}đ</strong>
-                    </div>
-                  </Card>
-                </Col>
-
-                <Col xs={24} sm={12} lg={6}>
-                  <Card className="border-0 shadow-md hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-purple-500 to-pink-600 text-white rounded-xl">
-                    <Statistic
-                      title={<span className="text-purple-100 text-xs font-medium">Món Bán Chạy Nhất</span>}
-                      value={topProducts[0]?.product || '—'}
-                      valueStyle={{ color: '#fff', fontSize: '16px', fontWeight: 'bold' }}
-                      prefix={<FireOutlined />}
-                    />
-                    <div className="mt-3 text-xs text-purple-100">
-                      Số lượng: <strong className="text-white">{topProducts[0]?.quantity.toLocaleString() || 0}</strong>
-                    </div>
-                  </Card>
-                </Col>
-              </Row>
-
-              {/* Charts Section */}
-              <Row gutter={[16, 16]} className="mb-6">
-                {/* Revenue Trend */}
-                <Col xs={24} lg={16}>
-                  <Card
-                    title={
+          {/* KPI Cards */}
+          <Spin spinning={revenueLoading}>
+            <Row gutter={[20, 20]} className="mb-6">
+              <Col xs={24} sm={12} lg={8}>
+                <MetricCard
+                  icon={DollarSign}
+                  title="Tổng doanh thu"
+                  value={formatCurrency(totalRevenue)}
+                  trend={`${summaryMetrics.growth?.revenue > 0 ? '+' : ''}${summaryMetrics.growth?.revenue || 0}%`}
+                  trendLabel="từ kỳ trước"
+                  valueSize="medium"
+                />
+              </Col>
+              <Col xs={24} sm={12} lg={8}>
+                <MetricCard
+                  icon={ShoppingCart}
+                  title="Tổng đơn hàng"
+                  value={totalOrders.toLocaleString()}
+                  trend={`${summaryMetrics.growth?.orders > 0 ? '+' : ''}${summaryMetrics.growth?.orders || 0}%`}
+                  trendLabel="từ kỳ trước"
+                  valueSize="large"
+                />
+              </Col>
+              <Col xs={24} sm={12} lg={8}>
+                <MetricCard
+                  icon={Users}
+                  title="Tổng khách hàng"
+                  value={totalCustomers.toLocaleString()}
+                  trend={`${summaryMetrics.growth?.customers > 0 ? '+' : ''}${summaryMetrics.growth?.customers || 0}%`}
+                  trendLabel="từ kỳ trước"
+                  valueSize="large"
+                />
+              </Col>
+            </Row>            {/* 1. BIỂU ĐỒ XU HƯỚNG KINH DOANH */}
+            <Row gutter={[20, 20]} className="mb-6">
+              <Col xs={24}>
+                <Card
+                  bordered={false}
+                  className="rounded-2xl border border-gray-100 shadow-sm"
+                  title={
+                    <div className="flex items-center justify-between flex-wrap gap-4">
                       <div className="flex items-center gap-2">
-                        <ThunderboltOutlined className="text-blue-600" />
-                        <span className="font-semibold text-gray-800">Xu Hướng Doanh Thu</span>
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
+                          <Clock size={20} strokeWidth={2.5} color="#1890ff" />
+                        </div>
+                        <div>
+                          <Text strong className="text-lg text-gray-800 block leading-tight">
+                            Xu Hướng Kinh Doanh
+                          </Text>
+                          <Text className="text-xs text-gray-500">
+                            Doanh thu và đơn hàng theo thời gian (30 ngày)
+                          </Text>
+                        </div>
                       </div>
-                    }
-                    className="border-0 shadow-md rounded-xl h-full"
-                    bodyStyle={{ padding: '24px' }}
-                  >
-                    <Line
-                      data={trendData}
-                      xField="date"
-                      yField="revenue"
-                      smooth
-                      color="#3b82f6"
-                      lineStyle={{
-                        lineWidth: 3
-                      }}
-                      point={{
-                        size: 5,
-                        shape: 'circle',
-                        style: {
-                          fill: '#3b82f6',
-                          stroke: '#fff',
-                          lineWidth: 2
-                        }
-                      }}
-                      xAxis={{
-                        label: {
-                          formatter: (v) => dayjs(v).format('DD/MM'),
-                          style: {
-                            fill: '#6b7280',
-                            fontSize: 11
-                          }
-                        }
-                      }}
-                      yAxis={{
-                        label: {
-                          formatter: (v) => `${(v / 1000000).toFixed(1)}M`,
-                          style: {
-                            fill: '#6b7280',
-                            fontSize: 11
-                          }
-                        }
-                      }}
-                      tooltip={{
-                        formatter: (datum) => ({
-                          name: 'Doanh thu',
-                          value: `${datum.revenue.toLocaleString()}đ`
-                        })
-                      }}
-                      animation={{
-                        appear: {
-                          animation: 'path-in',
-                          duration: 1000
-                        }
-                      }}
-                    />
-                  </Card>
-                </Col>
 
-                {/* Category Revenue */}
-                <Col xs={24} lg={8}>
-                  <Card
-                    title={
+                      <div className="flex items-center gap-3 flex-wrap">
+                        {/* Bộ lọc thời gian */}
+                        <Segmented
+                          value={trendViewType}
+                          onChange={setTrendViewType}
+                          options={[
+                            {
+                              label: <div className="flex items-center gap-1.5 py-1 px-2">
+                                <span className="text-xs font-medium">Giờ</span>
+                              </div>,
+                              value: 'hour'
+                            },
+                            {
+                              label: <div className="flex items-center gap-1.5 py-1 px-2">
+                                <span className="text-xs font-medium">Ngày</span>
+                              </div>,
+                              value: 'day'
+                            },
+                            {
+                              label: <div className="flex items-center gap-1.5 py-1 px-2">
+                                <span className="text-xs font-medium">Tuần</span>
+                              </div>,
+                              value: 'week'
+                            },
+                            {
+                              label: <div className="flex items-center gap-1.5 py-1 px-2">
+                                <span className="text-xs font-medium">Tháng</span>
+                              </div>,
+                              value: 'month'
+                            }
+                          ]}
+                          size="middle"
+                          className="bg-gray-50 rounded-lg p-0.5"
+                        />
+
+                        {/* Loại biểu đồ */}
+                        <Segmented
+                          value={trendChartType}
+                          onChange={setTrendChartType}
+                          options={[
+                            {
+                              label: <div className="flex items-center gap-1.5 py-1 px-3">
+                                <span className="text-xs font-medium">Diện tích</span>
+                              </div>,
+                              value: 'area'
+                            },
+                            {
+                              label: <div className="flex items-center gap-1.5 py-1 px-3">
+                                <span className="text-xs font-medium">Đường</span>
+                              </div>,
+                              value: 'line'
+                            }
+                          ]}
+                          size="middle"
+                          className="bg-gray-50 rounded-lg p-0.5"
+                        />
+                      </div>
+                    </div>
+                  }
+                  bodyStyle={{ padding: '24px' }}
+                >
+                  <ResponsiveContainer width="100%" height={400}>
+                    {trendChartType === 'area' ? (
+                      <AreaChart data={businessTrendData}>
+                        <defs>
+                          <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#1890ff" stopOpacity={0.2} />
+                            <stop offset="95%" stopColor="#1890ff" stopOpacity={0.02} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                        <XAxis
+                          dataKey="label"
+                          tick={{ fontSize: 12, fill: '#8c8c8c' }}
+                          stroke="#e8e8e8"
+                          tickLine={false}
+                          axisLine={{ stroke: '#e8e8e8' }}
+                        />
+                        <YAxis
+                          yAxisId="left"
+                          tick={{ fontSize: 12, fill: '#8c8c8c' }}
+                          stroke="#e8e8e8"
+                          tickLine={false}
+                          axisLine={{ stroke: '#e8e8e8' }}
+                          tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+                        />
+                        <YAxis
+                          yAxisId="right"
+                          orientation="right"
+                          tick={{ fontSize: 12, fill: '#8c8c8c' }}
+                          stroke="#e8e8e8"
+                          tickLine={false}
+                          axisLine={{ stroke: '#e8e8e8' }}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            background: '#fff',
+                            border: '1px solid #f0f0f0',
+                            borderRadius: '12px',
+                            boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                            padding: '16px'
+                          }}
+                          labelStyle={{ color: '#262626', fontWeight: 600, marginBottom: '12px', fontSize: '13px' }}
+                          formatter={(value, name) => {
+                            const labels = {
+                              revenue: 'Doanh thu',
+                              profit: 'Lợi nhuận',
+                              orders: 'Đơn hàng'
+                            }
+                            const formattedValue = name === 'orders'
+                              ? value.toLocaleString()
+                              : formatCurrency(value)
+                            return [formattedValue, labels[name]]
+                          }}
+                        />
+                        <Area
+                          yAxisId="left"
+                          type="monotone"
+                          dataKey="revenue"
+                          stroke="#1890ff"
+                          strokeWidth={3}
+                          fillOpacity={1}
+                          fill="url(#colorRevenue)"
+                          dot={{ fill: '#1890ff', strokeWidth: 2, r: 5, stroke: '#fff' }}
+                          activeDot={{ r: 7, strokeWidth: 2 }}
+                        />
+                      </AreaChart>
+                    ) : (
+                      <AreaChart data={businessTrendData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                        <XAxis
+                          dataKey="label"
+                          tick={{ fontSize: 12, fill: '#8c8c8c' }}
+                          stroke="#e8e8e8"
+                          tickLine={false}
+                          axisLine={{ stroke: '#e8e8e8' }}
+                        />
+                        <YAxis
+                          yAxisId="left"
+                          tick={{ fontSize: 12, fill: '#8c8c8c' }}
+                          stroke="#e8e8e8"
+                          tickLine={false}
+                          axisLine={{ stroke: '#e8e8e8' }}
+                          tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+                        />
+                        <YAxis
+                          yAxisId="right"
+                          orientation="right"
+                          tick={{ fontSize: 12, fill: '#8c8c8c' }}
+                          stroke="#e8e8e8"
+                          tickLine={false}
+                          axisLine={{ stroke: '#e8e8e8' }}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            background: '#fff',
+                            border: '1px solid #f0f0f0',
+                            borderRadius: '12px',
+                            boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                            padding: '16px'
+                          }}
+                          labelStyle={{ color: '#262626', fontWeight: 600, marginBottom: '12px', fontSize: '13px' }}
+                          formatter={(value, name) => {
+                            const labels = {
+                              revenue: 'Doanh thu',
+                              orders: 'Đơn hàng'
+                            }
+                            const formattedValue = name === 'orders'
+                              ? value.toLocaleString()
+                              : formatCurrency(value)
+                            return [formattedValue, labels[name]]
+                          }}
+                        />
+                        <Area
+                          yAxisId="left"
+                          type="monotone"
+                          dataKey="revenue"
+                          stroke="#1890ff"
+                          strokeWidth={3}
+                          fill="none"
+                          dot={{ fill: '#1890ff', strokeWidth: 2, r: 5, stroke: '#fff' }}
+                          activeDot={{ r: 7, strokeWidth: 2 }}
+                        />
+                        <Area
+                          yAxisId="right"
+                          type="monotone"
+                          dataKey="orders"
+                          stroke="#52c41a"
+                          strokeWidth={2.5}
+                          fill="none"
+                          strokeDasharray="5 5"
+                          dot={{ fill: '#52c41a', strokeWidth: 2, r: 4, stroke: '#fff' }}
+                          activeDot={{ r: 6, strokeWidth: 2 }}
+                        />
+                      </AreaChart>
+                    )}
+                  </ResponsiveContainer>
+
+                  {/* Legend */}
+                  <div className="flex items-center justify-center gap-8 mt-6 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded-full bg-blue-500"></div>
+                      <Text className="text-sm text-gray-600">Doanh thu</Text>
+                    </div>
+                    {trendChartType === 'line' && (
                       <div className="flex items-center gap-2">
-                        <TrophyOutlined className="text-emerald-600" />
-                        <span className="font-semibold text-gray-800">Doanh Thu Theo Loại Món</span>
+                        <div className="w-4 h-1 bg-green-500" style={{ borderTop: '2px dashed #52c41a' }}></div>
+                        <Text className="text-sm text-gray-600">Đơn hàng</Text>
                       </div>
-                    }
-                    className="border-0 shadow-md rounded-xl h-full"
-                    bodyStyle={{ padding: '24px' }}
-                  >
-                    <Bar
-                      data={categoryData}
-                      xField="revenue"
-                      yField="category"
-                      seriesField="category"
-                      color={({ category }) => {
-                        const colors = {
-                          'Món chính': '#3b82f6',
-                          'Đồ uống': '#10b981',
-                          'Khai vị': '#f59e0b'
-                        }
-                        return colors[category] || '#6b7280'
-                      }}
-                      label={{
-                        position: 'right',
-                        formatter: ({ revenue }) => `${(revenue / 1000000).toFixed(1)}M`,
-                        style: {
-                          fill: '#374151',
-                          fontSize: 11,
-                          fontWeight: 'bold'
-                        }
-                      }}
-                      xAxis={{
-                        label: {
-                          formatter: (v) => `${(v / 1000000).toFixed(0)}M`,
-                          style: {
-                            fill: '#6b7280',
-                            fontSize: 11
-                          }
-                        }
-                      }}
-                      yAxis={{
-                        label: {
-                          style: {
-                            fill: '#374151',
-                            fontSize: 12,
-                            fontWeight: 500
-                          }
-                        }
-                      }}
-                      animation={{
-                        appear: {
-                          animation: 'scale-in-x',
-                          duration: 800
-                        }
-                      }}
-                    />
-                  </Card>
-                </Col>
-              </Row>
+                    )}
+                  </div>
+                </Card>
+              </Col>
+            </Row>
 
-              {/* Tables Section */}
-              <Row gutter={[16, 16]}>
-                {/* Top Products */}
-                <Col xs={24} lg={14}>
-                  <Card
-                    title={
+            {/* 2. BIỂU ĐỒ DOANH THU THEO MÓN ĂN & 3. BIỂU ĐỒ DOANH THU THEO DANH MỤC */}
+            <Row gutter={[20, 20]} className="mb-6">
+              {/* Doanh Thu Theo Món Ăn */}
+              <Col xs={24} xl={14}>
+                <Card
+                  bordered={false}
+                  className="rounded-2xl border border-gray-100 shadow-sm"
+                  title={
+                    <div className="flex items-center justify-between flex-wrap gap-4">
                       <div className="flex items-center gap-2">
-                        <FireOutlined className="text-orange-600" />
-                        <span className="font-semibold text-gray-800">Top 10 Món Bán Chạy Nhất</span>
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-50 to-purple-100 flex items-center justify-center">
+                          <Package size={20} strokeWidth={2.5} color="#722ed1" />
+                        </div>
+                        <div>
+                          <Text strong className="text-lg text-gray-800 block leading-tight">
+                            Doanh Thu Theo Món Ăn
+                          </Text>
+                          <Text className="text-xs text-gray-500">
+                            Top {dishLimit} món có doanh thu cao nhất
+                          </Text>
+                        </div>
                       </div>
-                    }
-                    className="border-0 shadow-md rounded-xl"
-                  >
-                    <Table
-                      columns={topProductColumns}
-                      dataSource={topProducts}
-                      pagination={false}
-                      rowKey="product"
-                      bordered={false}
-                      size="small"
-                      className="custom-table"
-                      rowClassName={(record, index) =>
-                        index % 2 === 0 ? 'bg-gray-50/50' : 'bg-white'
-                      }
-                    />
-                  </Card>
-                </Col>
 
-                {/* Category Summary */}
-                <Col xs={24} lg={10}>
-                  <Card
-                    title={
-                      <div className="flex items-center gap-2">
-                        <DollarOutlined className="text-green-600" />
-                        <span className="font-semibold text-gray-800">Tổng Hợp Theo Loại Món</span>
+                      <div className="flex items-center gap-3">
+                        <Segmented
+                          value={dishLimit}
+                          onChange={setDishLimit}
+                          options={[
+                            {
+                              label: <div className="flex items-center gap-1.5 py-1 px-2">
+                                <span className="text-xs font-medium">Top 5</span>
+                              </div>,
+                              value: 5
+                            },
+                            {
+                              label: <div className="flex items-center gap-1.5 py-1 px-2">
+                                <span className="text-xs font-medium">Top 10</span>
+                              </div>,
+                              value: 10
+                            },
+                            {
+                              label: <div className="flex items-center gap-1.5 py-1 px-2">
+                                <span className="text-xs font-medium">Top 15</span>
+                              </div>,
+                              value: 15
+                            }
+                          ]}
+                          size="middle"
+                          className="bg-gray-50 rounded-lg p-0.5"
+                        />
+
+                        <Segmented
+                          value={dishChartType}
+                          onChange={setDishChartType}
+                          options={[
+                            {
+                              label: <div className="flex items-center gap-1.5 py-1 px-3">
+                                <span className="text-xs font-medium">Cột</span>
+                              </div>,
+                              value: 'bar'
+                            },
+                            {
+                              label: <div className="flex items-center gap-1.5 py-1 px-3">
+                                <span className="text-xs font-medium">Ngang</span>
+                              </div>,
+                              value: 'horizontal'
+                            }
+                          ]}
+                          size="middle"
+                          className="bg-gray-50 rounded-lg p-0.5"
+                        />
                       </div>
-                    }
-                    className="border-0 shadow-md rounded-xl"
-                  >
-                    <Table
-                      columns={categoryColumns}
-                      dataSource={categoryData}
-                      pagination={false}
-                      rowKey="category"
-                      bordered={false}
-                      size="small"
-                      rowClassName={(record, index) =>
-                        index % 2 === 0 ? 'bg-gray-50/50' : 'bg-white'
-                      }
-                    />
-                  </Card>
-                </Col>
-              </Row>
+                    </div>
+                  }
+                  bodyStyle={{ padding: '24px' }}
+                >
+                  <ResponsiveContainer width="100%" height={500}>
+                    {dishChartType === 'bar' ? (
+                      <BarChart data={dishRevenueData}>
+                        <defs>
+                          <linearGradient id="dishGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#722ed1" stopOpacity={1} />
+                            <stop offset="100%" stopColor="#b37feb" stopOpacity={0.8} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                        <XAxis
+                          dataKey="name"
+                          tick={{ fontSize: 11, fill: '#8c8c8c' }}
+                          stroke="#e8e8e8"
+                          tickLine={false}
+                          axisLine={{ stroke: '#e8e8e8' }}
+                          angle={-45}
+                          textAnchor="end"
+                          height={120}
+                          tickFormatter={(value) => value.length > 15 ? `${value.substring(0, 15)}...` : value}
+                        />
+                        <YAxis
+                          tick={{ fontSize: 12, fill: '#8c8c8c' }}
+                          stroke="#e8e8e8"
+                          tickLine={false}
+                          axisLine={{ stroke: '#e8e8e8' }}
+                          tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            background: '#fff',
+                            border: '1px solid #f0f0f0',
+                            borderRadius: '12px',
+                            boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                            padding: '16px'
+                          }}
+                          labelStyle={{ color: '#262626', fontWeight: 600, marginBottom: '8px' }}
+                          formatter={(value, name) => {
+                            if (name === 'revenue') return [formatCurrency(value), 'Doanh thu']
+                            if (name === 'quantity') return [value.toLocaleString(), 'Số lượng']
+                            return [value, name]
+                          }}
+                          cursor={{ fill: 'rgba(114, 46, 209, 0.05)' }}
+                        />
+                        <Bar
+                          dataKey="revenue"
+                          fill="url(#dishGradient)"
+                          radius={[8, 8, 0, 0]}
+                          maxBarSize={50}
+                        />
+                      </BarChart>
+                    ) : (
+                      <BarChart data={dishRevenueData} layout="vertical">
+                        <defs>
+                          <linearGradient id="dishGradientH" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="#722ed1" stopOpacity={1} />
+                            <stop offset="100%" stopColor="#b37feb" stopOpacity={0.8} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+                        <XAxis
+                          type="number"
+                          tick={{ fontSize: 12, fill: '#8c8c8c' }}
+                          stroke="#e8e8e8"
+                          tickLine={false}
+                          axisLine={{ stroke: '#e8e8e8' }}
+                          tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+                        />
+                        <YAxis
+                          type="category"
+                          dataKey="name"
+                          tick={{ fontSize: 11, fill: '#8c8c8c' }}
+                          stroke="#e8e8e8"
+                          tickLine={false}
+                          axisLine={{ stroke: '#e8e8e8' }}
+                          width={120}
+                          tickFormatter={(value) => value.length > 18 ? `${value.substring(0, 18)}...` : value}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            background: '#fff',
+                            border: '1px solid #f0f0f0',
+                            borderRadius: '12px',
+                            boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                            padding: '16px'
+                          }}
+                          labelStyle={{ color: '#262626', fontWeight: 600, marginBottom: '8px' }}
+                          formatter={(value) => [formatCurrency(value), 'Doanh thu']}
+                          cursor={{ fill: 'rgba(114, 46, 209, 0.05)' }}
+                        />
+                        <Bar
+                          dataKey="revenue"
+                          fill="url(#dishGradientH)"
+                          radius={[0, 8, 8, 0]}
+                          maxBarSize={25}
+                        />
+                      </BarChart>
+                    )}
+                  </ResponsiveContainer>
+                </Card>
+              </Col>
 
-              {/* Custom CSS for table styling */}
-              <style>{`
-            .custom-table .ant-table-thead > tr > th {
-              background: linear-gradient(to bottom, #f9fafb, #f3f4f6);
-              border-bottom: 2px solid #e5e7eb;
-              font-weight: 600;
-              padding: 12px 16px;
-            }
-            .custom-table .ant-table-tbody > tr > td {
-              padding: 12px 16px;
-              transition: all 0.2s ease;
-            }
-            .custom-table .ant-table-tbody > tr:hover > td {
-              background: #f0f9ff !important;
-            }
-          `}</style>
-            </>
-          )}
+              {/* Doanh Thu Theo Danh Mục */}
+              <Col xs={24} xl={10}>
+                <Card
+                  bordered={false}
+                  className="rounded-2xl border border-gray-100 shadow-sm h-full"
+                  title={
+                    <div className="flex items-center gap-2">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center">
+                        <Award size={20} strokeWidth={2.5} color="#fa8c16" />
+                      </div>
+                      <div>
+                        <Text strong className="text-lg text-gray-800 block leading-tight">
+                          Doanh Thu Theo Danh Mục
+                        </Text>
+                        <Text className="text-xs text-gray-500">
+                          Phân tích theo loại món
+                        </Text>
+                      </div>
+                    </div>
+                  }
+                  bodyStyle={{ padding: '24px' }}
+                >
+                  {/* Pie Chart */}
+                  <ResponsiveContainer width="100%" height={280}>
+                    <PieChart>
+                      <defs>
+                        {categoryRevenueData.map((item, index) => (
+                          <linearGradient key={`gradient-${index}`} id={`categoryGradient${index}`} x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stopColor={item.color} stopOpacity={1} />
+                            <stop offset="100%" stopColor={item.color} stopOpacity={0.7} />
+                          </linearGradient>
+                        ))}
+                      </defs>
+                      <Pie
+                        data={categoryRevenueData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={70}
+                        outerRadius={110}
+                        paddingAngle={3}
+                        dataKey="revenue"
+                        label={({ percentOfTotal }) => `${percentOfTotal}%`}
+                        labelLine={false}
+                      >
+                        {categoryRevenueData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={`url(#categoryGradient${index})`} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          background: '#fff',
+                          border: '1px solid #f0f0f0',
+                          borderRadius: '12px',
+                          boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                          padding: '16px'
+                        }}
+                        formatter={(value, name, props) => [formatCurrency(value), props.payload.name || 'Doanh thu']}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+
+                  {/* Category Details */}
+                  <div className="mt-6">
+                    <div className="grid grid-cols-1 gap-3">
+                      {categoryRevenueData.map((item) => (
+                        <div key={item.category} className="p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 flex-1">
+                              <div
+                                style={{
+                                  width: '12px',
+                                  height: '12px',
+                                  borderRadius: '3px',
+                                  background: item.color
+                                }}
+                              />
+                              <Text strong className="text-sm">{item.category}</Text>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <Text className="text-xs text-gray-500">{item.dishes} món</Text>
+                              <Text strong className="text-sm">{formatCurrency(item.revenue)}</Text>
+                              <Tag color={item.color} className="font-semibold ml-2">
+                                {item.percentOfTotal}%
+                              </Tag>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </Card>
+              </Col>
+            </Row>
+          </Spin>
         </Content>
       </Layout>
+
+      <style>{`
+        .ant-table-thead > tr > th {
+          background: linear-gradient(to bottom, #f9fafb, #f3f4f6) !important;
+          border-bottom: 2px solid #e5e7eb !important;
+          font-weight: 600 !important;
+          padding: 16px !important;
+        }
+        .ant-table-tbody > tr > td {
+          padding: 16px !important;
+          transition: all 0.2s ease !important;
+        }
+        .ant-table-tbody > tr:hover > td {
+          background: #f0f9ff !important;
+        }
+      `}</style>
     </Layout>
   )
 }

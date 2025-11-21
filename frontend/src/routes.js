@@ -120,6 +120,7 @@ const routes = [
       </ProtectedAdminRoute>
     ),
   },
+
   {
     path: "/main/reports/products",
     element: (
