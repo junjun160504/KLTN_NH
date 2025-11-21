@@ -24,6 +24,7 @@ import notificationRoutes from './routes/notification.routes.js'; // Notificatio
 import employeeRoutes from './routes/employee.routes.js';     // Employee management
 import dashboardRoutes from './routes/dashboard.routes.js';   // Dashboard analytics
 import reportSalesRoutes from './routes/reportSales.routes.js'; // Report Sales (detailed analytics)
+import reportCustomersRoutes from './routes/reportCustomers.routes.js'; // Report Customers (loyalty analytics)
 import pointRoutes from './routes/point.routes.js';           // Point system
 
 const app = express();
@@ -55,6 +56,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/dashboard/sales', reportSalesRoutes);
+app.use('/api/dashboard/customers', reportCustomersRoutes);
 app.use('/api/points', pointRoutes);
 
 

@@ -43,7 +43,7 @@ const AppSidebar = ({ collapsed, currentPageKey, setPageTitle }) => {
   // Helper function để tìm parent key
   const getParentKey = (key) => {
     if (['menus', 'categorys'].includes(key)) return 'products';
-    if (['report_sales', 'report_products', 'report_customers', 'report_chatbot'].includes(key)) return 'report';
+    if (['report_sales', 'report_customers', 'report_chatbot'].includes(key)) return 'report';
     return null;
   };
 
@@ -75,7 +75,6 @@ const AppSidebar = ({ collapsed, currentPageKey, setPageTitle }) => {
     staffs: { path: "/main/staffs", title: "Nhân viên" },
     accounts: { path: "/main/accounts", title: "Tài khoản" },
     report_sales: { path: "/main/reports/sales", title: "Báo cáo bán hàng" },
-    report_products: { path: "/main/reports/products", title: "Báo cáo sản phẩm" },
     report_customers: { path: "/main/reports/customers", title: "Báo cáo khách hàng" },
     report_chatbot: { path: "/main/reports/chatbots", title: "Báo cáo Chatbot" },
   };
@@ -139,7 +138,6 @@ const AppSidebar = ({ collapsed, currentPageKey, setPageTitle }) => {
               label: "Báo cáo",
               children: [
                 { key: "report_sales", label: "Báo cáo bán hàng" },
-                { key: "report_products", label: "Báo cáo sản phẩm" },
                 { key: "report_customers", label: "Báo cáo khách hàng" },
                 { key: "report_chatbot", label: "Báo cáo Chatbot" },
               ],

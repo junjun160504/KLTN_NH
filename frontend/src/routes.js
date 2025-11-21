@@ -8,7 +8,6 @@ import CustomerPage from "./page/management/Main/Customers";
 import StaffPage from "./page/management/Main/Staffs";
 import AccountPage from "./page/management/Main/Accounts";
 import ReportsSalesPage from "./page/management/Main/ReportsSales";
-import ReportsProductsPage from "./page/management/Main/ReportsProducts";
 import ReportsCustomersPage from "./page/management/Main/ReportsCustomers";
 import ReportsChatbotPage from "./page/management/Main/ReportsChatbots";
 
@@ -117,15 +116,6 @@ const routes = [
     element: (
       <ProtectedAdminRoute>
         <AdminLayout><ReportsSalesPage /></AdminLayout>
-      </ProtectedAdminRoute>
-    ),
-  },
-
-  {
-    path: "/main/reports/products",
-    element: (
-      <ProtectedAdminRoute>
-        <AdminLayout><ReportsProductsPage /></AdminLayout>
       </ProtectedAdminRoute>
     ),
   },
