@@ -455,6 +455,8 @@ export async function payOrderByAdmin({ sessionId, adminId, useAllPoints = false
     const session = sessions[0];
     const customerId = session.customer_id;
 
+
+
     // Get all orders for this session
     const sqlFindOrder = `SELECT * FROM orders WHERE qr_session_id = ?`;
     const orders = await query(sqlFindOrder, [sessionId]);
@@ -531,10 +533,14 @@ export async function payOrderByAdmin({ sessionId, adminId, useAllPoints = false
       let newPointsBalance = 0;
 
       if (customerId && finalAmount > 0) {
-        console.log('🎉 Tích điểm tự động cho customer...');
+        console.log(`🎉 Tích điểm tự động cho customer #${customerId}...`);
+        console.log(`💰 Số tiền thực tế: ${finalAmount.toLocaleString()}đ (sau khi trừ ${discountFromPoints.toLocaleString()}đ từ điểm)`);
         const earnResult = await pointService.earnPointsFromPayment(customerId, finalAmount, connect);
         pointsEarned = earnResult.points_earned;
         newPointsBalance = earnResult.points_balance;
+        console.log(`✅ Kết quả tích điểm: +${pointsEarned} điểm → Tổng: ${newPointsBalance} điểm`);
+      } else {
+        console.log(`⚠️ Không tích điểm: customerId=${customerId}, finalAmount=${finalAmount}`);
       }
 
       // 3. Close session as COMPLETED

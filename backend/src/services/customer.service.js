@@ -277,10 +277,16 @@ export async function updateLoyaltyPoints(customerId, points, operation = "ADD",
 
 /**
  * 💰 Tính điểm thưởng từ số tiền order
- * Business Rule: Mỗi 10,000 VNĐ = 1 điểm
+ * Business Rule: Mỗi 100,000 VNĐ = 1 điểm | Đơn tối thiểu 300,000đ
  */
 export function calculateLoyaltyPoints(orderAmount) {
-  const POINTS_PER_AMOUNT = 10000; // 10,000 VNĐ = 1 điểm
+  const MIN_ORDER_FOR_POINTS = 300000; // Đơn tối thiểu 300,000đ
+  const POINTS_PER_AMOUNT = 100000; // 100,000 VNĐ = 1 điểm
+
+  if (orderAmount < MIN_ORDER_FOR_POINTS) {
+    return 0; // Không đủ điều kiện tích điểm
+  }
+
   return Math.floor(orderAmount / POINTS_PER_AMOUNT);
 }
 

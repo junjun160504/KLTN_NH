@@ -1324,10 +1324,15 @@ const TablesPage = () => {
     }
 
     // 🎯 Tính discount nếu dùng hết điểm
+    // Logic mới: 1 điểm = 3,000đ | Tối thiểu 30 điểm
     const calculateDiscount = (points) => {
-      if (points <= 0) return 0
-      const discount = Math.floor((points / 100) * 10000)
-      return Math.min(discount, totalAmount) // Không vượt quá tổng tiền
+      const MIN_POINTS_TO_REDEEM = 30; // Tối thiểu 30 điểm
+      const DISCOUNT_PER_POINT = 3000; // 1 điểm = 3,000đ
+
+      if (points < MIN_POINTS_TO_REDEEM) return 0; // Chưa đủ điểm để đổi
+
+      const discount = points * DISCOUNT_PER_POINT;
+      return Math.min(discount, totalAmount); // Không vượt quá tổng tiền
     }
 
     const maxDiscount = calculateDiscount(customerPoints)
@@ -1448,27 +1453,35 @@ const TablesPage = () => {
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="text-xs text-[#ad6800] mb-1">
-                        Dùng hết điểm giảm:
+                  {customerPoints >= 30 ? (
+                    // ✅ Đủ điểm để đổi
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="text-xs text-[#ad6800] mb-1">
+                          Dùng hết điểm giảm:
+                        </div>
+                        <div className="text-sm font-semibold text-[#d46b08]">
+                          -{maxDiscount?.toLocaleString('vi-VN')}₫
+                        </div>
                       </div>
-                      <div className="text-sm font-semibold text-[#d46b08]">
-                        -{maxDiscount?.toLocaleString('vi-VN')}₫
-                      </div>
-                    </div>
 
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        className="sr-only peer"
-                        id="use-points-toggle"
-                        defaultChecked={customerWantsPoints}
-                        onChange={(e) => handleTogglePoints(e.target.checked)}
-                      />
-                      <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#d46b08]"></div>
-                    </label>
-                  </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          id="use-points-toggle"
+                          defaultChecked={customerWantsPoints}
+                          onChange={(e) => handleTogglePoints(e.target.checked)}
+                        />
+                        <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#d46b08]"></div>
+                      </label>
+                    </div>
+                  ) : (
+                    // ⚠️ Chưa đủ điểm để đổi (< 30 điểm)
+                    <div className="text-xs text-[#ad6800]">
+                      ℹ️ Cần tối thiểu 30 điểm để đổi (còn thiếu {30 - customerPoints} điểm)
+                    </div>
+                  )}
                 </div>
 
                 <div className="h-px bg-gradient-to-r from-transparent via-[#d9d9d9] to-transparent my-3" />

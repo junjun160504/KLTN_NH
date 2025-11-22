@@ -274,7 +274,7 @@ export default function HomecsPage() {
                 </div>
                 <div className="bg-yellow-50 rounded-lg p-3 border border-yellow-200">
                   <p className="text-xs text-gray-600 m-0">
-                    💡 <strong>1 điểm</strong> cho mỗi <strong>10,000₫</strong> chi tiêu | <strong>100 điểm</strong> = <strong>10,000₫</strong> giảm giá
+                    💡 <strong>1 điểm</strong> cho mỗi <strong>100,000₫</strong> chi tiêu (đơn tối thiểu 300k) | <strong>1 điểm</strong> = <strong>3,000₫</strong> giảm (tối thiểu 30 điểm)
                   </p>
                 </div>
               </div>

@@ -8,7 +8,8 @@ import {
   paymentByAdmin,
   notifyForUser,
   createSessionPayments,
-  cancelSessionPayments
+  cancelSessionPayments,
+  generateQRCode
 } from "../controllers/payment.controller.js";
 import { verifyToken } from "../middlewares/auth.middleware.js";
 
@@ -21,6 +22,9 @@ router.post("/admin", verifyToken, paymentByAdmin);
 
 // Tạo payment records cho session (Customer - Public)
 router.post("/session", createSessionPayments);
+
+// Generate QR code với amount tùy chỉnh (Customer - Public)
+router.post("/generate-qr", generateQRCode);
 
 // Hoàn tiền (Admin)
 router.post("/refund", verifyToken, refundPayment);

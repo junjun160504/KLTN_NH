@@ -647,15 +647,19 @@ export default function PaymentPage() {
     // 🔢 Đảm bảo totalAmount là number
     const totalAmount = Number(confirmedTotal) || 0;
 
-    // 🎯 Tính số tiền giảm từ điểm: 100 điểm = 10,000đ
+    // 🎯 Tính số tiền giảm từ điểm: 1 điểm = 3,000đ | Tối thiểu 30 điểm
     const calculateDiscount = (points) => {
         const numPoints = Number(points) || 0;
-        if (numPoints <= 0) return 0;
-        const discount = Math.floor((numPoints / 100) * 10000);
+        const MIN_POINTS_TO_REDEEM = 30; // Tối thiểu 30 điểm mới được đổi
+        const DISCOUNT_PER_POINT = 3000; // 1 điểm = 3,000đ
+
+        if (numPoints < MIN_POINTS_TO_REDEEM) return 0; // Chưa đủ điểm để đổi
+
+        const discount = numPoints * DISCOUNT_PER_POINT;
         return Math.min(discount, totalAmount); // Không vượt quá tổng tiền
     };
 
-    // Số tiền giảm từ điểm (100 điểm = 10,000đ)
+    // Số tiền giảm từ điểm (1 điểm = 3,000đ, tối thiểu 30 điểm)
     // 🔢 Đảm bảo customerPoints là number
     const pointsDiscount = usePoints ? calculateDiscount(Number(customerPoints) || 0) : 0;
 
@@ -828,27 +832,35 @@ export default function PaymentPage() {
                 setQrModalVisible(true);
 
                 try {
-                    // ✅ Gọi API thanh toán cho order đầu tiên ĐÃ XÁC NHẬN để lấy QR code
-                    const firstOrder = confirmedOrders[0];
-
-                    if (!firstOrder) {
+                    // ✅ Kiểm tra có đơn hàng không
+                    if (confirmedOrders.length === 0) {
                         message.warning("Không có đơn hàng nào đã được xác nhận để thanh toán!");
                         setQrLoading(false);
                         setQrModalVisible(false);
                         return;
                     }
 
-                    const response = await axios.post(`${REACT_APP_API_URL}/payment`, {
-                        order_id: firstOrder.id,
-                        method: paymentMethod,
+                    // 🎯 Tạo payment records cho TẤT CẢ đơn hàng
+                    const paymentPromises = confirmedOrders.map(order =>
+                        axios.post(`${REACT_APP_API_URL}/payment`, {
+                            order_id: order.id,
+                            method: paymentMethod,
+                            print_bill: false
+                        })
+                    );
+
+                    const paymentResponses = await Promise.all(paymentPromises);
+                    console.log("✅ Created payment records for all orders:", paymentResponses.length);
+
+                    // 🎯 Tạo QR code mới với tổng tiền CUỐI CÙNG (đã trừ điểm)
+                    const qrResponse = await axios.post(`${REACT_APP_API_URL}/payment/generate-qr`, {
                         amount: finalAmount,
-                        print_bill: false
+                        description: `Thanh toan ${confirmedOrders.length} don hang`
                     });
 
-                    // Kiểm tra và lưu thông tin QR
-                    if (response.data.data && response.data.data["qr_data"]) {
-                        setQrData(response.data.data.qr_data);
-                        console.log("QR data set successfully:", response.data.data.qr_data);
+                    if (qrResponse.data && qrResponse.data.data) {
+                        setQrData(qrResponse.data.data);
+                        console.log("✅ QR code created with final amount:", finalAmount);
                     } else {
                         console.error("QR data not found in response");
                         message.error("Không tìm được thông tin QR");
@@ -1312,8 +1324,8 @@ export default function PaymentPage() {
                             <Spin size="small" tip="Đang tải điểm..." />
                         ) : customerInfo ? (
                             // ✅ Đã có thông tin loyalty (đã đăng ký)
-                            customerPoints > 0 ? (
-                                // Có điểm → Hiển thị toggle
+                            customerPoints >= 30 ? (
+                                // ✅ Đủ điểm để đổi (≥30 điểm) → Hiển thị toggle
                                 <>
                                     <div>
                                         <Text style={{ fontSize: 14, color: "#333", display: "block" }}>
@@ -1367,6 +1379,13 @@ export default function PaymentPage() {
                                         </span>
                                     </label>
                                 </>
+                            ) : customerPoints > 0 ? (
+                                // ⚠️ Có điểm nhưng chưa đủ để đổi (< 30 điểm)
+                                <div style={{ width: '100%' }}>
+                                    <Text style={{ fontSize: 13, color: "#fa8c16", fontStyle: "italic" }}>
+                                        ℹ️ Bạn có {customerPoints} điểm. Cần tối thiểu 30 điểm để đổi (còn thiếu {30 - customerPoints} điểm)
+                                    </Text>
+                                </div>
                             ) : (
                                 // Đã đăng ký nhưng chưa có điểm → Hiển thị thông báo nhẹ
                                 <div style={{ width: '100%' }}>

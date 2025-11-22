@@ -1,6 +1,7 @@
 import * as paymentService from "../services/payment.service.js";
 import { validateSession } from "../services/qrSession.service.js";
 import { notifyUser } from "../services/simpleNotification.service.js";
+import { buildVietQR } from "../utils/vietqr.js";
 
 // Thanh toán
 export async function processPayment(req, res) {
@@ -170,3 +171,41 @@ export async function cancelSessionPayments(req, res) {
     res.status(500).json({ status: 500, message: err.message });
   }
 }
+
+// 🎯 Generate QR code với amount tùy chỉnh (cho trường hợp có discount từ điểm)
+export async function generateQRCode(req, res) {
+  try {
+    const { amount, description } = req.body;
+
+    // Validate input
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        status: 400,
+        message: 'Invalid amount'
+      });
+    }
+
+    // Generate QR code
+    const qr = await buildVietQR({
+      accountNumber: process.env.VIETQR_ACCOUNT_NO,
+      bankCode: process.env.VIETQR_BANK_CODE,
+      accountName: process.env.VIETQR_ACCOUNT_NAME,
+      amount: Math.round(amount),
+      addInfo: description || 'Thanh toan don hang'
+    });
+
+    res.status(200).json({
+      status: 200,
+      data: {
+        qr_code_url: qr.qrCodeUrl,
+        qr_code_image: qr.qrCodeImage,
+        quick_link: qr.quickLink,
+        bank_info: qr.bankInfo
+      }
+    });
+  } catch (err) {
+    console.error("generateQRCode error:", err);
+    res.status(500).json({ status: 500, message: err.message });
+  }
+}
+

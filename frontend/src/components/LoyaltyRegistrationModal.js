@@ -101,7 +101,7 @@ export default function LoyaltyRegistrationModal({
         {/* Info Box */}
         <div className="bg-purple-50 rounded-lg p-3 mb-4 border border-purple-100">
           <p className="text-xs text-gray-600 m-0">
-            💎 <strong>100 điểm</strong> cho mỗi <strong>10.000₫</strong> chi tiêu
+            💎 <strong>1 điểm</strong> cho mỗi <strong>100.000₫</strong> chi tiêu (đơn tối thiểu 300.000₫)
           </p>
         </div>
 
