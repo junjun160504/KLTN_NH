@@ -1808,8 +1808,8 @@ const TablesPage = () => {
   // ================= Order Status Tag =================
   const getOrderStatusTag = (status) => {
     const statusMap = {
-      NEW: { text: 'Chờ xác nhận', color: 'blue' },
-      IN_PROGRESS: { text: 'Đang phục vụ', color: 'orange' },
+      NEW: { text: 'Chờ xác nhận', color: 'orange' },
+      IN_PROGRESS: { text: 'Đang phục vụ', color: 'green' },
       DONE: { text: 'Hoàn thành', color: 'green' },
       PAID: { text: 'Đã thanh toán', color: 'success' }
     }

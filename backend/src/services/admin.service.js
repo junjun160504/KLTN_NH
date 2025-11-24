@@ -108,7 +108,7 @@ export async function getAllAdmins(filters = {}) {
         sql += ' AND a.is_active = 1';
     }
 
-    sql += ' ORDER BY a.created_at DESC';
+    sql += ' ORDER BY a.created_at';
 
     const admins = await query(sql, params);
     return admins;
@@ -493,8 +493,8 @@ export async function hardDeleteAdmin(id) {
         );
     }
 
-    // Permanent delete
-    await query('DELETE FROM admins WHERE id = ?', [id]);
+    // Soft delete instead of hard delete
+    await query('UPDATE admins SET deleted_at = NOW() WHERE id = ? AND deleted_at IS NULL', [id]);
 
     return { id };
 }

@@ -14,7 +14,7 @@ import QRCodeUtils from "../utils/qrCodeUtils.js";
 export async function generateTableQR(tableId) {
   try {
     // Verify table exists
-    const [table] = await query("SELECT * FROM tables WHERE id = ?", [tableId]);
+    const [table] = await query("SELECT * FROM tables WHERE id = ? AND deleted_at IS NULL", [tableId]);
     if (!table) {
       throw new Error(`Table with ID ${tableId} not found`);
     }
@@ -48,7 +48,7 @@ export async function generateTableQR(tableId) {
  */
 export async function generateAllTableQRs() {
   try {
-    const tables = await query("SELECT * FROM tables WHERE is_active = true ORDER BY id");
+    const tables = await query("SELECT * FROM tables WHERE is_active = true AND deleted_at IS NULL ORDER BY id");
 
     if (tables.length === 0) {
       throw new Error("No active tables found");
@@ -101,7 +101,7 @@ export async function validateTableQR(qrUrl) {
 
     // Get table information from database
     const [table] = await query(
-      "SELECT * FROM tables WHERE id = ? AND is_active = true",
+      "SELECT * FROM tables WHERE id = ? AND is_active = true AND deleted_at IS NULL",
       [validation.tableId]
     );
 
@@ -137,7 +137,7 @@ export async function validateTableQR(qrUrl) {
  */
 export async function getTableQRInfo(tableId) {
   try {
-    const [table] = await query("SELECT * FROM tables WHERE id = ?", [tableId]);
+    const [table] = await query("SELECT * FROM tables WHERE id = ? AND deleted_at IS NULL", [tableId]);
 
     if (!table) {
       throw new Error(`Table with ID ${tableId} not found`);
@@ -168,7 +168,7 @@ export async function getTableQRInfo(tableId) {
  */
 export async function deleteTableQR(tableId) {
   try {
-    const [table] = await query("SELECT * FROM tables WHERE id = ?", [tableId]);
+    const [table] = await query("SELECT * FROM tables WHERE id = ? AND deleted_at IS NULL", [tableId]);
 
     if (!table) {
       throw new Error(`Table with ID ${tableId} not found`);

@@ -33,6 +33,116 @@ async function getMenu() {
 }
 
 /**
+ * 🎨 Parse rich content response từ GPT
+ * Xử lý mọi loại nội dung: text, images, links, suggestions, actions
+ */
+function parseRichContentResponse(gptResponse, menuItems, originalMessage) {
+  const contents = [];
+
+  // 1️⃣ Extract text content
+  if (gptResponse.intro || gptResponse.text) {
+    const text = gptResponse.intro || gptResponse.text;
+
+    // Extract URLs from text
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const urls = text.match(urlRegex) || [];
+
+    contents.push({
+      type: 'text',
+      value: text,
+      urls: urls.length > 0 ? urls : null
+    });
+  }
+
+  // 2️⃣ Extract suggested menu items
+  const suggestedItems = (gptResponse.suggestions || [])
+    .map((suggestion) => {
+      const foundItem = menuItems.find(
+        (item) => item.name.toLowerCase() === suggestion.name.toLowerCase()
+      );
+
+      if (foundItem) {
+        return {
+          id: foundItem.id,
+          name: foundItem.name,
+          price: foundItem.price,
+          description: foundItem.description,
+          image_url: foundItem.image_url || "https://via.placeholder.com/150?text=No+Image",
+          reason: suggestion.reason,
+        };
+      }
+      return null;
+    })
+    .filter(Boolean);
+
+  if (suggestedItems.length > 0) {
+    contents.push({
+      type: 'menu_items',
+      items: suggestedItems
+    });
+  }
+
+  // 3️⃣ Detect mentioned items in text
+  const mentionedItems = [];
+  const textContent = gptResponse.intro || gptResponse.text || '';
+
+  if (textContent) {
+    menuItems.forEach((item) => {
+      const regex = new RegExp(item.name.replace(/[()]/g, '\\$&'), 'gi');
+      if (regex.test(textContent) && !suggestedItems.find(s => s.id === item.id)) {
+        mentionedItems.push({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          description: item.description,
+          image_url: item.image_url || "https://via.placeholder.com/150?text=No+Image",
+        });
+      }
+    });
+  }
+
+  if (mentionedItems.length > 0) {
+    contents.push({
+      type: 'mentioned_items',
+      items: mentionedItems
+    });
+  }
+
+  // 4️⃣ Extract action buttons (if any)
+  if (gptResponse.actions && Array.isArray(gptResponse.actions)) {
+    contents.push({
+      type: 'actions',
+      buttons: gptResponse.actions.map(action => ({
+        label: action.label || action.text,
+        action: action.action || action.type,
+        data: action.data || null
+      }))
+    });
+  }
+
+  // 5️⃣ Extract images (if any)
+  if (gptResponse.images && Array.isArray(gptResponse.images)) {
+    contents.push({
+      type: 'images',
+      urls: gptResponse.images
+    });
+  }
+
+  // 🎯 Return unified response structure
+  return {
+    message: originalMessage,
+    response_type: 'rich_content',
+    contents: contents,
+    // Legacy support (backward compatible)
+    type: suggestedItems.length > 0 ? 'suggestions' :
+      mentionedItems.length > 0 ? 'text_with_items' : 'text',
+    intro: gptResponse.intro || gptResponse.text,
+    suggestions: suggestedItems,
+    mentioned_items: mentionedItems
+  };
+}
+
+/**
  * Main chatbot reply function with conversation context
  * @param {string} message - Current user message
  * @param {Array} history - Conversation history [{from: "user"/"bot", text: "..."}]
@@ -135,70 +245,8 @@ Nếu khách hỏi thông tin thêm hoặc chat thường, trả về:
       throw new Error("Invalid JSON response from GPT");
     }
 
-    // Map tên món từ GPT sang full data từ DB
-    const suggestedItems = (gptResponse.suggestions || [])
-      .map((suggestion) => {
-        // Tìm món trong DB (case-insensitive)
-        const foundItem = menuItems.find(
-          (item) => item.name.toLowerCase() === suggestion.name.toLowerCase()
-        );
-
-        if (foundItem) {
-          return {
-            id: foundItem.id,
-            name: foundItem.name,
-            price: foundItem.price,
-            description: foundItem.description,
-            image_url: foundItem.image_url || "https://via.placeholder.com/150?text=No+Image",
-            reason: suggestion.reason,
-          };
-        }
-        return null;
-      })
-      .filter(Boolean); // Remove null values
-
-    // ✅ Detect mentioned items in intro text (for text responses)
-    const mentionedItems = [];
-    if (gptResponse.intro) {
-      menuItems.forEach((item) => {
-        // Check if item name appears in the intro text
-        const regex = new RegExp(item.name.replace(/[()]/g, '\\$&'), 'gi');
-        if (regex.test(gptResponse.intro)) {
-          mentionedItems.push({
-            id: item.id,
-            name: item.name,
-            price: item.price,
-            description: item.description,
-            image_url: item.image_url || "https://via.placeholder.com/150?text=No+Image",
-          });
-        }
-      });
-    }
-
-    // Return structured response
-    if (suggestedItems.length > 0) {
-      return {
-        message,
-        type: "suggestions",
-        intro: gptResponse.intro || "Dạ, mình gợi ý cho bạn mấy món này nhé! 😊",
-        suggestions: suggestedItems,
-      };
-    } else if (mentionedItems.length > 0) {
-      // ✅ Text response with mentioned items
-      return {
-        message,
-        type: "text_with_items",
-        text: gptResponse.intro || "Dạ, mình có thể giúp gì thêm cho bạn không ạ? 😊",
-        mentioned_items: mentionedItems,
-      };
-    } else {
-      // Text response (no suggestions, no mentioned items)
-      return {
-        message,
-        type: "text",
-        suggestion: gptResponse.intro || "Dạ, mình có thể giúp gì thêm cho bạn không ạ? 😊",
-      };
-    }
+    // 🎨 Parse rich content response
+    return parseRichContentResponse(gptResponse, menuItems, message);
   } catch (error) {
     console.error("OpenAI error:", error);
 

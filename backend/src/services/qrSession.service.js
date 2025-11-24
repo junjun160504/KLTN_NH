@@ -93,7 +93,7 @@ export async function validateSession(sessionId) {
 // Quét QR và mở session mới với validation
 export async function startSession({ table_id, customer_id, session_token }) {
     // Validate table exists
-    const [table] = await query("SELECT * FROM tables WHERE id = ? AND is_active = true", [table_id]);
+    const [table] = await query("SELECT * FROM tables WHERE id = ? AND is_active = true AND deleted_at IS NULL", [table_id]);
     if (!table) throw new Error("Table not found or inactive");
 
     // Validate QR session token if provided

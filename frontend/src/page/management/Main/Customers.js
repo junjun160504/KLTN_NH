@@ -9,7 +9,6 @@ import {
   Table,
   Modal,
   Form,
-  message,
   Popconfirm,
   Pagination,
   ConfigProvider,
@@ -17,7 +16,8 @@ import {
   Card,
   Statistic,
   Row,
-  Col
+  Col,
+  App
 } from 'antd'
 import vi_VN from 'antd/lib/locale/vi_VN'
 import {
@@ -41,6 +41,7 @@ const { Content } = Layout
 const REACT_APP_API_URL = process.env.REACT_APP_API_URL
 
 const CustomersPage = () => {
+  const { message } = App.useApp()
   const [collapsed, setCollapsed] = useSidebarCollapse()
   const [pageTitle] = useState('Quản lý khách hàng')
   const [allCustomers, setAllCustomers] = useState([])
@@ -81,13 +82,16 @@ const CustomersPage = () => {
       }
     } catch (error) {
       console.error('Failed to fetch customers:', error)
-      message.error('Không thể tải danh sách khách hàng')
+      message.error({
+        content: 'Không thể tải danh sách khách hàng',
+        duration: 3,
+      })
       setAllCustomers([])
       setCustomers([])
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [message])
 
   // Add customer
   const handleAddCustomer = async (values) => {
@@ -101,15 +105,21 @@ const CustomersPage = () => {
         headers: { Authorization: `Bearer ${token}` }
       })
       if (response.data.status === 200 || response.data.status === 201) {
-        message.success('Thêm khách hàng thành công!')
+        message.success({
+          content: 'Đã thêm khách hàng thành công',
+          duration: 3,
+        })
         setModalOpen(false)
         addForm.resetFields()
         fetchCustomers()
       }
     } catch (error) {
       if (error?.errorFields) return
-      const errorMsg = error.response?.data?.message || 'Thêm khách hàng thất bại!'
-      message.error(errorMsg)
+      const errorMsg = error.response?.data?.message || 'Thêm khách hàng thất bại'
+      message.error({
+        content: errorMsg,
+        duration: 3,
+      })
     }
   }
 
@@ -136,7 +146,10 @@ const CustomersPage = () => {
         headers: { Authorization: `Bearer ${token}` }
       })
       if (response.data.status === 200) {
-        message.success('Cập nhật khách hàng thành công!')
+        message.success({
+          content: 'Đã sửa thông tin khách hàng thành công',
+          duration: 3,
+        })
         setEditModalOpen(false)
         editForm.resetFields()
         setEditingCustomer(null)
@@ -144,8 +157,11 @@ const CustomersPage = () => {
       }
     } catch (error) {
       if (error?.errorFields) return
-      const errorMsg = error.response?.data?.message || 'Cập nhật khách hàng thất bại!'
-      message.error(errorMsg)
+      const errorMsg = error.response?.data?.message || 'Cập nhật khách hàng thất bại'
+      message.error({
+        content: errorMsg,
+        duration: 3,
+      })
     }
   }
 
@@ -157,13 +173,19 @@ const CustomersPage = () => {
         headers: { Authorization: `Bearer ${token}` }
       })
       if (response.data.status === 200) {
-        message.success('Xóa khách hàng thành công!')
+        message.success({
+          content: 'Đã xóa khách hàng thành công',
+          duration: 3,
+        })
         setAllCustomers(prev => prev.filter(item => item.id !== id))
         setCustomers(prev => prev.filter(item => item.id !== id))
       }
     } catch (error) {
       console.error('Failed to delete customer:', error)
-      message.error('Xóa khách hàng thất bại!')
+      message.error({
+        content: 'Xóa khách hàng thất bại',
+        duration: 3,
+      })
     }
   }
 
@@ -185,7 +207,10 @@ const CustomersPage = () => {
       }
     } catch (error) {
       console.error('Failed to fetch customer history:', error)
-      message.error('Không thể tải lịch sử đơn hàng')
+      message.error({
+        content: 'Không thể tải lịch sử đơn hàng',
+        duration: 3,
+      })
     } finally {
       setLoadingDetail(false)
     }
@@ -232,16 +257,16 @@ const CustomersPage = () => {
       dataIndex: 'id',
       key: 'id',
       align: 'center',
-      width: 60
+      width: '8%'
     },
     {
       title: 'Số điện thoại',
       dataIndex: 'phone',
       key: 'phone',
-      width: 140,
+      width: '20%',
+      align: 'center',
       render: (phone) => (
-        <div className="flex items-center gap-2">
-          <PhoneOutlined className="text-blue-600" />
+        <div className="flex justify-center gap-2">
           <span className="font-medium">{phone}</span>
         </div>
       )
@@ -250,22 +275,16 @@ const CustomersPage = () => {
       title: 'Tên',
       dataIndex: 'name',
       key: 'name',
-      width: 160,
+      width: '25%',
+      align: 'center',
       render: (name) => name || <span className="text-gray-400">—</span>
-    },
-    {
-      title: 'Email',
-      dataIndex: 'email',
-      key: 'email',
-      width: 200,
-      render: (email) => email || <span className="text-gray-400">—</span>
     },
     {
       title: 'Điểm',
       dataIndex: 'points',
       key: 'points',
       align: 'center',
-      width: 100,
+      width: '12%',
       render: (points) => (
         <Tag color="orange" className="font-semibold">
           {points || 0}
@@ -276,14 +295,16 @@ const CustomersPage = () => {
       title: 'Ngày tạo',
       dataIndex: 'created_at',
       key: 'created_at',
-      width: 140,
+      width: '15%',
+      align: 'center',
       render: (date) => date ? dayjs(date).format('DD/MM/YYYY') : '—'
     },
     {
       title: 'Thao tác',
       key: 'action',
       align: 'center',
-      width: 140,
+      width: '20%',
+      fixed: 'right',
       render: (_, record) => (
         <div className="flex gap-2 justify-center">
           <Button

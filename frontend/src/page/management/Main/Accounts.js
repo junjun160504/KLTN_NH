@@ -329,6 +329,7 @@ const AccountsPage = () => {
       dataIndex: "id",
       key: "id",
       align: "center",
+      fixed: "left",
       width: 60,
       render: (id) => (
         <div className="flex items-center justify-center">
@@ -366,13 +367,20 @@ const AccountsPage = () => {
       },
     },
     {
-      title: "ID Nhân viên",
-      dataIndex: "employee_id",
-      key: "employee_id",
+      title: "Nhân viên",
+      dataIndex: "employee_name",
+      key: "employee_name",
       align: "center",
       width: 160,
-      render: (employee_id) => (
-        <span className="text-sm text-gray-600">{employee_id || "—"}</span>
+      render: (employee_name, record) => (
+        <div className="flex flex-col items-center">
+          <span className="text-sm font-medium text-gray-800">
+            {employee_name || "—"}
+          </span>
+          {/* <span className="text-xs text-gray-500">
+            ID: {record.employee_id || "—"}
+          </span> */}
+        </div>
       ),
     },
     {
@@ -445,6 +453,7 @@ const AccountsPage = () => {
       title: "Thao tác",
       key: "action",
       align: "center",
+      fixed: 'right',
       width: 200,
       render: (_, record) => (
         <div className="flex items-center justify-center gap-2">

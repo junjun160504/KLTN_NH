@@ -18,7 +18,7 @@ const LoginPage = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      const from = location.state?.from?.pathname || '/main/homes'
+      const from = location.state?.from?.pathname || '/main/tables'
       navigate(from, { replace: true })
     }
   }, [isAuthenticated, navigate, location])
@@ -62,7 +62,7 @@ const LoginPage = () => {
         duration: 2
       })
 
-      const from = location.state?.from?.pathname || '/main/homes'
+      const from = location.state?.from?.pathname || '/main/tables'
       setTimeout(() => {
         navigate(from, { replace: true })
       }, 300)

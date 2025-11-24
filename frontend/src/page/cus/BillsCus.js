@@ -94,18 +94,18 @@ const formatPrice = (price) => {
 const STATUS_CONFIG = {
   NEW: {
     label: "Đang chờ",
-    color: "blue",
-    bgColor: "bg-blue-50",
-    borderColor: "border-blue-200",
-    icon: <ClockCircleOutlined className="text-blue-500" />,
+    color: "orange",
+    bgColor: "bg-orange-50",
+    borderColor: "border-orange-200",
+    icon: <ClockCircleOutlined className="text-orange-500" />,
     progress: 0,
   },
   IN_PROGRESS: {
     label: "Đang phục vụ",
-    color: "orange",
-    bgColor: "bg-orange-50",
-    borderColor: "border-orange-200",
-    icon: <FireOutlined className="text-orange-500" />,
+    color: "green",
+    bgColor: "bg-green-50",
+    borderColor: "border-green-200",
+    icon: <FireOutlined className="text-green-500" />,
     progress: 50,
   },
   DONE: {
@@ -301,7 +301,7 @@ export default function CustomerBillPage() {
     }
   }, [fetchOrders, session]);
 
-  // ✅ Auto refresh mỗi 30s để cập nhật trạng thái (silent mode) - Only if session exists
+  // ✅ Auto refresh mỗi 3s để cập nhật trạng thái (silent mode) - Only if session exists
   useEffect(() => {
     if (!session || !session.session_id) {
       return; // Don't start interval if no session
@@ -309,7 +309,7 @@ export default function CustomerBillPage() {
 
     const interval = setInterval(() => {
       fetchOrders(true); // Silent refresh - không hiển thị loading
-    }, 30000); // 30 seconds
+    }, 3000); // 3 seconds
 
     return () => clearInterval(interval);
   }, [fetchOrders, session]);
@@ -748,8 +748,8 @@ export default function CustomerBillPage() {
                         style={{
                           width: `${config.progress}%`,
                           background:
-                            order.status === "NEW" ? DESIGN_TOKENS.colors.info :
-                              order.status === "IN_PROGRESS" ? DESIGN_TOKENS.colors.warning :
+                            order.status === "NEW" ? DESIGN_TOKENS.colors.warning :
+                              order.status === "IN_PROGRESS" ? DESIGN_TOKENS.colors.success :
                                 DESIGN_TOKENS.colors.success,
                         }}
                       />

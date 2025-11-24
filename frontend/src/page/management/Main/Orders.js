@@ -71,7 +71,7 @@ const STATUS_MAP = {
 
 const STATUS_COLORS = {
   NEW: 'orange',
-  IN_PROGRESS: 'blue',
+  IN_PROGRESS: 'green',
   DONE: 'green',
   PAID: 'purple',
   CANCELLED: 'red'

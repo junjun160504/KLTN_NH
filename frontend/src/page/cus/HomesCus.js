@@ -39,6 +39,7 @@ export default function HomecsPage() {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [tableNumber, setTableNumber] = useState(null); // ✅ State for actual table number
+  const [callStaffMessage, setCallStaffMessage] = useState(""); // ✅ State for call staff message
 
   // ✅ Fetch table number from database
   const fetchTableNumber = useCallback(async () => {
@@ -152,12 +153,13 @@ export default function HomecsPage() {
       // Gọi API - Chỉ tạo notification, không lưu vào table riêng
       const response = await axios.post(`${process.env.REACT_APP_API_URL}/call-staff`, {
         qr_session_id: qrSessionId,
-        message: null, // có thể thêm input để user nhập message nếu muốn
+        message: callStaffMessage.trim() || null, // ✅ Gửi message từ input (nếu có)
       });
 
       if (response.status === 201) {
         message.success("Gọi nhân viên thành công!");
         setIsModalVisible(false);
+        setCallStaffMessage(""); // ✅ Reset message sau khi gọi thành công
       }
     } catch (error) {
       console.error("Error calling staff:", error);
@@ -598,14 +600,20 @@ export default function HomecsPage() {
             🔔 Gọi nhân viên
           </div>
         }
-        onCancel={() => setIsModalVisible(false)}
+        onCancel={() => {
+          setIsModalVisible(false);
+          setCallStaffMessage(""); // ✅ Clear message khi đóng modal
+        }}
         centered
         width={360}
         footer={[
           <Button
             key="cancel"
             size="large"
-            onClick={() => setIsModalVisible(false)}
+            onClick={() => {
+              setIsModalVisible(false);
+              setCallStaffMessage(""); // ✅ Clear message khi hủy
+            }}
             style={{
               borderRadius: 8,
               height: 44,
@@ -631,21 +639,42 @@ export default function HomecsPage() {
           </Button>,
         ]}
       >
-        <div style={{ textAlign: "center", padding: "12px 0" }}>
-          <p style={{ fontSize: 16, marginBottom: 16, color: "#333" }}>
-            Bạn có chắc chắn muốn gọi nhân viên không?
-          </p>
+        <div style={{ padding: "12px 0" }}>
+          {/* ✅ Input để nhập nội dung gọi nhân viên */}
+          <Form.Item style={{ marginBottom: 16 }}>
+            <textarea
+              value={callStaffMessage}
+              onChange={(e) => setCallStaffMessage(e.target.value)}
+              placeholder="Ví dụ: Cần thêm tô, muốn gọi thêm món..."
+              maxLength={200}
+              rows={3}
+              style={{
+                width: "92%",
+                padding: "10px 12px",
+                fontSize: 14,
+                borderRadius: 8,
+                border: "1px solid #d9d9d9",
+                resize: "none",
+                fontFamily: "inherit",
+              }}
+            />
+            <div style={{ textAlign: "right", fontSize: 12, color: "#8c8c8c", marginTop: 4 }}>
+              {callStaffMessage.length}/200
+            </div>
+          </Form.Item>
+
           <div
             style={{
               color: "#52c41a",
-              fontSize: 14,
+              fontSize: 13,
               background: "#f6ffed",
-              padding: "12px 16px",
+              padding: "10px 12px",
               borderRadius: 8,
               border: "1px solid #b7eb8f",
+              textAlign: "center",
             }}
           >
-            ✨ Nhân viên sẽ được thông báo và tới bàn của bạn ngay lập tức
+            ✨ Nhân viên sẽ nhận được thông báo ngay lập tức
           </div>
         </div>
       </Modal>

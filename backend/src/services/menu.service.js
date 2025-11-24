@@ -12,14 +12,15 @@ export async function getAllMenuItems(name) {
     from menu_items mi
     left join menu_item_categories mic on mi.id = mic.item_id
     left join menu_categories mc on mc.id = mic.category_id
-    where mi.name LIKE ?`;
+    where mi.name LIKE ? AND mi.deleted_at IS NULL AND (mc.deleted_at IS NULL OR mc.id IS NULL)`;
     params.push(`%${name}%`);
   } else {
     sql = `select mi.id, mi.name, mi.price, mi.description, mi.image_url, mi.is_available,
     mc.id as categoryId, mc.name as categoryName
     from menu_items mi
     left join menu_item_categories mic on mi.id = mic.item_id
-    left join menu_categories mc on mc.id = mic.category_id`;
+    left join menu_categories mc on mc.id = mic.category_id
+    where mi.deleted_at IS NULL AND (mc.deleted_at IS NULL OR mc.id IS NULL)`;
   }
 
   const itemsMap = {};
@@ -94,7 +95,7 @@ export async function getMenuItemById(id) {
     FROM menu_items mi
     JOIN menu_item_categories mic ON mi.id = mic.item_id
     JOIN menu_categories mc ON mc.id = mic.category_id
-    WHERE mi.id = ?
+    WHERE mi.id = ? AND mi.deleted_at IS NULL AND mc.deleted_at IS NULL
     `
   const [rows] = await pool.query(sql, [id]);
   const itemsMap = {};
@@ -196,18 +197,11 @@ export async function hardDeleteMenuItem(id) {
   try {
     await conn.beginTransaction();
 
-    // 1. Xóa các quan hệ món-danh mục
-    await conn.query("DELETE FROM menu_item_categories WHERE item_id = ?", [id]);
-
-    // 2. Xóa các reviews của món này (nếu có)
-    await conn.query("DELETE FROM menu_reviews WHERE item_id = ?", [id]);
-
-    // 3. Xóa món khỏi các đơn hàng cũ (tùy business logic, có thể giữ lại hoặc xóa)
-    // Ở đây ta sẽ set item_id = NULL thay vì xóa để giữ lịch sử đơn hàng
-    await conn.query("UPDATE order_items SET menu_item_id = NULL WHERE menu_item_id = ?", [id]);
-
-    // 4. Xóa món
-    const [result] = await conn.query("DELETE FROM menu_items WHERE id = ?", [id]);
+    // Soft delete: Cập nhật deleted_at thay vì xóa vĩnh viễn
+    const [result] = await conn.query(
+      "UPDATE menu_items SET deleted_at = NOW() WHERE id = ? AND deleted_at IS NULL",
+      [id]
+    );
 
     await conn.commit();
 
@@ -228,14 +222,14 @@ export async function hardDeleteMenuItem(id) {
 
 // Lấy danh sách tất cả danh mục (Read All)
 export async function getMenuCategories() {
-  const sql = "SELECT * FROM menu_categories";
+  const sql = "SELECT * FROM menu_categories WHERE deleted_at IS NULL";
   const rows = await query(sql);
   return rows;
 }
 
 // Lấy chi tiết một danh mục theo ID (Read One)
 export async function getCategoryById(id) {
-  const sql = "SELECT * FROM menu_categories WHERE id = ?";
+  const sql = "SELECT * FROM menu_categories WHERE id = ? AND deleted_at IS NULL";
   const rows = await query(sql, [id]);
   return rows[0] || null;
 }
@@ -306,15 +300,9 @@ export async function hardDeleteCategory(id) {
   try {
     await conn.beginTransaction();
 
-    // 1. Xóa các quan hệ món-danh mục
-    await conn.query(
-      "DELETE FROM menu_item_categories WHERE category_id = ?",
-      [id]
-    );
-
-    // 2. Xóa danh mục
+    // Soft delete: Cập nhật deleted_at thay vì xóa vĩnh viễn
     const [result] = await conn.query(
-      "DELETE FROM menu_categories WHERE id = ?",
+      "UPDATE menu_categories SET deleted_at = NOW() WHERE id = ? AND deleted_at IS NULL",
       [id]
     );
 
@@ -344,7 +332,7 @@ export async function getItemsByCategory(id) {
     FROM menu_items mi
     JOIN menu_item_categories mic ON mi.id = mic.item_id
     JOIN menu_categories mc ON mc.id = mic.category_id
-    WHERE mic.category_id = ?
+    WHERE mic.category_id = ? AND mi.deleted_at IS NULL AND mc.deleted_at IS NULL
     `
   const [rows] = await pool.query(sql, [id]);
   const itemsMap = {};
@@ -384,7 +372,7 @@ export async function getMenuItemDetail(itemId) {
       FROM menu_items mi
       LEFT JOIN menu_item_categories mic ON mi.id = mic.item_id
       LEFT JOIN menu_categories mc ON mc.id = mic.category_id
-      WHERE mi.id = ?`,
+      WHERE mi.id = ? AND mi.deleted_at IS NULL AND (mc.deleted_at IS NULL OR mc.id IS NULL)`,
       [itemId]
     );
 
@@ -460,9 +448,9 @@ export async function getMenuItemDetail(itemId) {
  */
 export async function exportCategoriesToExcel(includeDeleted = false) {
   // Lấy dữ liệu từ database
-  let sql = "SELECT * FROM menu_categories";
+  let sql = "SELECT * FROM menu_categories WHERE deleted_at IS NULL";
   if (!includeDeleted) {
-    sql += " WHERE is_available = 1";
+    sql += " AND is_available = 1";
   }
   sql += " ORDER BY id ASC";
 
@@ -640,7 +628,7 @@ export async function importCategoriesFromExcel(fileBuffer, options = {}) {
 
         // Kiểm tra duplicate
         const [existing] = await conn.query(
-          'SELECT id, name FROM menu_categories WHERE name = ?',
+          'SELECT id, name FROM menu_categories WHERE name = ? AND deleted_at IS NULL',
           [categoryData.name]
         );
 
@@ -731,6 +719,7 @@ export async function exportMenuItemsToExcel() {
       FROM menu_items mi
       LEFT JOIN menu_item_categories mic ON mi.id = mic.item_id
       LEFT JOIN menu_categories mc ON mc.id = mic.category_id
+      WHERE mi.deleted_at IS NULL AND (mc.deleted_at IS NULL OR mc.id IS NULL)
       ORDER BY mi.id ASC
     `);
 
@@ -971,7 +960,7 @@ export async function importMenuItemsFromExcel(fileBuffer, options = {}) {
         // Check if categories exist (if provided)
         if (itemData.category_ids.length > 0) {
           const [categoryCheck] = await conn.query(
-            'SELECT id FROM menu_categories WHERE id IN (?)',
+            'SELECT id FROM menu_categories WHERE id IN (?) AND deleted_at IS NULL',
             [itemData.category_ids]
           );
 
@@ -984,7 +973,7 @@ export async function importMenuItemsFromExcel(fileBuffer, options = {}) {
 
         // Check if item already exists (by name)
         const [existingItems] = await conn.query(
-          'SELECT id FROM menu_items WHERE LOWER(name) = LOWER(?)',
+          'SELECT id FROM menu_items WHERE LOWER(name) = LOWER(?) AND deleted_at IS NULL',
           [itemData.name]
         );
 

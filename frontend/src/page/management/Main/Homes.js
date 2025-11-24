@@ -114,8 +114,8 @@ const Home = () => {
   const getStatusColor = (status) => {
     // Đồng bộ với backend: NEW, IN_PROGRESS, PAID, CANCELLED
     const colors = {
-      NEW: '#1890ff',          // Chờ xác nhận - Xanh dương
-      IN_PROGRESS: '#faad14',  // Đang phục vụ - Vàng
+      NEW: '#faad14',          // Chờ xác nhận - Cam
+      IN_PROGRESS: '#52c41a',  // Đang phục vụ - Xanh lá
       PAID: '#52c41a',         // Hoàn thành - Xanh lá
       CANCELLED: '#ff4d4f'     // Đã hủy - Đỏ
     }

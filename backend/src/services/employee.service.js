@@ -31,7 +31,7 @@ export async function getAllEmployees(filters = {}) {
             sql += ' WHERE deleted_at IS NULL';
         }
 
-        sql += ' ORDER BY created_at DESC';
+        sql += ' ORDER BY created_at ASC';
 
         const employees = await query(sql);
         return employees;
@@ -337,12 +337,12 @@ export async function hardDeleteEmployee(id) {
         }
 
         // Check xem employee có đang được sử dụng trong admins không
-        const [admins] = await query(
+        const admins = await query(
             'SELECT id, username FROM admins WHERE employee_id = ?',
             [id]
         );
 
-        if (admins) {
+        if (admins.length > 0) {
             const usernames = admins.map(a => a.username).join(', ');
             throw new Error(
                 `Cannot hard delete employee: This employee is referenced by admin account(s): ${usernames}. ` +
@@ -350,12 +350,12 @@ export async function hardDeleteEmployee(id) {
             );
         }
 
-        // Hard delete
-        await query('DELETE FROM employees WHERE id = ?', [id]);
+        // Soft delete instead of hard delete
+        await query('UPDATE employees SET deleted_at = NOW() WHERE id = ? AND deleted_at IS NULL', [id]);
 
         return {
             success: true,
-            message: 'Employee permanently deleted',
+            message: 'Employee deleted successfully',
             id: id
         };
     } catch (error) {

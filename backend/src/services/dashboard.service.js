@@ -330,6 +330,7 @@ export async function getTopDishes({ startDate, endDate, limit = 5 }) {
     WHERE o.created_at BETWEEN ? AND ?
       AND o.status IN ('DONE', 'PAID')
       AND o.status != 'CANCELLED'
+      -- AND mi.deleted_at IS NULL
     GROUP BY mi.id, mi.name, mi.image_url, mi.price
     ORDER BY total_sold DESC
     LIMIT ?
@@ -413,7 +414,7 @@ export async function getTableStatus() {
     FROM tables t
     LEFT JOIN qr_sessions qs ON qs.table_id = t.id 
       AND qs.status = 'ACTIVE'
-    WHERE t.is_active = TRUE
+    WHERE t.is_active = TRUE AND t.deleted_at IS NULL
     ORDER BY t.table_number
   `
 
@@ -523,7 +524,7 @@ export async function getPerformanceMetrics({ startDate, endDate }) {
     FROM tables t
     LEFT JOIN qr_sessions qs ON qs.table_id = t.id 
       AND qs.created_at BETWEEN ? AND ?
-    WHERE t.is_active = TRUE
+    WHERE t.is_active = TRUE AND t.deleted_at IS NULL
   `
   const [occupancyData] = await pool.query(occupancyQuery, [startDate, endDate])
 

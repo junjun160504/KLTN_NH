@@ -40,7 +40,7 @@ const CategoriesPage = () => {
   const [loading, setLoading] = useState(false);
 
   const [searchText, setSearchText] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("available");
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -89,6 +89,19 @@ const CategoriesPage = () => {
   // Hàm xử lý submit thêm danh mục mới
   const handleAddCategory = async (values) => {
     try {
+      // ✅ Kiểm tra tên danh mục trùng
+      const duplicateName = allCategories.find(
+        cat => cat.name.toLowerCase().trim() === values.name.toLowerCase().trim()
+      );
+
+      if (duplicateName) {
+        message.error({
+          content: `Danh mục "${values.name}" đã tồn tại trong hệ thống!`,
+          duration: 3,
+        });
+        return;
+      }
+
       await axios.post(`${REACT_APP_API_URL}/menu/admin/categories`, {
         name: values.name,
         description: values.description || "",

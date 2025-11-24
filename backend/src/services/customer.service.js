@@ -20,7 +20,7 @@ export async function createOrUpdateCustomer({ name, email, phone }) {
 
   // Kiểm tra phone đã tồn tại chưa
   const [existing] = await pool.query(
-    "SELECT * FROM customers WHERE phone = ?",
+    "SELECT * FROM customers WHERE phone = ? AND deleted_at IS NULL",
     [normalizedPhone]
   );
 
@@ -38,7 +38,7 @@ export async function createOrUpdateCustomer({ name, email, phone }) {
     if (email) {
       // Kiểm tra email có bị trùng với customer khác không
       const [emailCheck] = await pool.query(
-        "SELECT id FROM customers WHERE email = ? AND id != ?",
+        "SELECT id FROM customers WHERE email = ? AND id != ? AND deleted_at IS NULL",
         [email, customerId]
       );
 
@@ -74,7 +74,7 @@ export async function createOrUpdateCustomer({ name, email, phone }) {
     // Kiểm tra email có bị trùng không (nếu có)
     if (email) {
       const [emailCheck] = await pool.query(
-        "SELECT id FROM customers WHERE email = ?",
+        "SELECT id FROM customers WHERE email = ? AND deleted_at IS NULL",
         [email]
       );
 
@@ -105,7 +105,7 @@ export async function createOrUpdateCustomer({ name, email, phone }) {
  */
 export async function getAllCustomers() {
   const [rows] = await pool.query(
-    "SELECT id, name, email, phone, points, created_at FROM customers ORDER BY created_at DESC"
+    "SELECT id, name, email, phone, points, created_at FROM customers WHERE deleted_at IS NULL ORDER BY created_at"
   );
   return rows;
 }
@@ -115,7 +115,7 @@ export async function getAllCustomers() {
  */
 export async function getCustomerById(customerId) {
   const [rows] = await pool.query(
-    "SELECT id, name, email, phone, points, created_at FROM customers WHERE id = ?",
+    "SELECT id, name, email, phone, points, created_at FROM customers WHERE id = ? AND deleted_at IS NULL",
     [customerId]
   );
 
@@ -133,7 +133,7 @@ export async function getCustomerByPhone(phone) {
   const normalizedPhone = phone.replace(/[\s\-]/g, "");
 
   const [rows] = await pool.query(
-    "SELECT id, name, email, phone, points, created_at FROM customers WHERE phone = ?",
+    "SELECT id, name, email, phone, points, created_at FROM customers WHERE phone = ? AND deleted_at IS NULL",
     [normalizedPhone]
   );
 
@@ -149,7 +149,7 @@ export async function getCustomerByPhone(phone) {
  */
 export async function getCustomerByEmail(email) {
   const [rows] = await pool.query(
-    "SELECT id, name, email, phone, points, created_at FROM customers WHERE email = ?",
+    "SELECT id, name, email, phone, points, created_at FROM customers WHERE email = ? AND deleted_at IS NULL",
     [email]
   );
 
@@ -181,7 +181,7 @@ export async function updateCustomerInfo(customerId, { name, email, phone }) {
     // Kiểm tra email trùng
     if (email) {
       const [emailCheck] = await pool.query(
-        "SELECT id FROM customers WHERE email = ? AND id != ?",
+        "SELECT id FROM customers WHERE email = ? AND id != ? AND deleted_at IS NULL",
         [email, customerId]
       );
 
@@ -198,7 +198,7 @@ export async function updateCustomerInfo(customerId, { name, email, phone }) {
     // Kiểm tra phone trùng
     const normalizedPhone = phone.replace(/[\s\-]/g, "");
     const [phoneCheck] = await pool.query(
-      "SELECT id FROM customers WHERE phone = ? AND id != ?",
+      "SELECT id FROM customers WHERE phone = ? AND id != ? AND deleted_at IS NULL",
       [normalizedPhone, customerId]
     );
 
@@ -320,5 +320,28 @@ export async function getCustomerOrderHistory(customerId) {
     customer,
     totalOrders: orders.length,
     orders,
+  };
+}
+
+/**
+ * 🗑️ Soft delete customer
+ * @param {number} customerId - Customer ID
+ * @returns {Object} Deletion result
+ */
+export async function deleteCustomer(customerId) {
+  const customer = await getCustomerById(customerId);
+  if (!customer) {
+    throw new Error("Customer not found");
+  }
+
+  // Soft delete - set deleted_at timestamp
+  await pool.query(
+    "UPDATE customers SET deleted_at = NOW() WHERE id = ? AND deleted_at IS NULL",
+    [customerId]
+  );
+
+  return {
+    id: customerId,
+    message: "Customer deleted successfully"
   };
 }

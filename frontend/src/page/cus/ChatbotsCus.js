@@ -22,6 +22,217 @@ const { Title, Text } = Typography;
 
 const REACT_APP_API_URL = process.env.REACT_APP_API_URL;
 
+// 🎨 Rich Content Renderer Component
+const RichContentRenderer = ({ contents, navigate }) => {
+  if (!contents || contents.length === 0) return null;
+
+  return (
+    <div style={{ maxWidth: "100%", width: "100%" }}>
+      {contents.map((content, index) => {
+        // 1️⃣ TEXT CONTENT
+        if (content.type === 'text') {
+          return (
+            <div
+              key={index}
+              style={{
+                background: "#f0f0f0",
+                color: "#333",
+                padding: "10px 14px",
+                borderRadius: 16,
+                marginBottom: contents.length > 1 ? 12 : 0,
+                fontSize: 15,
+                lineHeight: 1.5,
+              }}
+            >
+              {/* Main text */}
+              <div dangerouslySetInnerHTML={{
+                __html: content.value.replace(
+                  /(https?:\/\/[^\s]+)/g,
+                  '<a href="$1" target="_blank" rel="noopener noreferrer" style="color: #226533; text-decoration: underline;">$1</a>'
+                )
+              }} />
+
+              {/* Extracted URLs as buttons */}
+              {content.urls && content.urls.length > 0 && (
+                <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {content.urls.map((url, i) => (
+                    <Button
+                      key={i}
+                      size="small"
+                      type="link"
+                      href={url}
+                      target="_blank"
+                      style={{ padding: '0 8px', height: 24 }}
+                    >
+                      🔗 Link {i + 1}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        // 2️⃣ MENU ITEMS (Suggestions)
+        if (content.type === 'menu_items') {
+          return (
+            <div key={index} style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+              {content.items.map((item) => (
+                <Card
+                  key={item.id}
+                  hoverable
+                  onClick={() => navigate(`/food/${item.id}`)}
+                  style={{
+                    borderRadius: 12,
+                    overflow: "hidden",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                    transition: "all 0.3s",
+                  }}
+                  bodyStyle={{ padding: 0 }}
+                >
+                  <div style={{ display: "flex", alignItems: "stretch" }}>
+                    <img
+                      src={item.image_url}
+                      alt={item.name}
+                      style={{
+                        width: 90,
+                        height: 90,
+                        objectFit: "cover",
+                        flexShrink: 0,
+                        display: "block",
+                        margin: 8,
+                        borderRadius: 8,
+                      }}
+                    />
+                    <div style={{
+                      flex: 1,
+                      padding: "8px 12px",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                    }}>
+                      <div>
+                        <Text strong style={{ fontSize: 14, display: "block", marginBottom: 4, color: "#1a1a1a", lineHeight: 1.3 }}>
+                          {item.name}
+                        </Text>
+                        {item.reason && (
+                          <Text style={{ fontSize: 12, color: "#666", display: "block", marginBottom: 4, lineHeight: 1.3 }}>
+                            {item.reason}
+                          </Text>
+                        )}
+                      </div>
+                      <Text strong style={{ fontSize: 15, color: "#226533", fontWeight: 700 }}>
+                        {item.price.toLocaleString()}đ
+                      </Text>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          );
+        }
+
+        // 3️⃣ MENTIONED ITEMS (smaller cards)
+        if (content.type === 'mentioned_items') {
+          return (
+            <div key={index} style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+              {content.items.map((item) => (
+                <Card
+                  key={item.id}
+                  hoverable
+                  onClick={() => navigate(`/food/${item.id}`)}
+                  size="small"
+                  style={{
+                    borderRadius: 12,
+                    overflow: "hidden",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                  }}
+                  bodyStyle={{ padding: 0 }}
+                >
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    <img
+                      src={item.image_url}
+                      alt={item.name}
+                      style={{
+                        width: 60,
+                        height: 60,
+                        objectFit: "cover",
+                        margin: 8,
+                        borderRadius: 8,
+                      }}
+                    />
+                    <div style={{ flex: 1, padding: "8px 12px" }}>
+                      <Text strong style={{ fontSize: 13, display: "block", marginBottom: 4 }}>
+                        {item.name}
+                      </Text>
+                      <Text strong style={{ fontSize: 14, color: "#226533" }}>
+                        {item.price.toLocaleString()}đ
+                      </Text>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          );
+        }
+
+        // 4️⃣ ACTION BUTTONS
+        if (content.type === 'actions') {
+          return (
+            <div key={index} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+              {content.buttons.map((btn, i) => (
+                <Button
+                  key={i}
+                  type="primary"
+                  size="small"
+                  style={{
+                    borderRadius: 16,
+                    background: "#226533",
+                    borderColor: "#226533",
+                  }}
+                  onClick={() => {
+                    // Handle action based on type
+                    if (btn.action === 'navigate' && btn.data) {
+                      navigate(btn.data);
+                    } else if (btn.action === 'call') {
+                      window.location.href = `tel:${btn.data}`;
+                    }
+                  }}
+                >
+                  {btn.label}
+                </Button>
+              ))}
+            </div>
+          );
+        }
+
+        // 5️⃣ IMAGES
+        if (content.type === 'images') {
+          return (
+            <div key={index} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+              {content.urls.map((url, i) => (
+                <img
+                  key={i}
+                  src={url}
+                  alt={`Image ${i + 1}`}
+                  style={{
+                    maxWidth: '100%',
+                    borderRadius: 12,
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => window.open(url, '_blank')}
+                />
+              ))}
+            </div>
+          );
+        }
+
+        return null;
+      })}
+    </div>
+  );
+};
+
 export default function CustomerChatbotPage() {
   const navigate = useNavigate();
   const messagesEndRef = useRef(null);
@@ -96,8 +307,23 @@ export default function CustomerChatbotPage() {
 
       const botResponse = response.data.data;
 
-      // Add bot response based on type
-      if (botResponse.type === "suggestions" && botResponse.suggestions?.length > 0) {
+      // 🎨 Handle rich content response
+      if (botResponse.response_type === 'rich_content') {
+        setMessages((prev) => [
+          ...prev,
+          {
+            from: "bot",
+            type: "rich_content",
+            contents: botResponse.contents,
+            // Legacy fields for backward compatibility
+            intro: botResponse.intro,
+            suggestions: botResponse.suggestions,
+            mentioned_items: botResponse.mentioned_items
+          },
+        ]);
+      }
+      // Legacy handling
+      else if (botResponse.type === "suggestions" && botResponse.suggestions?.length > 0) {
         setMessages((prev) => [
           ...prev,
           {
@@ -245,6 +471,9 @@ export default function CustomerChatbotPage() {
                 >
                   {msg.text}
                 </div>
+              ) : msg.type === "rich_content" ? (
+                // 🎨 Rich content response (new)
+                <RichContentRenderer contents={msg.contents} navigate={navigate} />
               ) : msg.type === "suggestions" ? (
                 // Bot suggestions with images
                 <div style={{ maxWidth: "100%", width: "100%" }}>

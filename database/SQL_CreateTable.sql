@@ -80,6 +80,13 @@ CREATE TABLE menu_item_categories (
     FOREIGN KEY (category_id) REFERENCES menu_categories(id) ON DELETE CASCADE
 );
 
+
+alter table menu_items
+add column deleted_at timestamp default null;
+
+alter table menu_categories
+add column deleted_at timestamp default null;
+
 CREATE TABLE menu_price_history (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     item_id BIGINT,
@@ -264,3 +271,16 @@ ADD COLUMN metadata JSON,
 ADD INDEX idx_is_read (is_read),
 ADD INDEX idx_type (type),
 ADD INDEX idx_priority (priority);
+
+-- Thêm deleted_at cho soft delete tables
+ALTER TABLE tables
+ADD COLUMN deleted_at TIMESTAMP DEFAULT NULL;
+
+-- Thêm deleted_at cho soft delete customers
+ALTER TABLE customers
+ADD COLUMN deleted_at TIMESTAMP DEFAULT NULL;
+
+-- Fix employees table (thiếu dấu phẩy trước deleted_at)
+ALTER TABLE employees
+MODIFY COLUMN updated_at TIMESTAMP DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL DEFAULT NULL;

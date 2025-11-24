@@ -8,7 +8,6 @@ import {
   Input,
   Select,
   Tag,
-  message,
   Popconfirm,
   Form,
   Table,
@@ -16,6 +15,7 @@ import {
   ConfigProvider,
   Modal,
   Radio,
+  App
 } from "antd";
 
 import vi_VN from "antd/lib/locale/vi_VN";
@@ -32,6 +32,7 @@ const { Option } = Select;
 const REACT_APP_API_URL = process.env.REACT_APP_API_URL;
 
 const StaffsPage = () => {
+  const { message } = App.useApp()
   const [collapsed, setCollapsed] = useSidebarCollapse();
   const [pageTitle] = useState("Quản lý nhân viên");
 
@@ -68,7 +69,7 @@ const StaffsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [message]);
 
   const handleDeleteStaff = async (id) => {
     try {
@@ -81,7 +82,7 @@ const StaffsPage = () => {
       message.success("Xóa nhân viên thành công!");
     } catch (err) {
       console.error("API DELETE error:", err);
-      message.error("Xóa nhân viên thất bại!");
+      message.error("Xóa nhân viên thất bại!. Vui lòng kiểm tra tài khoản liên quan!");
     }
   };
 
@@ -243,6 +244,7 @@ const StaffsPage = () => {
       dataIndex: "id",
       key: "id",
       align: "center",
+      fixed: "left",
       width: 60,
       render: (id) => (
         <div className="flex items-center justify-center">
@@ -341,6 +343,7 @@ const StaffsPage = () => {
       key: "action",
       align: "center",
       width: 100,
+      fixed: "right",
       render: (_, record) => (
         <div className="flex items-center justify-center gap-2">
           <div className="group w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200">
@@ -611,6 +614,7 @@ const StaffsPage = () => {
                     label={<span className="text-sm font-medium text-gray-700">Email</span>}
                     name="email"
                     rules={[
+                      { required: true, message: "Vui lòng nhập email!" },
                       { type: "email", message: "Email không hợp lệ!" },
                     ]}
                     className="mb-4"
@@ -625,6 +629,7 @@ const StaffsPage = () => {
                     label={<span className="text-sm font-medium text-gray-700">Số điện thoại</span>}
                     name="phone"
                     rules={[
+                      { required: true, message: "Vui lòng nhập số điện thoại!" },
                       {
                         pattern: /^0\d{9,10}$/,
                         message: "Số điện thoại phải có 10-11 số và bắt đầu bằng 0!",

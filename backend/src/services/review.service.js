@@ -84,7 +84,7 @@ export async function saveMenuReview({ item_id, qr_session_id, rating, comment }
     }
 
     // Validate item exists
-    const items = await query('SELECT * FROM menu_items WHERE id = ?', [item_id]);
+    const items = await query('SELECT * FROM menu_items WHERE id = ? AND deleted_at IS NULL', [item_id]);
     if (items.length === 0) {
         throw new Error(`Menu item ID ${item_id} does not exist`);
     }

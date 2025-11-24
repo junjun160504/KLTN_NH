@@ -43,7 +43,7 @@ export async function createOrderByAdmin({ table_id, items, admin_id, customer_p
   try {
     // 1. Validate table exists
     const [[table]] = await connection.query(
-      "SELECT * FROM tables WHERE id = ? AND is_active = true",
+      "SELECT * FROM tables WHERE id = ? AND is_active = true AND deleted_at IS NULL",
       [table_id]
     );
 
@@ -141,7 +141,7 @@ export async function createOrderByAdmin({ table_id, items, admin_id, customer_p
 
       // Validate menu item exists and available
       const [[menuItem]] = await connection.query(
-        "SELECT * FROM menu_items WHERE id = ? AND is_available = true",
+        "SELECT * FROM menu_items WHERE id = ? AND is_available = true AND deleted_at IS NULL",
         [item.menu_item_id]
       );
 
@@ -298,7 +298,7 @@ export async function createOrder({ qr_session_id, items }) {
 
       // Validate menu item exists and available
       const [[menuItem]] = await connection.query(
-        "SELECT * FROM menu_items WHERE id = ? AND is_available = true",
+        "SELECT * FROM menu_items WHERE id = ? AND is_available = true AND deleted_at IS NULL",
         [item.menu_item_id]
       );
 
@@ -375,15 +375,14 @@ export async function createOrder({ qr_session_id, items }) {
         `SELECT oi.*, mi.name 
          FROM order_items oi
          JOIN menu_items mi ON oi.menu_item_id = mi.id
-         WHERE oi.order_id = ?
-         ORDER BY oi.created_at DESC`,
+         WHERE oi.order_id = ?`,
         [orderId]
       );
 
       const itemNames = items.map(item => {
         const dbItem = updatedItems.find(i => i.menu_item_id === item.menu_item_id);
         return dbItem
-          ? `${item.quantity}x ${dbItem.name} (${dbItem.unit_price.toLocaleString()}đ)`
+          ? `${item.quantity}x ${dbItem.name} (${Number(dbItem.unit_price).toLocaleString()}đ)`
           : `${item.quantity}x món`;
       }).join(', ');
 
@@ -481,7 +480,7 @@ export async function addItem(orderId, itemsData) {
       }
 
       const [[menuItem]] = await connection.query(
-        "SELECT * FROM menu_items WHERE id = ? AND is_available = true",
+        "SELECT * FROM menu_items WHERE id = ? AND is_available = true AND deleted_at IS NULL",
         [item.menu_item_id]
       );
 

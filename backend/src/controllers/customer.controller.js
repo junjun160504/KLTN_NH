@@ -374,3 +374,37 @@ export async function calculatePointsController(req, res) {
     });
   }
 }
+
+/**
+ * 🔒 ADMIN API - Xóa khách hàng (Soft delete)
+ * 
+ * @route DELETE /api/customers/:id
+ * @access OWNER, MANAGER
+ */
+export async function deleteCustomerController(req, res) {
+  try {
+    const { id } = req.params;
+
+    const result = await customerService.deleteCustomer(id);
+
+    res.status(200).json({
+      status: 200,
+      message: result.message,
+      data: { id: result.id }
+    });
+  } catch (err) {
+    console.error("deleteCustomerController error:", err);
+
+    if (err.message === "Customer not found") {
+      return res.status(404).json({
+        status: 404,
+        message: err.message,
+      });
+    }
+
+    res.status(500).json({
+      status: 500,
+      message: "Internal server error",
+    });
+  }
+}

@@ -8,6 +8,7 @@ import {
     updateLoyaltyPointsController,
     getCustomerOrderHistoryController,
     calculatePointsController,
+    deleteCustomerController,
 } from "../controllers/customer.controller.js";
 import { verifyToken, verifyRole } from "../middlewares/auth.middleware.js";
 
@@ -78,5 +79,12 @@ router.put("/:id/points", verifyToken, verifyRole(["OWNER", "MANAGER"]), updateL
  * Access: OWNER, MANAGER
  */
 router.get("/:id/history", verifyToken, verifyRole(["OWNER", "MANAGER"]), getCustomerOrderHistoryController);
+
+/**
+ * DELETE /api/customers/:id
+ * Xóa khách hàng (soft delete)
+ * Access: OWNER, MANAGER
+ */
+router.delete("/:id", verifyToken, verifyRole(["OWNER", "MANAGER"]), deleteCustomerController);
 
 export default router;

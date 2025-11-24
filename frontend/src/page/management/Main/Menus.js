@@ -162,6 +162,19 @@ const MenuPage = () => {
   // Hàm xử lý submit thêm món mới
   const handleAddFood = async (values) => {
     try {
+      // ✅ Kiểm tra tên món trùng
+      const duplicateName = allFoods.find(
+        food => food.name.toLowerCase().trim() === values.name.toLowerCase().trim()
+      );
+
+      if (duplicateName) {
+        message.error({
+          content: `Món "${values.name}" đã tồn tại trong hệ thống!`,
+          duration: 3,
+        });
+        return;
+      }
+
       setIsUploading(true); // ✅ Bật loading ngay khi submit form
 
       // Create FormData instead of JSON to support file upload
@@ -1007,7 +1020,7 @@ const MenuPage = () => {
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-gray-800 m-0">Chỉnh sửa món ăn</h3>
-                    <p className="text-xs text-gray-500 m-0">Cập nhật thông tin món ăn</p>
+                    <p className="text-xs text-gray-500 m-0">{editingFood?.name || 'Cập nhật thông tin món ăn'}</p>
                   </div>
                 </div>
               }
@@ -1020,11 +1033,60 @@ const MenuPage = () => {
                 setEditImagePreview(null);
               }}
               width={700}
-              footer={null}
+              footer={
+                <div className="flex justify-end gap-3 px-4 py-4">
+                  <Button
+                    size="medium"
+                    onClick={() => {
+                      setEditDrawerOpen(false);
+                      editForm.resetFields();
+                      setEditingFood(null);
+                      setEditImageFile(null);
+                      setEditImagePreview(null);
+                    }}
+                    className="rounded-lg px-6 h-11"
+                  >
+                    Hủy bỏ
+                  </Button>
+                  <Button
+                    type="primary"
+                    size="medium"
+                    onClick={() => editForm.submit()}
+                    loading={isEditUploading}
+                    className="rounded-lg px-8 h-11 bg-gradient-to-r from-blue-500 to-indigo-600 border-0 shadow-md hover:shadow-lg transition-all"
+                  >
+                    <EditOutlined /> Cập nhật
+                  </Button>
+                </div>
+              }
               centered
               className="japanese-modal"
               destroyOnHidden
+              styles={{
+                body: {
+                  maxHeight: 'calc(100vh - 200px)',
+                  overflowY: 'auto',
+                  paddingRight: '0px'
+                }
+              }}
             >
+              <style>
+                {`
+                  .japanese-modal .ant-modal-body::-webkit-scrollbar {
+                    width: 6px;
+                  }
+                  .japanese-modal .ant-modal-body::-webkit-scrollbar-track {
+                    background: transparent;
+                  }
+                  .japanese-modal .ant-modal-body::-webkit-scrollbar-thumb {
+                    background: #e5e7eb;
+                    border-radius: 3px;
+                  }
+                  .japanese-modal .ant-modal-body::-webkit-scrollbar-thumb:hover {
+                    background: #d1d5db;
+                  }
+                `}
+              </style>
               <Form
                 form={editForm}
                 layout="vertical"
@@ -1276,31 +1338,6 @@ const MenuPage = () => {
                       </div>
                     </div>
                   </div>
-                </div>
-
-                {/* Footer Actions */}
-                <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-100">
-                  <Button
-                    size="medium"
-                    onClick={() => {
-                      setEditDrawerOpen(false);
-                      editForm.resetFields();
-                      setEditingFood(null);
-                      setEditImageFile(null);
-                      setEditImagePreview(null);
-                    }}
-                    className="rounded-lg px-6 h-11"
-                  >
-                    Hủy bỏ
-                  </Button>
-                  <Button
-                    type="primary"
-                    size="medium"
-                    htmlType="submit"
-                    className="rounded-lg px-8 h-11 bg-gradient-to-r from-blue-500 to-indigo-600 border-0 shadow-md hover:shadow-lg transition-all"
-                  >
-                    <EditOutlined /> Cập nhật
-                  </Button>
                 </div>
               </Form>
             </Modal>
