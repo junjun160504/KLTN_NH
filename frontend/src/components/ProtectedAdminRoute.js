@@ -9,7 +9,7 @@ import { Spin } from 'antd';
  */
 const ProtectedAdminRoute = ({
     children,
-    requiredRole = null // 'ADMIN' or 'STAFF' or null (any authenticated user)
+    requiredRoles = null // Array of roles ['OWNER', 'MANAGER'] or null (any authenticated user)
 }) => {
     const { user, loading, isAuthenticated } = useAuth();
     const location = useLocation();
@@ -34,9 +34,11 @@ const ProtectedAdminRoute = ({
         return <Navigate to="/main/login" state={{ from: location }} replace />;
     }
 
-    // If specific role is required, check role
-    if (requiredRole && user.role !== requiredRole) {
-        return <Navigate to="/main/unauthorized" replace />;
+    // If specific roles are required, check if user has one of them
+    if (requiredRoles && Array.isArray(requiredRoles) && requiredRoles.length > 0) {
+        if (!requiredRoles.includes(user.role)) {
+            return <Navigate to="/main/unauthorized" replace />;
+        }
     }
 
     return children;

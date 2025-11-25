@@ -2,6 +2,23 @@ import { query } from '../config/db.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
+/**
+ * Helper function: Check if requester can manage target based on role hierarchy
+ * @param {string} requesterRole - Role of the person performing the action
+ * @param {string} targetRole - Role of the target account
+ * @returns {boolean} - True if allowed, false otherwise
+ */
+export function canManageTarget(requesterRole, targetRole) {
+    // OWNER can manage anyone
+    if (requesterRole === 'OWNER') return true;
+
+    // MANAGER can only manage STAFF
+    if (requesterRole === 'MANAGER' && targetRole === 'STAFF') return true;
+
+    // All other cases are denied
+    return false;
+}
+
 export async function login({ username, password }) {
     // JOIN với bảng employees để lấy name
     const rows = await query(

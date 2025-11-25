@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import AppHeader from "../../../components/AppHeader";
 import AppSidebar from "../../../components/AppSidebar";
 import useSidebarCollapse from "../../../hooks/useSidebarCollapse";
+import { useAuth } from "../../../contexts/AuthContext";
 import {
   Layout,
   Button,
@@ -33,6 +34,7 @@ const REACT_APP_API_URL = process.env.REACT_APP_API_URL;
 
 const StaffsPage = () => {
   const { message } = App.useApp()
+  const { canAccess } = useAuth()
   const [collapsed, setCollapsed] = useSidebarCollapse();
   const [pageTitle] = useState("Quản lý nhân viên");
 
@@ -358,32 +360,34 @@ const StaffsPage = () => {
             />
           </div>
 
-          <Popconfirm
-            title={<span className="font-semibold">Xác nhận xóa nhân viên?</span>}
-            description={
-              <div className="text-sm text-gray-600">
-                Nhân viên{" "}
-                <span className="font-medium text-gray-800">"{record.name}"</span>{" "}
-                sẽ bị xóa vĩnh viễn
+          {canAccess(['OWNER']) && (
+            <Popconfirm
+              title={<span className="font-semibold">Xác nhận xóa nhân viên?</span>}
+              description={
+                <div className="text-sm text-gray-600">
+                  Nhân viên{" "}
+                  <span className="font-medium text-gray-800">"{record.name}"</span>{" "}
+                  sẽ bị xóa vĩnh viễn
+                </div>
+              }
+              onConfirm={() => handleDeleteStaff(record.id)}
+              okText="Xóa"
+              cancelText="Hủy"
+              okButtonProps={{ danger: true, size: "small" }}
+              cancelButtonProps={{ size: "small" }}
+            >
+              <div className="group w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={
+                    <DeleteOutlined className="text-red-600 group-hover:text-red-500" />
+                  }
+                  title="Xóa"
+                />
               </div>
-            }
-            onConfirm={() => handleDeleteStaff(record.id)}
-            okText="Xóa"
-            cancelText="Hủy"
-            okButtonProps={{ danger: true, size: "small" }}
-            cancelButtonProps={{ size: "small" }}
-          >
-            <div className="group w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200">
-              <Button
-                type="text"
-                size="small"
-                icon={
-                  <DeleteOutlined className="text-red-600 group-hover:text-red-500" />
-                }
-                title="Xóa"
-              />
-            </div>
-          </Popconfirm>
+            </Popconfirm>
+          )}
         </div>
       ),
     },

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import AppHeader from "../../../components/AppHeader";
 import AppSidebar from "../../../components/AppSidebar";
+import { useAuth } from "../../../contexts/AuthContext";
 import {
   Layout,
   Button,
@@ -31,6 +32,7 @@ const REACT_APP_API_URL = process.env.REACT_APP_API_URL;
 
 const CategoriesPage = () => {
   const { message } = App.useApp();
+  const { canAccess } = useAuth();
 
   const [collapsed, setCollapsed] = useState(false);
   const [pageTitle] = useState("Quản lý danh mục");
@@ -244,39 +246,43 @@ const CategoriesPage = () => {
       align: 'center',
       render: (_, record) => (
         <div className="flex items-center justify-center gap-2">
-          <div className="group w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200">
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined className="text-blue-600 group-hover:text-blue-500" />}
-              onClick={() => openEditDrawer(record)}
-              title="Chỉnh sửa"
-            />
-          </div>
-
-          <Popconfirm
-            title={<span className="font-semibold">Xác nhận xóa danh mục?</span>}
-            description={
-              <div className="text-sm text-gray-600">
-                Danh mục <span className="font-medium text-gray-800">"{record.name}"</span> sẽ bị xóa vĩnh viễn
-              </div>
-            }
-            onConfirm={() => handleDeleteCategory(record.id)}
-            okText="Xóa"
-            cancelText="Hủy"
-            okButtonProps={{ danger: true, size: 'small' }}
-            cancelButtonProps={{ size: 'small' }}
-          >
+          {canAccess(['OWNER', 'MANAGER']) && (
             <div className="group w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200">
               <Button
                 type="text"
                 size="small"
-                icon={<DeleteOutlined className="text-red-600 group-hover:text-red-500" />}
-                title="Xóa"
+                icon={<EditOutlined className="text-blue-600 group-hover:text-blue-500" />}
+                onClick={() => openEditDrawer(record)}
+                title="Chỉnh sửa"
               />
             </div>
+          )}
 
-          </Popconfirm>
+          {canAccess(['OWNER', 'MANAGER']) && (
+            <Popconfirm
+              title={<span className="font-semibold">Xác nhận xóa danh mục?</span>}
+              description={
+                <div className="text-sm text-gray-600">
+                  Danh mục <span className="font-medium text-gray-800">"{record.name}"</span> sẽ bị xóa vĩnh viễn
+                </div>
+              }
+              onConfirm={() => handleDeleteCategory(record.id)}
+              okText="Xóa"
+              cancelText="Hủy"
+              okButtonProps={{ danger: true, size: 'small' }}
+              cancelButtonProps={{ size: 'small' }}
+            >
+              <div className="group w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<DeleteOutlined className="text-red-600 group-hover:text-red-500" />}
+                  title="Xóa"
+                />
+              </div>
+
+            </Popconfirm>
+          )}
         </div>
       ),
     },

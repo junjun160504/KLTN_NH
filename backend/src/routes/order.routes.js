@@ -12,7 +12,7 @@ import {
   cancelOrder,
   createOrderByAdmin, // NEW: Admin create order
 } from "../controllers/order.controller.js";
-import { verifyToken } from "../middlewares/auth.middleware.js";
+import { verifyToken, verifyRole } from "../middlewares/auth.middleware.js";
 
 const router = express.Router();
 

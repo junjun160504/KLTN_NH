@@ -10,7 +10,7 @@ import {
     hardDeleteEmployeeController,
     restoreEmployeeController
 } from '../controllers/employee.controller.js';
-import { verifyToken } from '../middlewares/auth.middleware.js';
+import { verifyToken, verifyRole } from '../middlewares/auth.middleware.js';
 
 const router = express.Router();
 
@@ -42,13 +42,13 @@ router.put('/:id', verifyToken, updateEmployeeController);
 
 // ================ DELETE & RESTORE OPERATIONS ================
 
-// POST /api/employees/:id/restore - Restore soft-deleted employee
-router.post('/:id/restore', verifyToken, restoreEmployeeController);
+// POST /api/employees/:id/restore - Restore soft-deleted employee (OWNER only)
+router.post('/:id/restore', verifyToken, verifyRole(['OWNER']), restoreEmployeeController);
 
-// DELETE /api/employees/:id - Soft delete employee
-router.delete('/:id', verifyToken, deleteEmployeeController);
+// DELETE /api/employees/:id - Soft delete employee (OWNER only)
+router.delete('/:id', verifyToken, verifyRole(['OWNER']), deleteEmployeeController);
 
-// DELETE /api/employees/:id/permanent - Hard delete employee (CẨN THẬN!)
-router.delete('/:id/permanent', verifyToken, hardDeleteEmployeeController);
+// DELETE /api/employees/:id/permanent - Hard delete employee (OWNER only)
+router.delete('/:id/permanent', verifyToken, verifyRole(['OWNER']), hardDeleteEmployeeController);
 
 export default router;

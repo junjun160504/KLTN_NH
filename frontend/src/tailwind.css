@@ -29,6 +29,16 @@
 /* Custom components với Tailwind */
 @layer components {
 
+  /* Hide scrollbar utility */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
   .btn-primary-gradient {
     @apply bg-gradient-to-r from-primary-600 to-primary-500 text-white font-semibold rounded-xl px-6 py-3 transition-all duration-300 transform hover:scale-105 hover:shadow-brand-lg;
   }

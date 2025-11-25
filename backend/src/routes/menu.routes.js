@@ -26,7 +26,7 @@ import {
   handleImageUploadError,
   processCloudinaryUpload
 } from "../middlewares/cloudinaryUpload.middleware.js";
-import { verifyToken } from "../middlewares/auth.middleware.js";
+import { verifyToken, verifyRole } from "../middlewares/auth.middleware.js";
 
 console.log("Mounting /api/menu routes...");
 const router = express.Router();
@@ -39,17 +39,17 @@ router.get("/cus/menus/categories", getMenuCategories);
 // Admin: Lấy chi tiết một danh mục theo ID
 router.get("/admin/categories/:id", verifyToken, getCategoryById);
 
-// Admin: Tạo danh mục mới
-router.post("/admin/categories", verifyToken, createCategory);
+// Admin: Tạo danh mục mới - OWNER, MANAGER only
+router.post("/admin/categories", verifyToken, verifyRole(['OWNER', 'MANAGER']), createCategory);
 
-// Admin: Cập nhật danh mục
-router.put("/admin/categories/:id", verifyToken, updateCategory);
+// Admin: Cập nhật danh mục - OWNER, MANAGER only
+router.put("/admin/categories/:id", verifyToken, verifyRole(['OWNER', 'MANAGER']), updateCategory);
 
-// Admin: Xóa mềm danh mục (soft delete)
-router.delete("/admin/categories/:id", verifyToken, deleteCategory);
+// Admin: Xóa mềm danh mục (soft delete) - OWNER, MANAGER only
+router.delete("/admin/categories/:id", verifyToken, verifyRole(['OWNER', 'MANAGER']), deleteCategory);
 
-// Admin: Xóa vĩnh viễn danh mục (hard delete) - Cẩn thận!
-router.delete("/admin/categories/:id/permanent", verifyToken, hardDeleteCategory);
+// Admin: Xóa vĩnh viễn danh mục (hard delete) - OWNER only
+router.delete("/admin/categories/:id/permanent", verifyToken, verifyRole(['OWNER']), hardDeleteCategory);
 
 // ================ EXCEL ROUTES ================
 
@@ -88,15 +88,15 @@ router.get("/cus/menus/:name", getMenuItems);
 
 
 // Admin: thêm món (với upload ảnh lên Cloudinary)
-router.post("/admin/menus", verifyToken, uploadMenuImage, handleImageUploadError, processCloudinaryUpload, createMenuItem);
+router.post("/admin/menus", verifyToken, verifyRole(['OWNER', 'MANAGER']), uploadMenuImage, handleImageUploadError, processCloudinaryUpload, createMenuItem);
 
-// Admin: cập nhật món (với upload ảnh lên Cloudinary)
-router.put("/admin/menus/:id", verifyToken, uploadMenuImage, handleImageUploadError, processCloudinaryUpload, updateMenuItem);
+// Admin: cập nhật món (với upload ảnh lên Cloudinary) - OWNER, MANAGER only
+router.put("/admin/menus/:id", verifyToken, verifyRole(['OWNER', 'MANAGER']), uploadMenuImage, handleImageUploadError, processCloudinaryUpload, updateMenuItem);
 
-// Admin: xóa mềm món (soft delete)
-router.delete("/admin/menus/:id", verifyToken, deleteMenuItem);
+// Admin: xóa mềm món (soft delete) - OWNER, MANAGER only
+router.delete("/admin/menus/:id", verifyToken, verifyRole(['OWNER', 'MANAGER']), deleteMenuItem);
 
-// Admin: xóa vĩnh viễn món (hard delete) - Cẩn thận!
-router.delete("/admin/menus/:id/permanent", verifyToken, hardDeleteMenuItem);
+// Admin: xóa vĩnh viễn món (hard delete) - OWNER only
+router.delete("/admin/menus/:id/permanent", verifyToken, verifyRole(['OWNER']), hardDeleteMenuItem);
 
 export default router;

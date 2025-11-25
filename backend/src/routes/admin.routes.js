@@ -19,7 +19,7 @@ import {
     getAdminStatsController,
     getAdminWithEmployeeController
 } from '../controllers/admin.controller.js';
-import { verifyToken, verifyRole, verifySelfOrOwner, verifyRoleChangePermission } from '../middlewares/auth.middleware.js';
+import { verifyToken, verifyRole, verifySelfOrOwner, verifyRoleChangePermission, verifyManagementHierarchy } from '../middlewares/auth.middleware.js';
 
 const router = express.Router();
 
@@ -35,8 +35,8 @@ router.post('/login', loginAdmin);
 // Validate token - Check if token is still valid
 router.get('/validate', verifyToken, validateTokenController);
 
-// OWNER ONLY - Register new admin
-router.post('/register-admin', verifyToken, verifyRole(['OWNER']), registerAdminController);
+// OWNER/MANAGER - Register new admin (with hierarchy check)
+router.post('/register-admin', verifyToken, verifyRole(['OWNER', 'MANAGER']), verifyManagementHierarchy, registerAdminController);
 
 // OWNER/MANAGER - Get login history
 router.get('/man/logins', verifyToken, verifyRole(['OWNER', 'MANAGER']), getLoginAdmin);
@@ -74,27 +74,27 @@ router.put('/:id', verifyToken, verifySelfOrOwner(true), verifyRoleChangePermiss
 // Change own password (Self only - requires old password)
 router.put('/:id/password', verifyToken, verifySelfOrOwner(false), changePasswordController);
 
-// Reset password by OWNER (OWNER only - no old password required)
-router.put('/:id/reset-password', verifyToken, verifyRole(['OWNER']), resetPasswordByOwnerController);
+// Reset password by OWNER/MANAGER (with hierarchy check in controller)
+router.put('/:id/reset-password', verifyToken, verifyRole(['OWNER', 'MANAGER']), resetPasswordByOwnerController);
 
 // ============================================
-// ACTIVATE/DEACTIVATE ROUTES (OWNER only)
+// ACTIVATE/DEACTIVATE ROUTES (OWNER/MANAGER with hierarchy)
 // ============================================
 
-router.put('/:id/deactivate', verifyToken, verifyRole(['OWNER']), deactivateAdminController);
-router.put('/:id/activate', verifyToken, verifyRole(['OWNER']), activateAdminController);
+router.put('/:id/deactivate', verifyToken, verifyRole(['OWNER', 'MANAGER']), deactivateAdminController);
+router.put('/:id/activate', verifyToken, verifyRole(['OWNER', 'MANAGER']), activateAdminController);
 
 // ============================================
-// DELETE & RESTORE ROUTES (OWNER only)
+// DELETE & RESTORE ROUTES (OWNER/MANAGER with hierarchy)
 // ============================================
 
-// Restore (OWNER only)
-router.post('/:id/restore', verifyToken, verifyRole(['OWNER']), restoreAdminController);
+// Restore (OWNER/MANAGER with hierarchy check in controller)
+router.post('/:id/restore', verifyToken, verifyRole(['OWNER', 'MANAGER']), restoreAdminController);
 
-// Soft delete (OWNER only)
-router.delete('/:id', verifyToken, verifyRole(['OWNER']), deleteAdminController);
+// Soft delete (OWNER/MANAGER with hierarchy check in controller)
+router.delete('/:id', verifyToken, verifyRole(['OWNER', 'MANAGER']), deleteAdminController);
 
-// Hard delete (OWNER only)
-router.delete('/:id/permanent', verifyToken, verifyRole(['OWNER']), hardDeleteAdminController);
+// Hard delete (OWNER/MANAGER with hierarchy check in controller)
+router.delete('/:id/permanent', verifyToken, verifyRole(['OWNER', 'MANAGER']), hardDeleteAdminController);
 
 export default router;

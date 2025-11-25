@@ -2,6 +2,7 @@
 import AppHeader from '../../../components/AppHeader'
 import AppSidebar from '../../../components/AppSidebar'
 import useSidebarCollapse from '../../../hooks/useSidebarCollapse'
+import { useAuth } from '../../../contexts/AuthContext'
 import {
   Layout,
   Button,
@@ -44,6 +45,7 @@ const CustomersPage = () => {
   const { message } = App.useApp()
   const [collapsed, setCollapsed] = useSidebarCollapse()
   const [pageTitle] = useState('Quản lý khách hàng')
+  const { canAccess } = useAuth()
   const [allCustomers, setAllCustomers] = useState([])
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(false)
@@ -319,14 +321,16 @@ const CustomersPage = () => {
             icon={<EditOutlined />}
             onClick={() => openEditModal(record)}
           />
-          <Popconfirm
-            title="Xác nhận xóa?"
-            onConfirm={() => handleDeleteCustomer(record.id)}
-            okText="Xóa"
-            cancelText="Hủy"
-          >
-            <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
+          {canAccess(['OWNER', 'MANAGER']) && (
+            <Popconfirm
+              title="Xác nhận xóa?"
+              onConfirm={() => handleDeleteCustomer(record.id)}
+              okText="Xóa"
+              cancelText="Hủy"
+            >
+              <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+            </Popconfirm>
+          )}
         </div>
       )
     }
@@ -458,13 +462,13 @@ const CustomersPage = () => {
               <Form.Item label="Tên khách hàng" name="name">
                 <Input prefix={<UserOutlined />} placeholder="Nhập tên (tùy chọn)" />
               </Form.Item>
-              <Form.Item
+              {/* <Form.Item
                 label="Email"
                 name="email"
                 rules={[{ type: 'email', message: 'Email không hợp lệ!' }]}
               >
                 <Input prefix={<MailOutlined />} placeholder="Nhập email (tùy chọn)" />
-              </Form.Item>
+              </Form.Item> */}
             </Form>
           </Modal>
 

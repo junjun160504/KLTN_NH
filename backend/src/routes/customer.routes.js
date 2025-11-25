@@ -46,24 +46,24 @@ router.post("/calculate-points", calculatePointsController);
 /**
  * GET /api/customers
  * Lấy danh sách tất cả khách hàng
- * Access: OWNER, MANAGER
+ * Access: All authenticated users (STAFF can view)
  */
-router.get("/", verifyToken, verifyRole(["OWNER", "MANAGER"]), getAllCustomersController);
+router.get("/", verifyToken, getAllCustomersController);
 
 /**
  * GET /api/customers/:id
  * Lấy thông tin chi tiết 1 khách hàng
- * Access: OWNER, MANAGER
+ * Access: All authenticated users (STAFF can view)
  */
-router.get("/:id", verifyToken, verifyRole(["OWNER", "MANAGER"]), getCustomerByIdController);
+router.get("/:id", verifyToken, getCustomerByIdController);
 
 /**
  * PUT /api/customers/:id
  * Cập nhật thông tin khách hàng
- * Access: OWNER, MANAGER
+ * Access: All authenticated users (STAFF can edit)
  * Body: { name?, email?, phone? }
  */
-router.put("/:id", verifyToken, verifyRole(["OWNER", "MANAGER"]), updateCustomerController);
+router.put("/:id", verifyToken, updateCustomerController);
 
 /**
  * PUT /api/customers/:id/points
@@ -76,9 +76,9 @@ router.put("/:id/points", verifyToken, verifyRole(["OWNER", "MANAGER"]), updateL
 /**
  * GET /api/customers/:id/history
  * Lấy lịch sử order của khách hàng
- * Access: OWNER, MANAGER
+ * Access: All authenticated users (STAFF can view)
  */
-router.get("/:id/history", verifyToken, verifyRole(["OWNER", "MANAGER"]), getCustomerOrderHistoryController);
+router.get("/:id/history", verifyToken, getCustomerOrderHistoryController);
 
 /**
  * DELETE /api/customers/:id

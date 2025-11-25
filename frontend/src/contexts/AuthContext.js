@@ -58,10 +58,13 @@ export const AuthProvider = ({ children }) => {
         logout,
         loading,
         isAuthenticated: !!user,
-        isAdmin: user?.role === 'ADMIN',
         isStaff: user?.role === 'STAFF',
         isManager: user?.role === 'MANAGER',
         isOwner: user?.role === 'OWNER',
+        // Helper: Kiểm tra user có role cụ thể
+        hasRole: (role) => user?.role === role,
+        // Helper: Kiểm tra user có quyền truy cập (nếu không truyền allowedRoles hoặc empty array thì cho phép tất cả)
+        canAccess: (allowedRoles) => !allowedRoles || allowedRoles.length === 0 || allowedRoles.includes(user?.role),
         getLoginTime: authService.getLoginTime,
         isRemembered: authService.isRemembered
     };

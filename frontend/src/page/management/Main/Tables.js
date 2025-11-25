@@ -141,7 +141,7 @@ const TablesPage = () => {
   // Use useModal hook for Modal.confirm
   const [modal, contextHolder] = Modal.useModal()
   const { message } = App.useApp() // Use App hook for message
-  const { user } = useAuth() // Get current logged-in admin
+  const { user, canAccess } = useAuth() // Get current logged-in admin
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -1877,21 +1877,21 @@ const TablesPage = () => {
         label: 'In QR',
         disabled: !table.qr_code_url
       },
-      {
+      canAccess(['OWNER', 'MANAGER']) && {
         key: 'edit',
         icon: <EditOutlined />,
         label: 'Chỉnh sửa'
       },
-      {
+      canAccess(['OWNER', 'MANAGER']) && {
         type: 'divider'
       },
-      {
+      canAccess(['OWNER', 'MANAGER']) && {
         key: 'delete',
         icon: <DeleteOutlined />,
         label: 'Xóa',
         danger: true
       }
-    ]
+    ].filter(Boolean) // Remove null/undefined items
 
     return (
       <Badge.Ribbon
@@ -2319,14 +2319,16 @@ const TablesPage = () => {
                   >
                     In tất cả QR
                   </Button>
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    style={{ background: '#226533' }}
-                    onClick={() => setDrawerOpen(true)}
-                  >
-                    Thêm bàn mới
-                  </Button>
+                  {canAccess(['OWNER', 'MANAGER']) && (
+                    <Button
+                      type="primary"
+                      icon={<PlusOutlined />}
+                      style={{ background: '#226533' }}
+                      onClick={() => setDrawerOpen(true)}
+                    >
+                      Thêm bàn mới
+                    </Button>
+                  )}
                 </Space>
               </div>
 

@@ -12,12 +12,14 @@ import {
   SafetyOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
 const { Sider } = Layout;
 
 const AppSidebar = ({ collapsed, currentPageKey, setPageTitle }) => {
   const navigate = useNavigate();
   const menuContainerRef = useRef(null);
+  const { user } = useAuth();
 
   // Lưu trạng thái mở/đóng của submenu vào localStorage
   const [openKeys, setOpenKeys] = useState(() => {
@@ -79,6 +81,48 @@ const AppSidebar = ({ collapsed, currentPageKey, setPageTitle }) => {
     report_chatbot: { path: "/main/reports/chatbots", title: "Báo cáo Chatbot" },
   };
 
+  // Dynamic menu items based on user role
+  const getMenuItems = () => {
+    const allMenuItems = [
+      { key: "homes", icon: <AppstoreOutlined />, label: "Tổng quan" },
+      { key: 'tables', icon: <TableOutlined />, label: 'Bàn' },
+      { key: "orders", icon: <ShoppingCartOutlined />, label: "Đơn hàng" },
+      {
+        key: "products",
+        icon: <WindowsOutlined />,
+        label: "Sản phẩm",
+        children: [
+          { key: "menus", icon: <CoffeeOutlined />, label: "Thực đơn" },
+          { key: "categorys", icon: <CoffeeOutlined />, label: "Danh mục" }
+        ],
+      },
+      { key: "customers", icon: <UserOutlined />, label: "Khách hàng" },
+      { key: "staffs", icon: <TeamOutlined />, label: "Nhân viên", roles: ['OWNER', 'MANAGER'] },
+      { key: "accounts", icon: <SafetyOutlined />, label: "Tài khoản", roles: ['OWNER', 'MANAGER'] },
+      {
+        key: "report",
+        icon: <BarChartOutlined />,
+        label: "Báo cáo",
+        roles: ['OWNER', 'MANAGER'],
+        children: [
+          { key: "report_sales", label: "Báo cáo bán hàng" },
+          { key: "report_customers", label: "Báo cáo khách hàng" },
+          { key: "report_chatbot", label: "Báo cáo Chatbot" },
+        ],
+      },
+    ];
+
+    // Filter menu items based on user role
+    const userRole = user?.role;
+
+    return allMenuItems.filter(item => {
+      // If item doesn't have roles restriction, show to everyone
+      if (!item.roles) return true;
+      // If item has roles restriction, check if user has the role
+      return item.roles.includes(userRole);
+    });
+  };
+
   return (
     <Sider
       trigger={null}
@@ -99,7 +143,11 @@ const AppSidebar = ({ collapsed, currentPageKey, setPageTitle }) => {
       {/* Menu với scroll - Grid Layout */}
       <div
         ref={menuContainerRef}
-        className="h-[calc(100%-6rem)] overflow-y-auto"
+        className="h-[calc(100%-6rem)] overflow-y-auto scrollbar-hide"
+        style={{
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+        }}
       >
         <Menu
           mode="inline"
@@ -116,33 +164,7 @@ const AppSidebar = ({ collapsed, currentPageKey, setPageTitle }) => {
             if (setPageTitle) setPageTitle(menuConfig[e.key].title);
           }}
           inlineCollapsed={collapsed}
-          items={[
-            { key: "homes", icon: <AppstoreOutlined />, label: "Tổng quan" },
-            { key: 'tables', icon: <TableOutlined />, label: 'Bàn' },
-            { key: "orders", icon: <ShoppingCartOutlined />, label: "Đơn hàng" },
-            {
-              key: "products",
-              icon: <WindowsOutlined />,
-              label: "Sản phẩm",
-              children: [
-                { key: "menus", icon: <CoffeeOutlined />, label: "Thực đơn" },
-                { key: "categorys", icon: <CoffeeOutlined />, label: "Danh mục" }
-              ],
-            },
-            { key: "customers", icon: <UserOutlined />, label: "Khách hàng" },
-            { key: "staffs", icon: <TeamOutlined />, label: "Nhân viên" },
-            { key: "accounts", icon: <SafetyOutlined />, label: "Tài khoản" },
-            {
-              key: "report",
-              icon: <BarChartOutlined />,
-              label: "Báo cáo",
-              children: [
-                { key: "report_sales", label: "Báo cáo bán hàng" },
-                { key: "report_customers", label: "Báo cáo khách hàng" },
-                { key: "report_chatbot", label: "Báo cáo Chatbot" },
-              ],
-            },
-          ]}
+          items={getMenuItems()}
         />
       </div>
     </Sider>

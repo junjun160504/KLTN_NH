@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import AppHeader from "../../../components/AppHeader";
 import AppSidebar from "../../../components/AppSidebar";
 import useSidebarCollapse from "../../../hooks/useSidebarCollapse";
+import { useAuth } from "../../../contexts/AuthContext";
 import {
   Layout,
   Button,
@@ -34,8 +35,22 @@ const { Option } = Select;
 const REACT_APP_API_URL = process.env.REACT_APP_API_URL;
 
 const AccountsPage = () => {
+  const { canAccess, user } = useAuth()
   const [collapsed, setCollapsed] = useSidebarCollapse();
   const [pageTitle] = useState("Quản lý tài khoản");
+
+  // Helper function: Check if user can manage target account based on hierarchy
+  const canManageAccount = (targetRole) => {
+    if (!user) return false;
+
+    // OWNER can manage everyone
+    if (user.role === 'OWNER') return true;
+
+    // MANAGER can only manage STAFF
+    if (user.role === 'MANAGER' && targetRole === 'STAFF') return true;
+
+    return false;
+  };
 
   const [allAccounts, setAllAccounts] = useState([]);
   const [accounts, setAccounts] = useState([]);
@@ -408,34 +423,50 @@ const AccountsPage = () => {
       onFilter: (value, record) => record.is_active === value,
       render: (is_active, record) => (
         <div className="flex items-center justify-center">
-          <Popconfirm
-            title={
-              <span className="font-semibold">
-                {is_active ? "Vô hiệu hóa" : "Kích hoạt"} tài khoản?
-              </span>
-            }
-            description={
-              <div className="text-sm text-gray-600">
-                Tài khoản{" "}
-                <span className="font-medium text-gray-800">
-                  "{record.username}"
-                </span>{" "}
-                sẽ bị {is_active ? "vô hiệu hóa" : "kích hoạt"}
+          {canManageAccount(record.role) ? (
+            <Popconfirm
+              title={
+                <span className="font-semibold">
+                  {is_active ? "Vô hiệu hóa" : "Kích hoạt"} tài khoản?
+                </span>
+              }
+              description={
+                <div className="text-sm text-gray-600">
+                  Tài khoản{" "}
+                  <span className="font-medium text-gray-800">
+                    "{record.username}"
+                  </span>{" "}
+                  sẽ bị {is_active ? "vô hiệu hóa" : "kích hoạt"}
+                </div>
+              }
+              onConfirm={() => handleToggleStatus(record.id, is_active)}
+              okText={is_active ? "Vô hiệu hóa" : "Kích hoạt"}
+              cancelText="Hủy"
+              okButtonProps={{
+                danger: is_active,
+                size: "small",
+              }}
+              cancelButtonProps={{ size: "small" }}
+            >
+              <div
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border cursor-pointer transition-all ${is_active
+                  ? "bg-green-50 border-green-200 hover:bg-green-100"
+                  : "bg-red-50 border-red-200 hover:bg-red-100"
+                  }`}
+              >
+                <span
+                  className={`text-xs font-medium ${is_active ? "text-green-700" : "text-red-700"
+                    }`}
+                >
+                  {is_active ? "Hoạt động" : "Vô hiệu hóa"}
+                </span>
               </div>
-            }
-            onConfirm={() => handleToggleStatus(record.id, is_active)}
-            okText={is_active ? "Vô hiệu hóa" : "Kích hoạt"}
-            cancelText="Hủy"
-            okButtonProps={{
-              danger: is_active,
-              size: "small",
-            }}
-            cancelButtonProps={{ size: "small" }}
-          >
+            </Popconfirm>
+          ) : (
             <div
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border cursor-pointer transition-all ${is_active
-                ? "bg-green-50 border-green-200 hover:bg-green-100"
-                : "bg-red-50 border-red-200 hover:bg-red-100"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${is_active
+                ? "bg-green-50 border-green-200"
+                : "bg-red-50 border-red-200"
                 }`}
             >
               <span
@@ -445,7 +476,7 @@ const AccountsPage = () => {
                 {is_active ? "Hoạt động" : "Vô hiệu hóa"}
               </span>
             </div>
-          </Popconfirm>
+          )}
         </div>
       ),
     },
@@ -457,60 +488,64 @@ const AccountsPage = () => {
       width: 200,
       render: (_, record) => (
         <div className="flex items-center justify-center gap-2">
-          <div className="group w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200">
-            <Button
-              type="text"
-              size="small"
-              icon={
-                <EditOutlined className="text-blue-600 group-hover:text-blue-500" />
-              }
-              onClick={() => openEditModal(record)}
-              title="Chỉnh sửa"
-            />
-          </div>
-
-          <div className="group w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200">
-            <Button
-              type="text"
-              size="small"
-              icon={
-                <LockOutlined className="text-orange-600 group-hover:text-orange-500" />
-              }
-              onClick={() => openResetPasswordModal(record)}
-              title="Đặt lại mật khẩu"
-            />
-          </div>
-
-          <Popconfirm
-            title={
-              <span className="font-semibold">Xác nhận xóa tài khoản?</span>
-            }
-            description={
-              <div className="text-sm text-gray-600">
-                Tài khoản{" "}
-                <span className="font-medium text-gray-800">
-                  "{record.username}"
-                </span>{" "}
-                sẽ bị xóa vĩnh viễn
+          {canManageAccount(record.role) && (
+            <>
+              <div className="group w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={
+                    <EditOutlined className="text-blue-600 group-hover:text-blue-500" />
+                  }
+                  onClick={() => openEditModal(record)}
+                  title="Chỉnh sửa"
+                />
               </div>
-            }
-            onConfirm={() => handleDeleteAccount(record.id)}
-            okText="Xóa"
-            cancelText="Hủy"
-            okButtonProps={{ danger: true, size: "small" }}
-            cancelButtonProps={{ size: "small" }}
-          >
-            <div className="group w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200">
-              <Button
-                type="text"
-                size="small"
-                icon={
-                  <DeleteOutlined className="text-red-600 group-hover:text-red-500" />
+
+              <div className="group w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={
+                    <LockOutlined className="text-orange-600 group-hover:text-orange-500" />
+                  }
+                  onClick={() => openResetPasswordModal(record)}
+                  title="Đặt lại mật khẩu"
+                />
+              </div>
+
+              <Popconfirm
+                title={
+                  <span className="font-semibold">Xác nhận xóa tài khoản?</span>
                 }
-                title="Xóa"
-              />
-            </div>
-          </Popconfirm>
+                description={
+                  <div className="text-sm text-gray-600">
+                    Tài khoản{" "}
+                    <span className="font-medium text-gray-800">
+                      "{record.username}"
+                    </span>{" "}
+                    sẽ bị xóa vĩnh viễn
+                  </div>
+                }
+                onConfirm={() => handleDeleteAccount(record.id)}
+                okText="Xóa"
+                cancelText="Hủy"
+                okButtonProps={{ danger: true, size: "small" }}
+                cancelButtonProps={{ size: "small" }}
+              >
+                <div className="group w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={
+                      <DeleteOutlined className="text-red-600 group-hover:text-red-500" />
+                    }
+                    title="Xóa"
+                  />
+                </div>
+              </Popconfirm>
+            </>
+          )}
         </div>
       ),
     },
@@ -583,13 +618,15 @@ const AccountsPage = () => {
                 <Option value="inactive">Vô hiệu hóa</Option>
               </Select>
 
-              <Button
-                type="primary"
-                style={{ background: "#226533" }}
-                onClick={() => setModalOpen(true)}
-              >
-                + Thêm tài khoản
-              </Button>
+              {canAccess(['OWNER', 'MANAGER']) && (
+                <Button
+                  type="primary"
+                  style={{ background: "#226533" }}
+                  onClick={() => setModalOpen(true)}
+                >
+                  + Thêm tài khoản
+                </Button>
+              )}
             </div>
           </div>
 
@@ -788,18 +825,22 @@ const AccountsPage = () => {
                   >
                     <Radio.Group className="w-full">
                       <div className="flex flex-col gap-3 pt-2">
-                        <Radio value="OWNER">
-                          <span className="text-sm font-medium">OWNER</span>
-                          <span className="text-xs text-gray-500 ml-2">
-                            - Toàn quyền quản trị
-                          </span>
-                        </Radio>
-                        <Radio value="MANAGER">
-                          <span className="text-sm font-medium">MANAGER</span>
-                          <span className="text-xs text-gray-500 ml-2">
-                            - Quản lý và xem báo cáo
-                          </span>
-                        </Radio>
+                        {user?.role === 'OWNER' && (
+                          <Radio value="OWNER">
+                            <span className="text-sm font-medium">OWNER</span>
+                            <span className="text-xs text-gray-500 ml-2">
+                              - Toàn quyền quản trị
+                            </span>
+                          </Radio>
+                        )}
+                        {user?.role === 'OWNER' && (
+                          <Radio value="MANAGER">
+                            <span className="text-sm font-medium">MANAGER</span>
+                            <span className="text-xs text-gray-500 ml-2">
+                              - Quản lý và xem báo cáo
+                            </span>
+                          </Radio>
+                        )}
                         <Radio value="STAFF">
                           <span className="text-sm font-medium">STAFF</span>
                           <span className="text-xs text-gray-500 ml-2">
@@ -959,18 +1000,22 @@ const AccountsPage = () => {
                   >
                     <Radio.Group className="w-full">
                       <div className="flex flex-col gap-3 pt-2">
-                        <Radio value="OWNER">
-                          <span className="text-sm font-medium">OWNER</span>
-                          <span className="text-xs text-gray-500 ml-2">
-                            - Toàn quyền quản trị
-                          </span>
-                        </Radio>
-                        <Radio value="MANAGER">
-                          <span className="text-sm font-medium">MANAGER</span>
-                          <span className="text-xs text-gray-500 ml-2">
-                            - Quản lý và xem báo cáo
-                          </span>
-                        </Radio>
+                        {user?.role === 'OWNER' && (
+                          <Radio value="OWNER">
+                            <span className="text-sm font-medium">OWNER</span>
+                            <span className="text-xs text-gray-500 ml-2">
+                              - Toàn quyền quản trị
+                            </span>
+                          </Radio>
+                        )}
+                        {user?.role === 'OWNER' && (
+                          <Radio value="MANAGER">
+                            <span className="text-sm font-medium">MANAGER</span>
+                            <span className="text-xs text-gray-500 ml-2">
+                              - Quản lý và xem báo cáo
+                            </span>
+                          </Radio>
+                        )}
                         <Radio value="STAFF">
                           <span className="text-sm font-medium">STAFF</span>
                           <span className="text-xs text-gray-500 ml-2">

@@ -328,7 +328,8 @@ export async function resetPasswordByOwnerController(req, res) {
     try {
         const targetAdminId = parseInt(req.params.id);
         const { newPassword } = req.body;
-        const ownerAdminId = req.user.id; // From verifyToken middleware
+        const requesterAdminId = req.user.id; // From verifyToken middleware
+        const requesterRole = req.user.role;
 
         if (!newPassword) {
             return res.status(400).json({
@@ -355,7 +356,20 @@ export async function resetPasswordByOwnerController(req, res) {
             });
         }
 
-        await adminService.resetPasswordByOwner(targetAdminId, newPassword, ownerAdminId);
+        // Check hierarchy: Get target admin's role
+        const targetAdmin = await adminService.getAdminById(targetAdminId);
+
+        // Check if requester can manage target
+        if (!adminService.canManageTarget(requesterRole, targetAdmin.role)) {
+            return res.status(403).json({
+                status: 403,
+                message: requesterRole === 'MANAGER'
+                    ? 'MANAGER can only reset password for STAFF accounts'
+                    : 'Access denied. Insufficient permissions.'
+            });
+        }
+
+        await adminService.resetPasswordByOwner(targetAdminId, newPassword, requesterAdminId);
 
         res.status(200).json({
             status: 200,
@@ -400,6 +414,20 @@ export async function resetPasswordByOwnerController(req, res) {
 export async function deactivateAdminController(req, res) {
     try {
         const { id } = req.params;
+        const requesterRole = req.user.role;
+
+        // Check hierarchy: Get target admin's role
+        const targetAdmin = await adminService.getAdminById(parseInt(id));
+
+        // Check if requester can manage target
+        if (!adminService.canManageTarget(requesterRole, targetAdmin.role)) {
+            return res.status(403).json({
+                status: 403,
+                message: requesterRole === 'MANAGER'
+                    ? 'MANAGER can only deactivate STAFF accounts'
+                    : 'Access denied. Insufficient permissions.'
+            });
+        }
 
         const admin = await adminService.deactivateAdmin(parseInt(id));
 
@@ -440,6 +468,20 @@ export async function deactivateAdminController(req, res) {
 export async function activateAdminController(req, res) {
     try {
         const { id } = req.params;
+        const requesterRole = req.user.role;
+
+        // Check hierarchy: Get target admin's role
+        const targetAdmin = await adminService.getAdminById(parseInt(id));
+
+        // Check if requester can manage target
+        if (!adminService.canManageTarget(requesterRole, targetAdmin.role)) {
+            return res.status(403).json({
+                status: 403,
+                message: requesterRole === 'MANAGER'
+                    ? 'MANAGER can only activate STAFF accounts'
+                    : 'Access denied. Insufficient permissions.'
+            });
+        }
 
         const admin = await adminService.activateAdmin(parseInt(id));
 
@@ -480,6 +522,20 @@ export async function activateAdminController(req, res) {
 export async function deleteAdminController(req, res) {
     try {
         const { id } = req.params;
+        const requesterRole = req.user.role;
+
+        // Check hierarchy: Get target admin's role
+        const targetAdmin = await adminService.getAdminById(parseInt(id));
+
+        // Check if requester can manage target
+        if (!adminService.canManageTarget(requesterRole, targetAdmin.role)) {
+            return res.status(403).json({
+                status: 403,
+                message: requesterRole === 'MANAGER'
+                    ? 'MANAGER can only delete STAFF accounts'
+                    : 'Access denied. Insufficient permissions.'
+            });
+        }
 
         const result = await adminService.deleteAdmin(parseInt(id));
 
@@ -521,6 +577,20 @@ export async function deleteAdminController(req, res) {
 export async function hardDeleteAdminController(req, res) {
     try {
         const { id } = req.params;
+        const requesterRole = req.user.role;
+
+        // Check hierarchy: Get target admin's role
+        const targetAdmin = await adminService.getAdminById(parseInt(id));
+
+        // Check if requester can manage target
+        if (!adminService.canManageTarget(requesterRole, targetAdmin.role)) {
+            return res.status(403).json({
+                status: 403,
+                message: requesterRole === 'MANAGER'
+                    ? 'MANAGER can only permanently delete STAFF accounts'
+                    : 'Access denied. Insufficient permissions.'
+            });
+        }
 
         const result = await adminService.hardDeleteAdmin(parseInt(id));
 
@@ -562,6 +632,20 @@ export async function hardDeleteAdminController(req, res) {
 export async function restoreAdminController(req, res) {
     try {
         const { id } = req.params;
+        const requesterRole = req.user.role;
+
+        // Check hierarchy: Get target admin's role (from deleted records)
+        const targetAdmin = await adminService.getAdminById(parseInt(id));
+
+        // Check if requester can manage target
+        if (!adminService.canManageTarget(requesterRole, targetAdmin.role)) {
+            return res.status(403).json({
+                status: 403,
+                message: requesterRole === 'MANAGER'
+                    ? 'MANAGER can only restore STAFF accounts'
+                    : 'Access denied. Insufficient permissions.'
+            });
+        }
 
         const admin = await adminService.restoreAdmin(parseInt(id));
 

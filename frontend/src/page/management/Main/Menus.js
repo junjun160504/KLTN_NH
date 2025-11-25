@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import AppHeader from "../../../components/AppHeader";
 import AppSidebar from "../../../components/AppSidebar";
 import useSidebarCollapse from "../../../hooks/useSidebarCollapse";
+import { useAuth } from "../../../contexts/AuthContext";
 import {
   Layout,
   Button,
@@ -46,6 +47,7 @@ const MenuPage = () => {
   const { message } = App.useApp(); // ✅ Use App hook for message
   const [collapsed, setCollapsed] = useSidebarCollapse();
   const [pageTitle] = useState("Quản lý thực đơn");
+  const { canAccess } = useAuth();
 
   const [allFoods, setAllFoods] = useState([]); // dữ liệu gốc
   const [foods, setFoods] = useState([]); // dữ liệu hiển thị
@@ -540,39 +542,43 @@ const MenuPage = () => {
       align: 'center',
       render: (_, record) => (
         <div className="flex items-center justify-center gap-2">
-          <div className="group w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200">
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined className="text-blue-600 group-hover:text-blue-500" />}
-              onClick={() => openEditDrawer(record)}
-              title="Chỉnh sửa"
-            />
-          </div>
-
-          <Popconfirm
-            title={<span className="font-semibold">Xác nhận xóa món?</span>}
-            description={
-              <div className="text-sm text-gray-600">
-                Món <span className="font-medium text-gray-800">"{record.name}"</span> sẽ bị xóa vĩnh viễn
-              </div>
-            }
-            onConfirm={() => handleDeleteFood(record.id)}
-            okText="Xóa"
-            cancelText="Hủy"
-            okButtonProps={{ danger: true, size: 'small' }}
-            cancelButtonProps={{ size: 'small' }}
-          >
+          {canAccess(['OWNER', 'MANAGER']) && (
             <div className="group w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200">
               <Button
                 type="text"
                 size="small"
-                icon={<DeleteOutlined className="text-red-600 group-hover:text-red-500" />}
-                title="Xóa"
+                icon={<EditOutlined className="text-blue-600 group-hover:text-blue-500" />}
+                onClick={() => openEditDrawer(record)}
+                title="Chỉnh sửa"
               />
             </div>
+          )}
 
-          </Popconfirm>
+          {canAccess(['OWNER', 'MANAGER']) && (
+            <Popconfirm
+              title={<span className="font-semibold">Xác nhận xóa món?</span>}
+              description={
+                <div className="text-sm text-gray-600">
+                  Món <span className="font-medium text-gray-800">"{record.name}"</span> sẽ bị xóa vĩnh viễn
+                </div>
+              }
+              onConfirm={() => handleDeleteFood(record.id)}
+              okText="Xóa"
+              cancelText="Hủy"
+              okButtonProps={{ danger: true, size: 'small' }}
+              cancelButtonProps={{ size: 'small' }}
+            >
+              <div className="group w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<DeleteOutlined className="text-red-600 group-hover:text-red-500" />}
+                  title="Xóa"
+                />
+              </div>
+
+            </Popconfirm>
+          )}
         </div>
       ),
     },
