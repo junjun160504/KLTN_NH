@@ -25,6 +25,8 @@ import {
   DeleteOutlined,
   PlusOutlined,
 } from "@ant-design/icons";
+import { Download } from "react-feather";
+import * as XLSX from 'xlsx';
 import axios from "axios";
 
 const { Content } = Layout;
@@ -196,6 +198,189 @@ const StaffsPage = () => {
 
       // Các lỗi khác hiển thị message chung
       message.error(errorMsg);
+    }
+  };
+
+  // ================= EXPORT EXCEL =================
+  const handleExportExcel = () => {
+    try {
+      // Lấy dữ liệu đã lọc hiện tại
+      const exportData = staffs;
+
+      if (exportData.length === 0) {
+        message.warning('Không có dữ liệu để xuất!');
+        return;
+      }
+
+      // Style definitions
+      const headerStyle = {
+        fill: { fgColor: { rgb: "1890FF" } },
+        font: { bold: true, color: { rgb: "FFFFFF" }, sz: 12 },
+        alignment: { horizontal: "center", vertical: "center" },
+        border: {
+          top: { style: "thin", color: { rgb: "000000" } },
+          bottom: { style: "thin", color: { rgb: "000000" } },
+          left: { style: "thin", color: { rgb: "000000" } },
+          right: { style: "thin", color: { rgb: "000000" } }
+        }
+      };
+
+      const dataCellStyle = {
+        alignment: { vertical: "center", wrapText: true },
+        border: {
+          top: { style: "thin", color: { rgb: "D9D9D9" } },
+          bottom: { style: "thin", color: { rgb: "D9D9D9" } },
+          left: { style: "thin", color: { rgb: "D9D9D9" } },
+          right: { style: "thin", color: { rgb: "D9D9D9" } }
+        }
+      };
+
+      const centerCellStyle = {
+        ...dataCellStyle,
+        alignment: { horizontal: "center", vertical: "center" }
+      };
+
+      const titleStyle = {
+        fill: { fgColor: { rgb: "1890FF" } },
+        font: { bold: true, color: { rgb: "FFFFFF" }, sz: 14 },
+        alignment: { horizontal: "center", vertical: "center" }
+      };
+
+      const workbook = XLSX.utils.book_new();
+
+      // ===== SHEET: DANH SÁCH NHÂN VIÊN =====
+      const wsData = [[]];
+
+      // Title row (merged)
+      wsData.push(['DANH SÁCH NHÂN VIÊN']);
+      wsData.push([]);
+
+      // Header row
+      wsData.push([
+        'STT',
+        'Tên nhân viên',
+        'Email',
+        'Số điện thoại',
+        'Vai trò',
+        'Ngày vào làm',
+        'Trạng thái'
+      ]);
+
+      // Data rows
+      exportData.forEach((staff, index) => {
+        const genderMap = {
+          MALE: 'Nam',
+          FEMALE: 'Nữ',
+          OTHER: 'Khác'
+        };
+
+        const statusText = staff.deleted_at ? 'Ngừng hoạt động' : 'Hoạt động';
+        const createdDate = staff.created_at ? new Date(staff.created_at).toLocaleDateString('vi-VN') : '';
+
+        wsData.push([
+          index + 1,
+          staff.name || '',
+          staff.email || '',
+          staff.phone || '',
+          genderMap[staff.gender] || 'Khác',
+          createdDate,
+          statusText
+        ]);
+      });
+
+      // Add summary row
+      wsData.push([]);
+      wsData.push([
+        'Tổng cộng',
+        `${exportData.length} nhân viên`,
+        '',
+        '',
+        '',
+        '',
+        `Hoạt động: ${exportData.filter(s => !s.deleted_at).length}`
+      ]);
+
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+      // Merge title
+      ws['!merges'] = [
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 6 } }
+      ];
+
+      // Column widths
+      ws['!cols'] = [
+        { wch: 6 },   // STT
+        { wch: 25 },  // Tên
+        { wch: 30 },  // Email
+        { wch: 15 },  // Phone
+        { wch: 12 },  // Vai trò
+        { wch: 15 },  // Ngày vào làm
+        { wch: 18 }   // Trạng thái
+      ];
+
+      // Apply styles
+      const range = XLSX.utils.decode_range(ws['!ref']);
+
+      // Title style (row 2)
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 1, c: C });
+        if (!ws[cellAddress]) continue;
+        ws[cellAddress].s = titleStyle;
+      }
+
+      // Header style (row 4)
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 3, c: C });
+        if (!ws[cellAddress]) continue;
+        ws[cellAddress].s = headerStyle;
+      }
+
+      // Data rows style
+      for (let R = 4; R < range.e.r - 1; R++) {
+        for (let C = range.s.c; C <= range.e.c; C++) {
+          const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+          if (!ws[cellAddress]) continue;
+
+          // Center alignment for: STT, Vai trò, Ngày vào làm, Trạng thái
+          if (C === 0 || C === 4 || C === 5 || C === 6) {
+            ws[cellAddress].s = centerCellStyle;
+          } else {
+            ws[cellAddress].s = dataCellStyle;
+          }
+        }
+      }
+
+      // Summary row style
+      const summaryRowIdx = range.e.r;
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: summaryRowIdx, c: C });
+        if (!ws[cellAddress]) continue;
+        ws[cellAddress].s = {
+          fill: { fgColor: { rgb: "F0F0F0" } },
+          font: { bold: true, sz: 11 },
+          alignment: { horizontal: C === 0 ? "center" : "left", vertical: "center" },
+          border: {
+            top: { style: "medium", color: { rgb: "000000" } },
+            bottom: { style: "medium", color: { rgb: "000000" } },
+            left: { style: "thin", color: { rgb: "D9D9D9" } },
+            right: { style: "thin", color: { rgb: "D9D9D9" } }
+          }
+        };
+      }
+
+      XLSX.utils.book_append_sheet(workbook, ws, 'Danh sách nhân viên');
+
+      // Generate filename
+      const now = new Date();
+      const dateStr = `${now.getDate().toString().padStart(2, '0')}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getFullYear()}`;
+      const filename = `DanhSachNhanVien_${dateStr}.xlsx`;
+
+      // Export
+      XLSX.writeFile(workbook, filename, { cellStyles: true });
+      message.success(`Xuất Excel thành công: ${filename}`);
+    } catch (error) {
+      console.error('Export Excel error:', error);
+      message.error('Xuất Excel thất bại!');
     }
   };
 
@@ -459,6 +644,14 @@ const StaffsPage = () => {
                 <Option value="active">Hoạt động</Option>
                 <Option value="inactive">Đã xóa</Option>
               </Select>
+
+              <Button
+                icon={<Download size={16} />}
+                onClick={handleExportExcel}
+                className="rounded-lg h-8 flex items-center gap-1.5"
+              >
+                Xuất Excel
+              </Button>
 
               <Button
                 type="primary"

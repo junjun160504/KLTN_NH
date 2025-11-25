@@ -47,17 +47,20 @@ export async function getBusinessTrend({ startDate, endDate, groupBy = 'day' }) 
       groupByClause = "DATE(o.created_at), DATE_FORMAT(o.created_at, '%d/%m')"
   }
 
-  // Query for current period trend
+  // Query for current period trend with payment method breakdown
   const trendQuery = `
     SELECT 
       ${dateFormat} as date,
       ${labelFormat} as label,
       COALESCE(SUM(o.total_price), 0) as revenue,
+      COALESCE(SUM(CASE WHEN p.method = 'BANKING' THEN p.amount ELSE 0 END), 0) as revenue_qr_banking,
+      COALESCE(SUM(CASE WHEN p.method = 'CASH' THEN p.amount ELSE 0 END), 0) as revenue_cash,
       COUNT(DISTINCT o.qr_session_id) as orders,
       COUNT(DISTINCT qs.customer_id) as customers,
       ROUND(COALESCE(SUM(o.total_price) / NULLIF(COUNT(DISTINCT o.qr_session_id), 0), 0), 2) as avgOrderValue
     FROM orders o
     LEFT JOIN qr_sessions qs ON o.qr_session_id = qs.id
+    LEFT JOIN payments p ON o.id = p.order_id AND p.payment_status = 'PAID'
     WHERE o.created_at BETWEEN ? AND ?
       AND o.status IN ('DONE', 'PAID')
       AND o.status != 'CANCELLED'
@@ -103,6 +106,8 @@ export async function getBusinessTrend({ startDate, endDate, groupBy = 'day' }) 
       date: item.date,
       label: item.label,
       revenue: parseFloat(item.revenue),
+      revenueQrBanking: parseFloat(item.revenue_qr_banking),
+      revenueCash: parseFloat(item.revenue_cash),
       orders: parseInt(item.orders),
       customers: parseInt(item.customers),
       avgOrderValue: parseFloat(item.avgOrderValue)
