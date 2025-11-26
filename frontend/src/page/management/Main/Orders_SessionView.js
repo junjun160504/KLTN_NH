@@ -39,6 +39,8 @@ import {
   EditOutlined,
   DeleteOutlined
 } from '@ant-design/icons'
+import { Download } from 'react-feather'
+import * as XLSX from 'xlsx'
 import dayjs from 'dayjs'
 import isBetween from 'dayjs/plugin/isBetween'
 import axios from 'axios'
@@ -817,6 +819,352 @@ function OrderSessionPage() {
     setCurrentPage(1)
   }, [filterStatus, dateRange, searchText])
 
+  // ==================== EXPORT EXCEL ====================
+  const handleExportExcel = useCallback(() => {
+    try {
+      // Lấy dữ liệu đã lọc hiện tại
+      const exportData = filteredSessions
+
+      if (exportData.length === 0) {
+        message.warning('Không có dữ liệu để xuất!')
+        return
+      }
+
+      // Style definitions
+      const headerStyle = {
+        fill: { fgColor: { rgb: "1890FF" } },
+        font: { bold: true, color: { rgb: "FFFFFF" }, sz: 12 },
+        alignment: { horizontal: "center", vertical: "center" },
+        border: {
+          top: { style: "thin", color: { rgb: "000000" } },
+          bottom: { style: "thin", color: { rgb: "000000" } },
+          left: { style: "thin", color: { rgb: "000000" } },
+          right: { style: "thin", color: { rgb: "000000" } }
+        }
+      }
+
+      const dataCellStyle = {
+        alignment: { vertical: "center", wrapText: true },
+        border: {
+          top: { style: "thin", color: { rgb: "D9D9D9" } },
+          bottom: { style: "thin", color: { rgb: "D9D9D9" } },
+          left: { style: "thin", color: { rgb: "D9D9D9" } },
+          right: { style: "thin", color: { rgb: "D9D9D9" } }
+        }
+      }
+
+      const centerCellStyle = {
+        ...dataCellStyle,
+        alignment: { horizontal: "center", vertical: "center" }
+      }
+
+      const numberCellStyle = {
+        ...dataCellStyle,
+        alignment: { horizontal: "right", vertical: "center" },
+        numFmt: "#,##0"
+      }
+
+      const titleStyle = {
+        fill: { fgColor: { rgb: "1890FF" } },
+        font: { bold: true, color: { rgb: "FFFFFF" }, sz: 14 },
+        alignment: { horizontal: "center", vertical: "center" }
+      }
+
+      const workbook = XLSX.utils.book_new()
+
+      // ===== SHEET 1: DANH SÁCH PHIÊN =====
+      const wsData = [[]]
+
+      // Title row (merged)
+      wsData.push(['DANH SÁCH PHIÊN ĂN'])
+      wsData.push([])
+
+      // Header row
+      wsData.push([
+        'Mã phiên',
+        'Bàn',
+        'SĐT khách',
+        'Số đơn',
+        'Tổng tiền (VNĐ)',
+        'Thời gian bắt đầu',
+        'Trạng thái phiên'
+      ])
+
+      // Data rows
+      let totalRevenue = 0
+      let totalSessions = exportData.length
+      let activeSessions = 0
+
+      exportData.forEach((session) => {
+        const createdDate = dayjs(session.createdAt).format('YYYY-MM-DD HH:mm:ss')
+
+        totalRevenue += session.totalAmount
+        if (session.sessionStatus === 'ACTIVE') {
+          activeSessions++
+        }
+
+        wsData.push([
+          session.sessionCode || '',
+          session.table || '',
+          session.phone || '-',
+          session.orderCount || 0,
+          session.totalAmount || 0,
+          createdDate,
+          SESSION_STATUS_MAP[session.sessionStatus] || session.sessionStatus
+        ])
+      })
+
+      // Add summary row
+      wsData.push([])
+      wsData.push([
+        'Tổng cộng',
+        `${totalSessions} phiên`,
+        '',
+        exportData.reduce((sum, s) => sum + (s.orderCount || 0), 0),
+        totalRevenue,
+        `Đang mở: ${activeSessions}`,
+        ''
+      ])
+
+      const ws = XLSX.utils.aoa_to_sheet(wsData)
+
+      // Merge title
+      ws['!merges'] = [
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 6 } }
+      ]
+
+      // Column widths
+      ws['!cols'] = [
+        { wch: 15 },  // Mã phiên
+        { wch: 10 },  // Bàn
+        { wch: 15 },  // SĐT
+        { wch: 10 },  // Số đơn
+        { wch: 18 },  // Tổng tiền
+        { wch: 20 },  // Thời gian
+        { wch: 16 }   // Trạng thái
+      ]
+
+      // Apply styles
+      const range = XLSX.utils.decode_range(ws['!ref'])
+
+      // Title style (row 2)
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 1, c: C })
+        if (!ws[cellAddress]) continue
+        ws[cellAddress].s = titleStyle
+      }
+
+      // Header style (row 4)
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 3, c: C })
+        if (!ws[cellAddress]) continue
+        ws[cellAddress].s = headerStyle
+      }
+
+      // Data rows style
+      for (let R = 4; R < range.e.r - 1; R++) {
+        for (let C = range.s.c; C <= range.e.c; C++) {
+          const cellAddress = XLSX.utils.encode_cell({ r: R, c: C })
+          if (!ws[cellAddress]) continue
+
+          // Number columns: Số đơn, Tổng tiền
+          if (C === 3 || C === 4) {
+            ws[cellAddress].s = numberCellStyle
+          }
+          // Center columns: Mã phiên, Bàn, Số đơn, Trạng thái
+          else if (C === 0 || C === 1 || C === 3 || C === 6) {
+            ws[cellAddress].s = centerCellStyle
+          }
+          // Left-aligned: SĐT, Thời gian
+          else {
+            ws[cellAddress].s = dataCellStyle
+          }
+        }
+      }
+
+      // Summary row style
+      const summaryRowIdx = range.e.r
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: summaryRowIdx, c: C })
+        if (!ws[cellAddress]) continue
+        ws[cellAddress].s = {
+          fill: { fgColor: { rgb: "F0F0F0" } },
+          font: { bold: true, sz: 11 },
+          alignment: {
+            horizontal: C === 0 ? "center" : (C === 3 || C === 4) ? "right" : "left",
+            vertical: "center"
+          },
+          border: {
+            top: { style: "medium", color: { rgb: "000000" } },
+            bottom: { style: "medium", color: { rgb: "000000" } },
+            left: { style: "thin", color: { rgb: "D9D9D9" } },
+            right: { style: "thin", color: { rgb: "D9D9D9" } }
+          },
+          numFmt: (C === 3 || C === 4) ? "#,##0" : undefined
+        }
+      }
+
+      XLSX.utils.book_append_sheet(workbook, ws, 'Danh sách phiên')
+
+      // ===== SHEET 2: CHI TIẾT ĐƠN HÀNG THEO PHIÊN =====
+      const wsDetailData = [[]]
+
+      // Title row (merged)
+      wsDetailData.push(['CHI TIẾT ĐƠN HÀNG THEO PHIÊN'])
+      wsDetailData.push([])
+
+      // Header row
+      wsDetailData.push([
+        'Mã phiên',
+        'Bàn',
+        'Mã đơn',
+        'Tổng tiền (VNĐ)',
+        'Trạng thái đơn',
+        'Thời gian tạo'
+      ])
+
+      // Data rows
+      let totalOrders = 0
+      let totalOrderRevenue = 0
+
+      exportData.forEach((session) => {
+        if (session.orders && session.orders.length > 0) {
+          session.orders.forEach((order) => {
+            const createdDate = dayjs(order.createdAt).format('YYYY-MM-DD HH:mm:ss')
+
+            totalOrders++
+            totalOrderRevenue += order.totalAmount || 0
+
+            wsDetailData.push([
+              session.sessionCode || '',
+              session.table || '',
+              order.code || '',
+              order.totalAmount || 0,
+              order.statusVI || '',
+              createdDate
+            ])
+          })
+        }
+      })
+
+      // Add summary row
+      wsDetailData.push([])
+      wsDetailData.push([
+        'Tổng cộng',
+        '',
+        `${totalOrders} đơn`,
+        totalOrderRevenue,
+        '',
+        ''
+      ])
+
+      const wsDetail = XLSX.utils.aoa_to_sheet(wsDetailData)
+
+      // Merge title
+      wsDetail['!merges'] = [
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } }
+      ]
+
+      // Column widths
+      wsDetail['!cols'] = [
+        { wch: 15 },  // Mã phiên
+        { wch: 10 },  // Bàn
+        { wch: 12 },  // Mã đơn
+        { wch: 18 },  // Tổng tiền
+        { wch: 16 },  // Trạng thái
+        { wch: 20 }   // Thời gian
+      ]
+
+      // Apply styles for detail sheet
+      const rangeDetail = XLSX.utils.decode_range(wsDetail['!ref'])
+
+      // Title style (row 2) with green color
+      for (let C = rangeDetail.s.c; C <= rangeDetail.e.c; C++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 1, c: C })
+        if (!wsDetail[cellAddress]) continue
+        wsDetail[cellAddress].s = {
+          fill: { fgColor: { rgb: "52C41A" } },
+          font: { bold: true, color: { rgb: "FFFFFF" }, sz: 14 },
+          alignment: { horizontal: "center", vertical: "center" }
+        }
+      }
+
+      // Header style (row 4) with green color
+      for (let C = rangeDetail.s.c; C <= rangeDetail.e.c; C++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 3, c: C })
+        if (!wsDetail[cellAddress]) continue
+        wsDetail[cellAddress].s = {
+          fill: { fgColor: { rgb: "52C41A" } },
+          font: { bold: true, color: { rgb: "FFFFFF" }, sz: 12 },
+          alignment: { horizontal: "center", vertical: "center" },
+          border: {
+            top: { style: "thin", color: { rgb: "000000" } },
+            bottom: { style: "thin", color: { rgb: "000000" } },
+            left: { style: "thin", color: { rgb: "000000" } },
+            right: { style: "thin", color: { rgb: "000000" } }
+          }
+        }
+      }
+
+      // Data rows style
+      for (let R = 4; R < rangeDetail.e.r - 1; R++) {
+        for (let C = rangeDetail.s.c; C <= rangeDetail.e.c; C++) {
+          const cellAddress = XLSX.utils.encode_cell({ r: R, c: C })
+          if (!wsDetail[cellAddress]) continue
+
+          // Number columns: Tổng tiền
+          if (C === 3) {
+            wsDetail[cellAddress].s = numberCellStyle
+          }
+          // Center columns: Mã phiên, Bàn, Mã đơn, Trạng thái
+          else if (C === 0 || C === 1 || C === 2 || C === 4) {
+            wsDetail[cellAddress].s = centerCellStyle
+          }
+          // Left-aligned: Thời gian
+          else {
+            wsDetail[cellAddress].s = dataCellStyle
+          }
+        }
+      }
+
+      // Summary row style
+      const summaryDetailRowIdx = rangeDetail.e.r
+      for (let C = rangeDetail.s.c; C <= rangeDetail.e.c; C++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: summaryDetailRowIdx, c: C })
+        if (!wsDetail[cellAddress]) continue
+        wsDetail[cellAddress].s = {
+          fill: { fgColor: { rgb: "F0F0F0" } },
+          font: { bold: true, sz: 11 },
+          alignment: {
+            horizontal: C === 0 ? "center" : C === 3 ? "right" : "left",
+            vertical: "center"
+          },
+          border: {
+            top: { style: "medium", color: { rgb: "000000" } },
+            bottom: { style: "medium", color: { rgb: "000000" } },
+            left: { style: "thin", color: { rgb: "D9D9D9" } },
+            right: { style: "thin", color: { rgb: "D9D9D9" } }
+          },
+          numFmt: C === 3 ? "#,##0" : undefined
+        }
+      }
+
+      XLSX.utils.book_append_sheet(workbook, wsDetail, 'Chi tiết đơn hàng')
+
+      // Generate filename
+      const startDate = dateRange && dateRange[0] ? dateRange[0].format('DDMMYYYY') : dayjs().format('DDMMYYYY')
+      const endDate = dateRange && dateRange[1] ? dateRange[1].format('DDMMYYYY') : dayjs().format('DDMMYYYY')
+      const filename = `BaoCaoPhienAn_${startDate}_${endDate}.xlsx`
+
+      // Export
+      XLSX.writeFile(workbook, filename, { cellStyles: true })
+      message.success(`Xuất Excel thành công: ${filename}`)
+    } catch (error) {
+      console.error('Export Excel error:', error)
+      message.error('Xuất Excel thất bại!')
+    }
+  }, [filteredSessions, dateRange, message])
+
   // ==================== HELPER COMPONENTS ====================
   const StatusBadge = ({ status }) => {
     const statusVI = STATUS_MAP.EN_TO_VI[status] || status
@@ -1166,7 +1514,17 @@ function OrderSessionPage() {
                   </Select>
                 </Space>
 
-                <CustomDateRangePicker value={dateRange} onChange={setDateRange} />
+                <Space wrap>
+                  <Button
+                    icon={<Download size={16} />}
+                    onClick={handleExportExcel}
+                    className="rounded-lg h-8 flex items-center gap-1.5"
+                  >
+                    Xuất Excel
+                  </Button>
+
+                  <CustomDateRangePicker value={dateRange} onChange={setDateRange} />
+                </Space>
               </Space>
             </Card>
 

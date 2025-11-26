@@ -185,6 +185,8 @@ const ReportsSalesPage = () => {
           date: item.date,
           label: item.label,
           revenue: item.revenue,
+          revenueQrBanking: item.revenueQrBanking || 0,
+          revenueCash: item.revenueCash || 0,
           orders: item.orders,
           customers: item.customers,
           avgOrderValue: item.avgOrderValue
@@ -287,53 +289,572 @@ const ReportsSalesPage = () => {
   const totalRevenue = summaryMetrics.totalRevenue || 0
   const totalOrders = summaryMetrics.totalOrders || 0
   const totalCustomers = summaryMetrics.totalCustomers || 0
-  const avgOrderValue = summaryMetrics.avgOrderValue || 0
-
-  // Calculate additional metrics for charts if needed
-  const totalProfit = businessTrendData.reduce((sum, item) => sum + (item.profit || 0), 0)
-  const profitMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : 0
 
   // ==================== EXPORT FUNCTION ====================
   const handleExport = () => {
     try {
-      const summaryData = [
-        { 'Chỉ số': 'Tổng doanh thu', 'Giá trị': `${totalRevenue.toLocaleString()} VNĐ` },
-        { 'Chỉ số': 'Tổng lợi nhuận', 'Giá trị': `${totalProfit.toLocaleString()} VNĐ` },
-        { 'Chỉ số': 'Tỷ suất lợi nhuận', 'Giá trị': `${profitMargin}%` },
-        { 'Chỉ số': 'Tổng đơn hàng', 'Giá trị': `${totalOrders.toLocaleString()}` },
-        { 'Chỉ số': 'Giá trị TB/đơn', 'Giá trị': `${avgOrderValue.toLocaleString()} VNĐ` },
-        { 'Chỉ số': 'Tổng khách hàng', 'Giá trị': `${totalCustomers.toLocaleString()}` }
+      const wb = XLSX.utils.book_new()
+      const [start, end] = dateRange
+      const rangeInDays = end.diff(start, 'day') + 1
+
+      // ========== HELPER FUNCTIONS ==========
+
+      // Style cho header
+      const headerStyle = {
+        fill: { fgColor: { rgb: '1890FF' } },
+        font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 12 },
+        alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+        border: {
+          top: { style: 'thin', color: { rgb: '000000' } },
+          bottom: { style: 'thin', color: { rgb: '000000' } },
+          left: { style: 'thin', color: { rgb: '000000' } },
+          right: { style: 'thin', color: { rgb: '000000' } }
+        }
+      }
+
+      // Style cho data cell
+      const dataCellStyle = {
+        alignment: { horizontal: 'right', vertical: 'center' },
+        border: {
+          top: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          bottom: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          left: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          right: { style: 'thin', color: { rgb: 'D9D9D9' } }
+        }
+      }
+
+      // Style cho text cell (STT, Ngày, Tháng)
+      const textCellStyle = {
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: {
+          top: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          bottom: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          left: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          right: { style: 'thin', color: { rgb: 'D9D9D9' } }
+        }
+      }
+
+      // Style cho total row
+      const totalCellStyle = {
+        fill: { fgColor: { rgb: 'F0F0F0' } },
+        font: { bold: true, sz: 11 },
+        alignment: { horizontal: 'right', vertical: 'center' },
+        border: {
+          top: { style: 'medium', color: { rgb: '000000' } },
+          bottom: { style: 'medium', color: { rgb: '000000' } },
+          left: { style: 'thin', color: { rgb: '000000' } },
+          right: { style: 'thin', color: { rgb: '000000' } }
+        }
+      }
+
+      // ========== 1️⃣ SHEET "DOANH THU THEO NGÀY" ==========
+
+      const dailyHeaders = ['STT', 'Ngày', 'Số hóa đơn', 'Doanh thu (VNĐ)', 'Doanh thu QR Banking', 'Doanh thu Tiền mặt', 'Khách hàng', 'TB/đơn']
+
+      const dailyDataRows = businessTrendData.map((item, index) => [
+        index + 1,
+        dayjs(item.date).format('DD/MM/YYYY'),
+        item.orders || 0,
+        Math.floor(item.revenue || 0),
+        Math.floor(item.revenueQrBanking || 0),
+        Math.floor(item.revenueCash || 0),
+        item.customers || 0,
+        Math.floor(item.avgOrderValue || 0)
+      ])
+
+      // Calculate totals
+      const dailyTotals = [
+        '',
+        'Tổng cộng',
+        dailyDataRows.reduce((sum, row) => sum + row[2], 0),
+        dailyDataRows.reduce((sum, row) => sum + row[3], 0),
+        dailyDataRows.reduce((sum, row) => sum + row[4], 0),
+        dailyDataRows.reduce((sum, row) => sum + row[5], 0),
+        dailyDataRows.reduce((sum, row) => sum + row[6], 0),
+        ''
       ]
 
-      const dishData = dishRevenueData.map((item, index) => ({
-        'STT': index + 1,
-        'Tên món': item.name,
-        'Danh mục': item.category,
-        'Số lượng': item.quantity,
-        'Doanh thu': item.revenue,
-        'Chi phí': item.cost,
-        'Lợi nhuận': item.profit,
-        'Tỷ suất LN (%)': item.profitMargin,
-        'Tăng trưởng (%)': item.growth
-      }))
+      // Create worksheet data
+      const dailyWsData = [
+        // Title row
+        [{ v: `BÁO CÁO DOANH THU THEO NGÀY (${start.format('DD/MM/YYYY')} - ${end.format('DD/MM/YYYY')})`, t: 's' }],
+        [], // Empty row
+        // Header row
+        dailyHeaders,
+        // Data rows
+        ...dailyDataRows,
+        // Total row
+        dailyTotals
+      ]
 
-      const categoryExport = categoryRevenueData.map(item => ({
-        'Danh mục': item.category,
-        'Số món': item.dishes,
-        'Số lượng bán': item.quantity,
-        'Doanh thu': item.revenue,
-        'Chi phí': item.cost,
-        'Lợi nhuận': item.profit,
-        'Tỷ suất LN (%)': item.profitMargin,
-        'Tỷ trọng (%)': item.percentOfTotal
-      }))
+      const dailyWs = XLSX.utils.aoa_to_sheet(dailyWsData)
 
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryData), 'Tổng quan')
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dishData), 'Doanh thu món ăn')
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(categoryExport), 'Doanh thu danh mục')
+      // Merge title cell
+      dailyWs['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } } // Merge title across all columns
+      ]
 
-      const fileName = `BaoCaoBanHang_${dayjs().format('YYYYMMDD_HHmmss')}.xlsx`
+      // Apply styles
+      // Title
+      dailyWs['A1'].s = {
+        fill: { fgColor: { rgb: '1890FF' } },
+        font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 14 },
+        alignment: { horizontal: 'center', vertical: 'center' }
+      }
+
+      // Headers (row 3)
+      dailyHeaders.forEach((_, colIdx) => {
+        const cellRef = XLSX.utils.encode_cell({ r: 2, c: colIdx })
+        if (!dailyWs[cellRef]) dailyWs[cellRef] = { t: 's', v: '' }
+        dailyWs[cellRef].s = headerStyle
+      })
+
+      // Data cells
+      dailyDataRows.forEach((row, rowIdx) => {
+        row.forEach((val, colIdx) => {
+          const cellRef = XLSX.utils.encode_cell({ r: rowIdx + 3, c: colIdx })
+          if (!dailyWs[cellRef]) dailyWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
+
+          // Apply style based on column type
+          if (colIdx === 0 || colIdx === 1 || colIdx === 6) {
+            // STT, Ngày, Khách hàng - center align
+            dailyWs[cellRef].s = textCellStyle
+          } else {
+            // Number columns - right align
+            dailyWs[cellRef].s = dataCellStyle
+            // Format as number with thousand separator
+            if (typeof val === 'number') {
+              dailyWs[cellRef].z = '#,##0'
+            }
+          }
+        })
+      })
+
+      // Total row
+      const totalRowIdx = dailyDataRows.length + 3
+      dailyTotals.forEach((val, colIdx) => {
+        const cellRef = XLSX.utils.encode_cell({ r: totalRowIdx, c: colIdx })
+        if (!dailyWs[cellRef]) dailyWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
+        dailyWs[cellRef].s = totalCellStyle
+        if (typeof val === 'number') {
+          dailyWs[cellRef].z = '#,##0'
+        }
+      })
+
+      // Set column widths
+      dailyWs['!cols'] = [
+        { wch: 6 },  // STT
+        { wch: 12 }, // Ngày
+        { wch: 14 }, // Số hóa đơn
+        { wch: 18 }, // Doanh thu
+        { wch: 22 }, // Doanh thu QR Banking
+        { wch: 20 }, // Doanh thu Tiền mặt
+        { wch: 14 }, // Khách hàng
+        { wch: 12 }  // TB/đơn
+      ]
+
+      // Set row heights
+      dailyWs['!rows'] = [
+        { hpt: 30 }, // Title row
+        { hpt: 5 },  // Empty row
+        { hpt: 25 }  // Header row
+      ]
+
+      XLSX.utils.book_append_sheet(wb, dailyWs, 'Doanh thu theo ngày')
+
+      // ========== 2️⃣ SHEET "DOANH THU THEO THÁNG" ==========
+      if (rangeInDays >= 30) {
+        // Aggregate data by month
+        const monthlyMap = {}
+
+        businessTrendData.forEach(item => {
+          const monthKey = dayjs(item.date).format('MM/YYYY')
+
+          if (!monthlyMap[monthKey]) {
+            monthlyMap[monthKey] = {
+              orders: 0,
+              revenue: 0,
+              qrBanking: 0,
+              cash: 0,
+              customers: 0
+            }
+          }
+
+          monthlyMap[monthKey].orders += item.orders || 0
+          monthlyMap[monthKey].revenue += item.revenue || 0
+          monthlyMap[monthKey].qrBanking += item.revenueQrBanking || 0
+          monthlyMap[monthKey].cash += item.revenueCash || 0
+          monthlyMap[monthKey].customers += item.customers || 0
+        })
+
+        const monthlyHeaders = ['STT', 'Tháng', 'Số hóa đơn', 'Doanh thu (VNĐ)', 'Doanh thu QR Banking', 'Doanh thu Tiền mặt', 'Khách hàng', 'TB/đơn']
+
+        const monthlyDataRows = Object.entries(monthlyMap).map(([month, data], index) => [
+          index + 1,
+          month,
+          data.orders,
+          Math.floor(data.revenue),
+          Math.floor(data.qrBanking),
+          Math.floor(data.cash),
+          data.customers,
+          data.orders > 0 ? Math.floor(data.revenue / data.orders) : 0
+        ])
+
+        // Calculate totals
+        const monthlyTotals = [
+          '',
+          'Tổng cộng',
+          monthlyDataRows.reduce((sum, row) => sum + row[2], 0),
+          monthlyDataRows.reduce((sum, row) => sum + row[3], 0),
+          monthlyDataRows.reduce((sum, row) => sum + row[4], 0),
+          monthlyDataRows.reduce((sum, row) => sum + row[5], 0),
+          monthlyDataRows.reduce((sum, row) => sum + row[6], 0),
+          ''
+        ]
+
+        // Create worksheet data
+        const monthlyWsData = [
+          // Title row
+          [{ v: `BÁO CÁO DOANH THU THEO THÁNG (${start.format('DD/MM/YYYY')} - ${end.format('DD/MM/YYYY')})`, t: 's' }],
+          [], // Empty row
+          // Header row
+          monthlyHeaders,
+          // Data rows
+          ...monthlyDataRows,
+          // Total row
+          monthlyTotals
+        ]
+
+        const monthlyWs = XLSX.utils.aoa_to_sheet(monthlyWsData)
+
+        // Merge title cell
+        monthlyWs['!merges'] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }
+        ]
+
+        // Apply styles - Title
+        monthlyWs['A1'].s = {
+          fill: { fgColor: { rgb: '52C41A' } },
+          font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 14 },
+          alignment: { horizontal: 'center', vertical: 'center' }
+        }
+
+        // Headers (row 3)
+        const monthlyHeaderStyle = {
+          ...headerStyle,
+          fill: { fgColor: { rgb: '52C41A' } }
+        }
+
+        monthlyHeaders.forEach((_, colIdx) => {
+          const cellRef = XLSX.utils.encode_cell({ r: 2, c: colIdx })
+          if (!monthlyWs[cellRef]) monthlyWs[cellRef] = { t: 's', v: '' }
+          monthlyWs[cellRef].s = monthlyHeaderStyle
+        })
+
+        // Data cells
+        monthlyDataRows.forEach((row, rowIdx) => {
+          row.forEach((val, colIdx) => {
+            const cellRef = XLSX.utils.encode_cell({ r: rowIdx + 3, c: colIdx })
+            if (!monthlyWs[cellRef]) monthlyWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
+
+            if (colIdx === 0 || colIdx === 1 || colIdx === 6) {
+              monthlyWs[cellRef].s = textCellStyle
+            } else {
+              monthlyWs[cellRef].s = dataCellStyle
+              if (typeof val === 'number') {
+                monthlyWs[cellRef].z = '#,##0'
+              }
+            }
+          })
+        })
+
+        // Total row
+        const monthlyTotalRowIdx = monthlyDataRows.length + 3
+        monthlyTotals.forEach((val, colIdx) => {
+          const cellRef = XLSX.utils.encode_cell({ r: monthlyTotalRowIdx, c: colIdx })
+          if (!monthlyWs[cellRef]) monthlyWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
+          monthlyWs[cellRef].s = totalCellStyle
+          if (typeof val === 'number') {
+            monthlyWs[cellRef].z = '#,##0'
+          }
+        })
+
+        // Set column widths
+        monthlyWs['!cols'] = [
+          { wch: 6 },  // STT
+          { wch: 12 }, // Tháng
+          { wch: 14 }, // Số hóa đơn
+          { wch: 18 }, // Doanh thu
+          { wch: 22 }, // Doanh thu QR Banking
+          { wch: 20 }, // Doanh thu Tiền mặt
+          { wch: 14 }, // Khách hàng
+          { wch: 12 }  // TB/đơn
+        ]
+
+        // Set row heights
+        monthlyWs['!rows'] = [
+          { hpt: 30 }, // Title row
+          { hpt: 5 },  // Empty row
+          { hpt: 25 }  // Header row
+        ]
+
+        XLSX.utils.book_append_sheet(wb, monthlyWs, 'Doanh thu theo tháng')
+      }
+
+      // ========== 3️⃣ SHEET "DOANH THU THEO MÓN" ==========
+
+      const dishHeaders = ['STT', 'Tên món', 'Danh mục', 'Số lượng bán', 'Doanh thu (VNĐ)', 'Tăng trưởng (%)']
+
+      const dishDataRows = dishRevenueData.map((item, index) => [
+        index + 1,
+        item.name,
+        item.category || 'Chưa phân loại',
+        item.quantity || 0,
+        Math.floor(item.revenue || 0),
+        item.growth || 0
+      ])
+
+      // Calculate totals for dishes
+      const dishTotals = [
+        '',
+        'Tổng cộng',
+        '',
+        dishDataRows.reduce((sum, row) => sum + row[3], 0),
+        dishDataRows.reduce((sum, row) => sum + row[4], 0),
+        ''
+      ]
+
+      // Create worksheet data
+      const dishWsData = [
+        // Title row
+        [{ v: `TOP ${dishLimit} MÓN CÓ DOANH THU CAO NHẤT (${start.format('DD/MM/YYYY')} - ${end.format('DD/MM/YYYY')})`, t: 's' }],
+        [], // Empty row
+        // Header row
+        dishHeaders,
+        // Data rows
+        ...dishDataRows,
+        // Total row
+        dishTotals
+      ]
+
+      const dishWs = XLSX.utils.aoa_to_sheet(dishWsData)
+
+      // Merge title cell
+      dishWs['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } }
+      ]
+
+      // Apply styles - Title
+      dishWs['A1'].s = {
+        fill: { fgColor: { rgb: '722ED1' } },
+        font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 14 },
+        alignment: { horizontal: 'center', vertical: 'center' }
+      }
+
+      // Headers (row 3)
+      const dishHeaderStyle = {
+        fill: { fgColor: { rgb: '722ED1' } },
+        font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 12 },
+        alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+        border: {
+          top: { style: 'thin', color: { rgb: '000000' } },
+          bottom: { style: 'thin', color: { rgb: '000000' } },
+          left: { style: 'thin', color: { rgb: '000000' } },
+          right: { style: 'thin', color: { rgb: '000000' } }
+        }
+      }
+
+      dishHeaders.forEach((_, colIdx) => {
+        const cellRef = XLSX.utils.encode_cell({ r: 2, c: colIdx })
+        if (!dishWs[cellRef]) dishWs[cellRef] = { t: 's', v: '' }
+        dishWs[cellRef].s = dishHeaderStyle
+      })
+
+      // Data cells
+      dishDataRows.forEach((row, rowIdx) => {
+        row.forEach((val, colIdx) => {
+          const cellRef = XLSX.utils.encode_cell({ r: rowIdx + 3, c: colIdx })
+          if (!dishWs[cellRef]) dishWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
+
+          if (colIdx === 0 || colIdx === 1 || colIdx === 2) {
+            // STT, Tên món, Danh mục - left/center align
+            dishWs[cellRef].s = {
+              alignment: { horizontal: colIdx === 0 ? 'center' : 'left', vertical: 'center' },
+              border: {
+                top: { style: 'thin', color: { rgb: 'D9D9D9' } },
+                bottom: { style: 'thin', color: { rgb: 'D9D9D9' } },
+                left: { style: 'thin', color: { rgb: 'D9D9D9' } },
+                right: { style: 'thin', color: { rgb: 'D9D9D9' } }
+              }
+            }
+          } else {
+            // Number columns - right align
+            dishWs[cellRef].s = dataCellStyle
+            if (typeof val === 'number') {
+              dishWs[cellRef].z = colIdx === 5 ? '#,##0.0' : '#,##0' // Growth với 1 decimal
+            }
+          }
+        })
+      })
+
+      // Total row
+      const dishTotalRowIdx = dishDataRows.length + 3
+      dishTotals.forEach((val, colIdx) => {
+        const cellRef = XLSX.utils.encode_cell({ r: dishTotalRowIdx, c: colIdx })
+        if (!dishWs[cellRef]) dishWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
+        dishWs[cellRef].s = totalCellStyle
+        if (typeof val === 'number') {
+          dishWs[cellRef].z = '#,##0'
+        }
+      })
+
+      // Set column widths
+      dishWs['!cols'] = [
+        { wch: 6 },  // STT
+        { wch: 30 }, // Tên món
+        { wch: 18 }, // Danh mục
+        { wch: 16 }, // Số lượng bán
+        { wch: 20 }, // Doanh thu
+        { wch: 16 }  // Tăng trưởng
+      ]
+
+      // Set row heights
+      dishWs['!rows'] = [
+        { hpt: 30 }, // Title row
+        { hpt: 5 },  // Empty row
+        { hpt: 25 }  // Header row
+      ]
+
+      XLSX.utils.book_append_sheet(wb, dishWs, 'Doanh thu theo món')
+
+      // ========== 4️⃣ SHEET "DOANH THU THEO DANH MỤC" ==========
+
+      const categoryHeaders = ['STT', 'Danh mục', 'Số món', 'Số lượng bán', 'Doanh thu (VNĐ)', 'Tỷ trọng (%)']
+
+      const categoryDataRows = categoryRevenueData.map((item, index) => [
+        index + 1,
+        item.category || item.name,
+        item.dishes || 0,
+        item.quantity || 0,
+        Math.floor(item.revenue || 0),
+        parseFloat(item.percentOfTotal || 0)
+      ])
+
+      // Calculate totals for categories
+      const categoryTotals = [
+        '',
+        'Tổng cộng',
+        categoryDataRows.reduce((sum, row) => sum + row[2], 0),
+        categoryDataRows.reduce((sum, row) => sum + row[3], 0),
+        categoryDataRows.reduce((sum, row) => sum + row[4], 0),
+        100.0 // Tổng tỷ trọng luôn = 100%
+      ]
+
+      // Create worksheet data
+      const categoryWsData = [
+        // Title row
+        [{ v: `DOANH THU THEO DANH MỤC (${start.format('DD/MM/YYYY')} - ${end.format('DD/MM/YYYY')})`, t: 's' }],
+        [], // Empty row
+        // Header row
+        categoryHeaders,
+        // Data rows
+        ...categoryDataRows,
+        // Total row
+        categoryTotals
+      ]
+
+      const categoryWs = XLSX.utils.aoa_to_sheet(categoryWsData)
+
+      // Merge title cell
+      categoryWs['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } }
+      ]
+
+      // Apply styles - Title
+      categoryWs['A1'].s = {
+        fill: { fgColor: { rgb: 'FA8C16' } },
+        font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 14 },
+        alignment: { horizontal: 'center', vertical: 'center' }
+      }
+
+      // Headers (row 3)
+      const categoryHeaderStyle = {
+        fill: { fgColor: { rgb: 'FA8C16' } },
+        font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 12 },
+        alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+        border: {
+          top: { style: 'thin', color: { rgb: '000000' } },
+          bottom: { style: 'thin', color: { rgb: '000000' } },
+          left: { style: 'thin', color: { rgb: '000000' } },
+          right: { style: 'thin', color: { rgb: '000000' } }
+        }
+      }
+
+      categoryHeaders.forEach((_, colIdx) => {
+        const cellRef = XLSX.utils.encode_cell({ r: 2, c: colIdx })
+        if (!categoryWs[cellRef]) categoryWs[cellRef] = { t: 's', v: '' }
+        categoryWs[cellRef].s = categoryHeaderStyle
+      })
+
+      // Data cells
+      categoryDataRows.forEach((row, rowIdx) => {
+        row.forEach((val, colIdx) => {
+          const cellRef = XLSX.utils.encode_cell({ r: rowIdx + 3, c: colIdx })
+          if (!categoryWs[cellRef]) categoryWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
+
+          if (colIdx === 0 || colIdx === 1) {
+            // STT, Danh mục - center/left align
+            categoryWs[cellRef].s = {
+              alignment: { horizontal: colIdx === 0 ? 'center' : 'left', vertical: 'center' },
+              border: {
+                top: { style: 'thin', color: { rgb: 'D9D9D9' } },
+                bottom: { style: 'thin', color: { rgb: 'D9D9D9' } },
+                left: { style: 'thin', color: { rgb: 'D9D9D9' } },
+                right: { style: 'thin', color: { rgb: 'D9D9D9' } }
+              }
+            }
+          } else {
+            // Number columns - right align
+            categoryWs[cellRef].s = dataCellStyle
+            if (typeof val === 'number') {
+              categoryWs[cellRef].z = colIdx === 5 ? '#,##0.0' : '#,##0' // Tỷ trọng với 1 decimal
+            }
+          }
+        })
+      })
+
+      // Total row
+      const categoryTotalRowIdx = categoryDataRows.length + 3
+      categoryTotals.forEach((val, colIdx) => {
+        const cellRef = XLSX.utils.encode_cell({ r: categoryTotalRowIdx, c: colIdx })
+        if (!categoryWs[cellRef]) categoryWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
+        categoryWs[cellRef].s = totalCellStyle
+        if (typeof val === 'number') {
+          categoryWs[cellRef].z = colIdx === 5 ? '#,##0.0' : '#,##0'
+        }
+      })
+
+      // Set column widths
+      categoryWs['!cols'] = [
+        { wch: 6 },  // STT
+        { wch: 25 }, // Danh mục
+        { wch: 12 }, // Số món
+        { wch: 16 }, // Số lượng bán
+        { wch: 20 }, // Doanh thu
+        { wch: 14 }  // Tỷ trọng
+      ]
+
+      // Set row heights
+      categoryWs['!rows'] = [
+        { hpt: 30 }, // Title row
+        { hpt: 5 },  // Empty row
+        { hpt: 25 }  // Header row
+      ]
+
+      XLSX.utils.book_append_sheet(wb, categoryWs, 'Doanh thu theo danh mục')
+
+      // File name theo format: BaoCaoBanHang_DDMMYYYY_DDMMYYYY.xlsx
+      const fileName = `BaoCaoBanHang_${start.format('DDMMYYYY')}_${end.format('DDMMYYYY')}.xlsx`
       XLSX.writeFile(wb, fileName)
 
       message.success('Xuất báo cáo thành công!')

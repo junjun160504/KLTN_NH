@@ -161,19 +161,299 @@ const ReportsCustomerPage = () => {
   // ====== Export Excel ======
   const handleExport = () => {
     try {
-      const exportData = topCustomers.map((c, index) => ({
-        'STT': index + 1,
-        'Khách hàng': c.name,
-        'Số điện thoại': c.phone,
-        'Điểm tích lũy': c.points,
-        'Số lần ghé': c.visits,
-        'Lần ghé gần nhất': dayjs(c.lastVisit).format('DD/MM/YYYY')
-      }))
-
       const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exportData), 'Báo cáo tích điểm')
+      const [start, end] = dateRange
 
-      const fileName = `BaoCaoTichDiem_${dayjs().format('YYYYMMDD_HHmmss')}.xlsx`
+      // ========== HELPER STYLES ==========
+
+      // Style cho header
+      const headerStyle = {
+        fill: { fgColor: { rgb: '1890FF' } },
+        font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 12 },
+        alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+        border: {
+          top: { style: 'thin', color: { rgb: '000000' } },
+          bottom: { style: 'thin', color: { rgb: '000000' } },
+          left: { style: 'thin', color: { rgb: '000000' } },
+          right: { style: 'thin', color: { rgb: '000000' } }
+        }
+      }
+
+      // Style cho data cell
+      const dataCellStyle = {
+        alignment: { horizontal: 'right', vertical: 'center' },
+        border: {
+          top: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          bottom: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          left: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          right: { style: 'thin', color: { rgb: 'D9D9D9' } }
+        }
+      }
+
+      // Style cho text cell
+      const textCellStyle = {
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: {
+          top: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          bottom: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          left: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          right: { style: 'thin', color: { rgb: 'D9D9D9' } }
+        }
+      }
+
+      // Style cho total row
+      const totalCellStyle = {
+        fill: { fgColor: { rgb: 'F0F0F0' } },
+        font: { bold: true, sz: 11 },
+        alignment: { horizontal: 'right', vertical: 'center' },
+        border: {
+          top: { style: 'medium', color: { rgb: '000000' } },
+          bottom: { style: 'medium', color: { rgb: '000000' } },
+          left: { style: 'thin', color: { rgb: '000000' } },
+          right: { style: 'thin', color: { rgb: '000000' } }
+        }
+      }
+
+      // ========== 1️⃣ SHEET "TOP KHÁCH HÀNG TÍCH ĐIỂM" ==========
+
+      const customerHeaders = ['STT', 'Tên khách hàng', 'Số điện thoại', 'Điểm tích lũy', 'Số lần ghé', 'Lần ghé gần nhất', 'Trạng thái']
+
+      const customerDataRows = topCustomers.map((c, index) => {
+        const points = c.points || 0
+        let status = 'Khách mới'
+        if (points >= 3000) status = 'VIP'
+        else if (points >= 2000) status = 'Khách cũ'
+        else if (points >= 500) status = 'Khách quen'
+
+        return [
+          index + 1,
+          c.name || 'Khách hàng ẩn danh',
+          c.phone || '',
+          points,
+          c.visits || 0,
+          c.lastVisit ? dayjs(c.lastVisit).format('DD/MM/YYYY HH:mm') : 'Chưa có',
+          status
+        ]
+      })
+
+      // Calculate totals
+      const customerTotals = [
+        '',
+        'Tổng cộng',
+        `${customerDataRows.length} khách hàng`,
+        customerDataRows.reduce((sum, row) => sum + row[3], 0),
+        customerDataRows.reduce((sum, row) => sum + row[4], 0),
+        '',
+        ''
+      ]
+
+      // Create worksheet data
+      const customerWsData = [
+        // Title row
+        [{ v: `TOP ${topLimit} KHÁCH HÀNG TÍCH ĐIỂM (${start.format('DD/MM/YYYY')} - ${end.format('DD/MM/YYYY')})`, t: 's' }],
+        [], // Empty row
+        // Header row
+        customerHeaders,
+        // Data rows
+        ...customerDataRows,
+        // Total row
+        customerTotals
+      ]
+
+      const customerWs = XLSX.utils.aoa_to_sheet(customerWsData)
+
+      // Merge title cell
+      customerWs['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }
+      ]
+
+      // Apply styles - Title
+      customerWs['A1'].s = {
+        fill: { fgColor: { rgb: '722ED1' } },
+        font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 14 },
+        alignment: { horizontal: 'center', vertical: 'center' }
+      }
+
+      // Headers (row 3)
+      const customerHeaderStyle = {
+        ...headerStyle,
+        fill: { fgColor: { rgb: '722ED1' } }
+      }
+
+      customerHeaders.forEach((_, colIdx) => {
+        const cellRef = XLSX.utils.encode_cell({ r: 2, c: colIdx })
+        if (!customerWs[cellRef]) customerWs[cellRef] = { t: 's', v: '' }
+        customerWs[cellRef].s = customerHeaderStyle
+      })
+
+      // Data cells
+      customerDataRows.forEach((row, rowIdx) => {
+        row.forEach((val, colIdx) => {
+          const cellRef = XLSX.utils.encode_cell({ r: rowIdx + 3, c: colIdx })
+          if (!customerWs[cellRef]) customerWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
+
+          if (colIdx === 0 || colIdx === 6) {
+            // STT, Trạng thái - center align
+            customerWs[cellRef].s = textCellStyle
+          } else if (colIdx === 1 || colIdx === 2 || colIdx === 5) {
+            // Tên, SĐT, Lần ghé - left/center align
+            customerWs[cellRef].s = {
+              alignment: { horizontal: colIdx === 2 || colIdx === 5 ? 'center' : 'left', vertical: 'center' },
+              border: {
+                top: { style: 'thin', color: { rgb: 'D9D9D9' } },
+                bottom: { style: 'thin', color: { rgb: 'D9D9D9' } },
+                left: { style: 'thin', color: { rgb: 'D9D9D9' } },
+                right: { style: 'thin', color: { rgb: 'D9D9D9' } }
+              }
+            }
+          } else {
+            // Number columns - right align
+            customerWs[cellRef].s = dataCellStyle
+            if (typeof val === 'number') {
+              customerWs[cellRef].z = '#,##0'
+            }
+          }
+        })
+      })
+
+      // Total row
+      const customerTotalRowIdx = customerDataRows.length + 3
+      customerTotals.forEach((val, colIdx) => {
+        const cellRef = XLSX.utils.encode_cell({ r: customerTotalRowIdx, c: colIdx })
+        if (!customerWs[cellRef]) customerWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
+        customerWs[cellRef].s = totalCellStyle
+        if (typeof val === 'number') {
+          customerWs[cellRef].z = '#,##0'
+        }
+      })
+
+      // Set column widths
+      customerWs['!cols'] = [
+        { wch: 6 },  // STT
+        { wch: 25 }, // Tên khách hàng
+        { wch: 15 }, // Số điện thoại
+        { wch: 16 }, // Điểm tích lũy
+        { wch: 14 }, // Số lần ghé
+        { wch: 20 }, // Lần ghé gần nhất
+        { wch: 14 }  // Trạng thái
+      ]
+
+      // Set row heights
+      customerWs['!rows'] = [
+        { hpt: 30 }, // Title row
+        { hpt: 5 },  // Empty row
+        { hpt: 25 }  // Header row
+      ]
+
+      XLSX.utils.book_append_sheet(wb, customerWs, 'Top khách hàng')
+
+      // ========== 2️⃣ SHEET "PHÂN BỔ ĐIỂM TÍCH LŨY" ==========
+
+      const distributionHeaders = ['STT', 'Khoảng điểm', 'Số khách hàng', 'Tỷ lệ (%)']
+
+      const distributionDataRows = pointDistributionData.map((item, index) => [
+        index + 1,
+        item.range,
+        item.count || 0,
+        parseFloat(item.percentage || 0)
+      ])
+
+      // Calculate totals
+      const distributionTotals = [
+        '',
+        'Tổng cộng',
+        distributionDataRows.reduce((sum, row) => sum + row[2], 0),
+        100.0
+      ]
+
+      // Create worksheet data
+      const distributionWsData = [
+        // Title row
+        [{ v: `PHÂN BỔ ĐIỂM TÍCH LŨY THEO KHOẢNG (${start.format('DD/MM/YYYY')} - ${end.format('DD/MM/YYYY')})`, t: 's' }],
+        [], // Empty row
+        // Header row
+        distributionHeaders,
+        // Data rows
+        ...distributionDataRows,
+        // Total row
+        distributionTotals
+      ]
+
+      const distributionWs = XLSX.utils.aoa_to_sheet(distributionWsData)
+
+      // Merge title cell
+      distributionWs['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }
+      ]
+
+      // Apply styles - Title
+      distributionWs['A1'].s = {
+        fill: { fgColor: { rgb: '52C41A' } },
+        font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 14 },
+        alignment: { horizontal: 'center', vertical: 'center' }
+      }
+
+      // Headers (row 3)
+      const distributionHeaderStyle = {
+        ...headerStyle,
+        fill: { fgColor: { rgb: '52C41A' } }
+      }
+
+      distributionHeaders.forEach((_, colIdx) => {
+        const cellRef = XLSX.utils.encode_cell({ r: 2, c: colIdx })
+        if (!distributionWs[cellRef]) distributionWs[cellRef] = { t: 's', v: '' }
+        distributionWs[cellRef].s = distributionHeaderStyle
+      })
+
+      // Data cells
+      distributionDataRows.forEach((row, rowIdx) => {
+        row.forEach((val, colIdx) => {
+          const cellRef = XLSX.utils.encode_cell({ r: rowIdx + 3, c: colIdx })
+          if (!distributionWs[cellRef]) distributionWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
+
+          if (colIdx === 0 || colIdx === 1) {
+            // STT, Khoảng điểm - center align
+            distributionWs[cellRef].s = textCellStyle
+          } else {
+            // Number columns - right align
+            distributionWs[cellRef].s = dataCellStyle
+            if (typeof val === 'number') {
+              distributionWs[cellRef].z = colIdx === 3 ? '#,##0.0' : '#,##0'
+            }
+          }
+        })
+      })
+
+      // Total row
+      const distributionTotalRowIdx = distributionDataRows.length + 3
+      distributionTotals.forEach((val, colIdx) => {
+        const cellRef = XLSX.utils.encode_cell({ r: distributionTotalRowIdx, c: colIdx })
+        if (!distributionWs[cellRef]) distributionWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
+        distributionWs[cellRef].s = totalCellStyle
+        if (typeof val === 'number') {
+          distributionWs[cellRef].z = colIdx === 3 ? '#,##0.0' : '#,##0'
+        }
+      })
+
+      // Set column widths
+      distributionWs['!cols'] = [
+        { wch: 6 },  // STT
+        { wch: 18 }, // Khoảng điểm
+        { wch: 18 }, // Số khách hàng
+        { wch: 14 }  // Tỷ lệ
+      ]
+
+      // Set row heights
+      distributionWs['!rows'] = [
+        { hpt: 30 }, // Title row
+        { hpt: 5 },  // Empty row
+        { hpt: 25 }  // Header row
+      ]
+
+      XLSX.utils.book_append_sheet(wb, distributionWs, 'Phân bổ điểm')
+
+      // File name
+      const fileName = `BaoCaoTichDiem_${start.format('DDMMYYYY')}_${end.format('DDMMYYYY')}.xlsx`
       XLSX.writeFile(wb, fileName)
 
       message.success('Xuất báo cáo thành công!')
@@ -181,14 +461,6 @@ const ReportsCustomerPage = () => {
       message.error('Có lỗi xảy ra khi xuất báo cáo')
       console.error('Export error:', error)
     }
-  }
-
-  // ====== Format Functions ======
-  const formatCurrency = (value) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND'
-    }).format(value)
   }
 
   // ====== Metric Card Component ======
