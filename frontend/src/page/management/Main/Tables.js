@@ -837,62 +837,79 @@ const TablesPage = () => {
     setAddingItem(true)
 
     try {
-      // Kiểm tra xem món đã có trong order chưa (theo menu_item_id)
-      const existingItem = currentOrderItems.find((i) => i.id === menuItem.id)
+      // Get all orders for this table
+      const orders = allTablesOrders[selectedTable.id] || []
 
-      if (existingItem) {
-        // Nếu món đã có trong order, tăng số lượng
-        if (!existingItem.order_item_id) {
-          console.error('Existing item missing order_item_id:', existingItem)
-          message.error('Lỗi: Không tìm thấy ID của món trong đơn hàng')
+      // Find if there's a NEW order (pending confirmation)
+      const newOrder = orders.find(o => o.status === 'NEW')
+
+      if (newOrder) {
+        // If there's a NEW order, check if item already exists in that order
+        const itemsInNewOrder = currentOrderItems.filter(i => i.order_id === newOrder.id)
+        const existingItem = itemsInNewOrder.find(i => i.id === menuItem.id)
+
+        if (existingItem) {
+          // Item exists in NEW order - increase quantity
+          await handleIncreaseQuantity(existingItem.order_item_id)
           return
         }
-        await handleIncreaseQuantity(existingItem.order_item_id)
-      } else {
-        // Nếu món chưa có, tạo order mới với item này
-        const orderData = {
-          table_id: selectedTable.id,
-          items: [
-            {
-              menu_item_id: menuItem.id,
-              quantity: 1
-            }
-          ]
-        }
+      }
 
-        const response = await axios.post(
-          `${REACT_APP_API_URL}/orders/admin/create`,
-          orderData
-        )
+      // Create new order with this item
+      // This happens when:
+      // 1. No orders exist yet
+      // 2. No NEW orders (all are IN_PROGRESS/DONE) - creates new order automatically
+      // 3. Item doesn't exist in existing NEW order
+      const orderData = {
+        table_id: selectedTable.id,
+        items: [
+          {
+            menu_item_id: menuItem.id,
+            quantity: 1
+          }
+        ]
+      }
 
-        // Lấy order và item mới tạo
-        const newOrder = response.data.data
-        const newOrderItem = newOrder.items[newOrder?.items?.length - 1]
+      const response = await axios.post(
+        `${REACT_APP_API_URL}/orders/admin/create`,
+        orderData
+      )
 
-        // Optimistic UI update - Thêm item mới vào currentOrderItems
-        const newItem = {
-          id: menuItem.id, // menu_item_id
-          order_item_id: newOrderItem.id, // order_item.id
-          name: menuItem.name,
-          quantity: 1,
-          price: menuItem.price,
-          image: menuItem.image_url || 'https://via.placeholder.com/70',
-          note: newOrderItem.note || '', // Thêm note field
-          order_id: newOrder.id,
-          order_status: newOrder.status
-        }
+      // Lấy order và item mới tạo
+      const createdOrder = response.data.data
+      const newOrderItem = createdOrder.items[createdOrder?.items?.length - 1]
 
-        setCurrentOrderItems(prev => [...prev, newItem])
+      // Optimistic UI update - Thêm item mới vào currentOrderItems
+      const newItem = {
+        id: menuItem.id, // menu_item_id
+        order_item_id: newOrderItem.id, // order_item.id
+        name: menuItem.name,
+        quantity: 1,
+        price: menuItem.price,
+        image: menuItem.image_url || 'https://via.placeholder.com/70',
+        note: newOrderItem.note || '',
+        order_id: createdOrder.id,
+        order_status: createdOrder.status
+      }
 
-        // Success message
+      setCurrentOrderItems(prev => [...prev, newItem])
+
+      // Success message with context
+      if (orders.some(o => o.status === 'IN_PROGRESS' || o.status === 'DONE')) {
         message.success({
-          content: `Đã thêm món ăn vào đơn hàng`,
+          content: `Đã tạo đơn hàng mới với món "${menuItem.name}"`,
           duration: 2,
         })
-
-        // Refresh orders for this table
-        await updateSingleTableOrders(selectedTable.id)
+      } else {
+        message.success({
+          content: `Đã thêm "${menuItem.name}" vào đơn hàng`,
+          duration: 2,
+        })
       }
+
+      // Refresh orders for this table
+      await updateSingleTableOrders(selectedTable.id)
+
     } catch (err) {
       console.error('Failed to add item:', err)
       const errorMsg = err.response?.data?.message || 'Thêm món thất bại!'
@@ -1004,6 +1021,84 @@ const TablesPage = () => {
           document.body.removeChild(iframe)
         }, 1000)
       }, 500)
+    }
+  }
+
+  // ================= Print Invoice with QR Code =================
+  const handlePrintInvoice = async () => {
+    try {
+      if (!selectedTable || !currentOrderItems || currentOrderItems.length === 0) {
+        message.warning('Không có đơn hàng để in hóa đơn!')
+        return
+      }
+
+      // Get orders for the selected table
+      const orders = allTablesOrders[selectedTable.id] || []
+      const confirmedOrders = orders.filter(o => o.status === 'IN_PROGRESS' || o.status === 'DONE')
+
+      if (confirmedOrders.length === 0) {
+        message.warning('Không có đơn hàng đã xác nhận để in hóa đơn!')
+        return
+      }
+
+      const confirmedTotal = confirmedOrders.reduce((sum, order) => sum + Number(order.total_price || 0), 0)
+
+      // Get session info to get QR code
+      const sessionData = localStorage.getItem('qr_session')
+      let qrCodeUrl = null
+
+      if (sessionData) {
+        const { session_id } = JSON.parse(sessionData)
+
+        // Get session details with QR code
+        try {
+          const sessionResponse = await axios.get(`${REACT_APP_API_URL}/qr-sessions/${session_id}`)
+          if (sessionResponse.data?.data?.qr_code_url) {
+            qrCodeUrl = sessionResponse.data.data.qr_code_url
+          }
+        } catch (err) {
+          console.warn('Could not fetch session QR code:', err)
+        }
+      }
+
+      // Prepare invoice data
+      const invoiceData = {
+        sessionId: orders[0]?.session_id || 'N/A',
+        tableNumber: selectedTable.table_number,
+        items: currentOrderItems
+          .filter(item => item.order_status === 'IN_PROGRESS' || item.order_status === 'DONE')
+          .map(item => ({
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+          })),
+        totalAmount: confirmedTotal,
+        discount: 0,
+        tax: 0,
+        serviceFee: 0,
+        finalAmount: confirmedTotal,
+        paymentTime: new Date().toLocaleString('vi-VN', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        }),
+        staffName: user?.name || user?.username || 'Nhân viên',
+        qrCodeUrl: qrCodeUrl // Add QR code URL
+      }
+
+      // Print invoice
+      printInvoice(invoiceData)
+
+      message.success({
+        content: '🖨️ Đang in hóa đơn...',
+        duration: 2
+      })
+    } catch (error) {
+      console.error('Print invoice error:', error)
+      message.error('Không thể in hóa đơn. Vui lòng thử lại.')
     }
   }
 
@@ -1673,7 +1768,12 @@ const TablesPage = () => {
     const hasActiveOrder = orders.length > 0
 
     if (hasActiveOrder) {
-      return 'occupied' // Viền xanh
+      // Kiểm tra nếu có order nào ở trạng thái NEW
+      const hasNewOrder = orders.some(order => order.status === 'NEW')
+      if (hasNewOrder) {
+        return 'pending' // Màu cam - có order chờ xác nhận
+      }
+      return 'occupied' // Màu xanh - tất cả order đã xác nhận
     }
     return 'available' // Xám
   }
@@ -1720,6 +1820,7 @@ const TablesPage = () => {
     const tableId = params.get('tableId')
     const shouldOpenPanel = params.get('openPanel') === 'true'
     const useAllPoints = params.get('useAllPoints') === 'true' // 🎯 Đọc useAllPoints từ URL
+    const printBill = params.get('printBill') === 'true' // 🖨️ Đọc printBill từ URL
 
     if (tableId && shouldOpenPanel && tables.length > 0) {
       // Find table by ID
@@ -1728,9 +1829,12 @@ const TablesPage = () => {
       if (targetTable) {
         console.log('📱 Opening order panel for table:', targetTable.table_number)
         console.log('💎 Customer wants to use points:', useAllPoints)
+        console.log('🖨️ Customer wants to print bill:', printBill)
 
         // 🎯 Lưu lựa chọn của customer vào state
         setCustomerWantsUsePoints(useAllPoints)
+        // 🖨️ Set print invoice based on customer's choice
+        setShouldPrintInvoice(printBill)
 
         // Open order panel
         setSelectedTable(targetTable)
@@ -1796,10 +1900,6 @@ const TablesPage = () => {
     return searchMatch && statusMatch
   })
 
-  const replaceUrlServer = (url) => {
-    return url.replace('/api', '')
-  }
-
   // Helper to get QR image URL (handle both local and Cloudinary)
   const getQRImageUrl = (qrCodeUrl) => {
     return getImageUrl(qrCodeUrl)
@@ -1828,6 +1928,13 @@ const TablesPage = () => {
         borderColor: '#d9d9d9',
         backgroundColor: '#fafafa',
         cursor: 'pointer'
+      },
+      pending: {
+        borderColor: '#fa8c16',
+        borderWidth: '3px',
+        backgroundColor: '#ffffff',
+        cursor: 'pointer',
+        boxShadow: '0 2px 8px rgba(250, 140, 22, 0.2)'
       },
       occupied: {
         borderColor: '#52c41a',
@@ -2056,8 +2163,12 @@ const TablesPage = () => {
             />
           </div>
 
-          {/* Add Item Button - Only show if there's at least one NEW order OR no orders */}
-          {(orders.length === 0 || orders.some(o => o.status === 'NEW')) && (
+          {/* Add Item Button - Show when session is ACTIVE (not paid yet)
+              - If no orders: creates first order
+              - If has NEW orders: adds to existing NEW order
+              - If all orders are IN_PROGRESS/DONE: creates new order automatically
+          */}
+          {sessionInfo?.status === 'ACTIVE' && (
             <Button
               type="text"
               icon={<PlusOutlined style={{ fontSize: '20px', fontWeight: 'bold' }} />}
@@ -2200,49 +2311,84 @@ const TablesPage = () => {
               boxShadow: '0 -2px 8px rgba(0,0,0,0.06)'
             }}
           >
-            <Space direction="vertical" style={{ width: '100%' }} size="middle">
-              {/* Print Invoice Switch */}
+            <Space direction="vertical" style={{ width: '100%' }} size={12}>
+              {/* Print Invoice Switch - Compact design */}
               <div
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  padding: '12px 16px',
-                  backgroundColor: '#f9f9f9',
-                  borderRadius: '8px',
+                  padding: '10px 14px',
+                  backgroundColor: '#fafafa',
+                  borderRadius: '6px',
                   border: '1px solid #e8e8e8'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <PrinterOutlined style={{ fontSize: '16px', color: '#595959' }} />
-                  <Text style={{ fontSize: '14px', fontWeight: '500' }}>
-                    In hóa đơn
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <PrinterOutlined style={{ fontSize: '14px', color: '#595959' }} />
+                  <Text style={{ fontSize: '13px', fontWeight: '500', color: '#595959' }}>
+                    Tự động in hóa đơn
                   </Text>
                 </div>
                 <Switch
+                  size="small"
                   checked={shouldPrintInvoice}
                   onChange={(checked) => setShouldPrintInvoice(checked)}
-                  checkedChildren="Có"
-                  unCheckedChildren="Không"
                 />
               </div>
 
-              {/* Payment Button */}
-              <Button
-                type="primary"
-                size="large"
-                block
-                icon={<DollarOutlined />}
-                onClick={handlePayment}
-                style={{
-                  height: '48px',
-                  fontSize: '15px',
-                  fontWeight: 'bold'
-                }}
-              >
-                Thanh toán
-                {/* • {Number(grandTotal)?.toLocaleString('vi-VN')}đ */}
-              </Button>
+              {/* Action Buttons Row - Print Invoice & Payment */}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                {/* Print Invoice Button - Only show if there are confirmed orders */}
+                {orders.some(o => o.status === 'IN_PROGRESS' || o.status === 'DONE') && (
+                  <Button
+                    size="large"
+                    icon={<PrinterOutlined />}
+                    onClick={handlePrintInvoice}
+                    style={{
+                      flex: 1,
+                      height: '50px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      border: '2px solid #226533',
+                      color: '#226533',
+                      background: '#fff',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    In hóa đơn
+                  </Button>
+                )}
+
+                {/* Payment Button */}
+                <Button
+                  type="primary"
+                  size="large"
+                  icon={<DollarOutlined />}
+                  onClick={handlePayment}
+                  style={{
+                    flex: orders.some(o => o.status === 'IN_PROGRESS' || o.status === 'DONE') ? 1 : 'auto',
+                    width: orders.some(o => o.status === 'IN_PROGRESS' || o.status === 'DONE') ? 'auto' : '100%',
+                    height: '50px',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    background: 'linear-gradient(135deg, #226533 0%, #2d8e47 100%)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 12px rgba(34, 101, 51, 0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  Thanh toán
+                </Button>
+              </div>
             </Space>
           </div>
         )}
@@ -2306,7 +2452,8 @@ const TablesPage = () => {
                   >
                     <Option value="all">Tất cả</Option>
                     <Option value="available">Trống</Option>
-                    <Option value="occupied">Đang sử dụng</Option>
+                    <Option value="pending">Chờ xác nhận</Option>
+                    <Option value="occupied">Đang phục vụ</Option>
                     <Option value="inactive">Tạm ngừng</Option>
                   </Select>
                 </Space>
@@ -2350,10 +2497,16 @@ const TablesPage = () => {
                     bàn
                   </Text>
                   <Text>
+                    <span style={{ fontWeight: 'bold', color: '#fa8c16' }}>
+                      {filteredTables.filter((t) => getTableStatus(t) === 'pending').length}
+                    </span>{' '}
+                    chờ xác nhận
+                  </Text>
+                  <Text>
                     <span style={{ fontWeight: 'bold', color: '#52c41a' }}>
                       {filteredTables.filter((t) => getTableStatus(t) === 'occupied').length}
                     </span>{' '}
-                    đang sử dụng
+                    đang phục vụ
                   </Text>
                   <Text>
                     <span style={{ fontWeight: 'bold', color: '#999' }}>

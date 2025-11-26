@@ -13,6 +13,7 @@ import {
 } from '@ant-design/icons';
 import { useNotifications, NOTIFICATION_TYPES } from '../contexts/NotificationContext';
 import { useNavigate } from 'react-router-dom';
+import notificationService from '../services/notificationService';
 
 const { Text } = Typography;
 
@@ -265,10 +266,17 @@ const ToastItem = ({ toast, onClose, onClick }) => {
 
 const ToastNotification = () => {
     const navigate = useNavigate();
-    const { toasts, removeToast } = useNotifications();
+    const { toasts, removeToast, markAsRead } = useNotifications();
 
-    const handleToastClick = (toast) => {
+    const handleToastClick = async (toast) => {
         if (toast.actionUrl) {
+            // Mark as read if not already read
+            if (!toast.isRead) {
+                markAsRead(toast.id);
+                // Also call API to persist
+                await notificationService.markAsRead(toast.id);
+            }
+
             navigate(toast.actionUrl);
             removeToast(toast.id);
         }

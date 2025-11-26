@@ -72,23 +72,21 @@ export default function CustomerMenuPage() {
       console.log("API GET menu/cus/menus", response.data);
       const foodsData = response.data.data;
 
-      // ✅ Smart comparison: Only update state if data changed
-      const cachedFoods = sessionStorage.getItem('menu_foods_cache');
-      const hasDataChanged = !cachedFoods || JSON.stringify(foodsData) !== cachedFoods;
+      // ✅ ALWAYS update state when API returns data
+      // (User might be switching from category/search to "all items")
+      setFoods(foodsData);
 
-      if (hasDataChanged) {
-        console.log('🔄 Menu data changed, updating state');
-        setFoods(foodsData);
+      // Cache only "all items" (not search results or category-specific)
+      if (!skipCache && url.includes('/menus/all')) {
+        const cachedFoods = sessionStorage.getItem('menu_foods_cache');
+        const hasDataChanged = !cachedFoods || JSON.stringify(foodsData) !== cachedFoods;
 
-        // Cache only "all items" (not search results)
-        if (!skipCache && url.includes('/menus/all')) {
+        if (hasDataChanged) {
+          console.log('🔄 Menu data changed, updating cache');
           sessionStorage.setItem('menu_foods_cache', JSON.stringify(foodsData));
           sessionStorage.setItem('menu_cache_timestamp', Date.now().toString());
-        }
-      } else {
-        console.log('✅ Menu data unchanged, skipping re-render');
-        // Still update timestamp to keep cache fresh
-        if (!skipCache && url.includes('/menus/all')) {
+        } else {
+          console.log('✅ Cache is up to date');
           sessionStorage.setItem('menu_cache_timestamp', Date.now().toString());
         }
       }

@@ -577,9 +577,9 @@ export default function CustomerReviewAllPage() {
                             <Text strong style={{ fontSize: 14, color: "#333" }}>
                               {item.menu_item_name}
                             </Text>
-                            <Text type="secondary" style={{ fontSize: 12, marginLeft: 8 }}>
+                            {/* <Text type="secondary" style={{ fontSize: 12, marginLeft: 8 }}>
                               ×{item.quantity}
-                            </Text>
+                            </Text> */}
                             {orderIds.length > 1 && (
                               <Text type="secondary" style={{ fontSize: 11, marginLeft: 8 }}>
                                 (Đơn #{item.orderNumber})

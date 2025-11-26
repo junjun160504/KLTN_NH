@@ -222,7 +222,8 @@ export async function hardDeleteMenuItem(id) {
 
 // Lấy danh sách tất cả danh mục (Read All)
 export async function getMenuCategories() {
-  const sql = "SELECT * FROM menu_categories WHERE deleted_at IS NULL";
+  // Chỉ lấy categories đang hoạt động (is_available = 1) và chưa bị xóa vĩnh viễn (deleted_at IS NULL)
+  const sql = "SELECT * FROM menu_categories WHERE deleted_at IS NULL AND is_available = 1";
   const rows = await query(sql);
   return rows;
 }

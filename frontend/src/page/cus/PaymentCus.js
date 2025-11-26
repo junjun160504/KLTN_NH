@@ -15,6 +15,7 @@ import {
     QrcodeOutlined,
     DownloadOutlined,
     CloseCircleOutlined,
+    PrinterOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
@@ -87,6 +88,7 @@ export default function PaymentPage() {
     const [paymentMethod, setPaymentMethod] = useState('CASH'); // 'CASH', 'BANKING', 'QR', 'CARD'
     const [loading, setLoading] = useState(false);
     const [usePoints, setUsePoints] = useState(false); // Dùng điểm hay không
+    const [printBill, setPrintBill] = useState(true); // In hóa đơn hay không - mặc định BẬT
 
     // QR Code Modal State
     const [qrModalVisible, setQrModalVisible] = useState(false);
@@ -296,6 +298,13 @@ export default function PaymentPage() {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, [fetchCustomerPoints]);
+
+    // ✅ Auto-enable printBill when payment method is CASH
+    useEffect(() => {
+        if (paymentMethod === 'CASH') {
+            setPrintBill(true); // Tiền mặt mặc định in hóa đơn
+        }
+    }, [paymentMethod]);
 
     // ✅ Check if orders have been reviewed
     const checkIfReviewed = React.useCallback((orderIds) => {
@@ -715,10 +724,10 @@ export default function PaymentPage() {
                 return;
             }
 
-            if (finalAmount <= 0) {
-                message.warning("Số tiền thanh toán phải lớn hơn 0!");
-                return;
-            }
+            // if (finalAmount <= 0) {
+            //     message.warning("Số tiền thanh toán phải lớn hơn 0!");
+            //     return;
+            // }
 
             // Lấy thông tin session
             const sessionData = localStorage.getItem("qr_session");
@@ -784,7 +793,7 @@ export default function PaymentPage() {
                 title: `Yêu cầu thanh toán tiền mặt - Bàn ${table_id}`,
                 message: paymentMessage,
                 priority: 'high', // Ưu tiên cao
-                action_url: `/main/tables?tableId=${table_id}&openPanel=true`,
+                action_url: `/main/tables?tableId=${table_id}&openPanel=true&useAllPoints=${usePoints}&printBill=${printBill}`, // 🖨️ Thêm printBill vào URL
                 metadata: JSON.stringify({
                     table_id,
                     session_id,
@@ -794,7 +803,8 @@ export default function PaymentPage() {
                     original_amount: totalAmount,
                     order_ids: confirmedOrders.map(o => o.id), // ✅ Chỉ gửi ID của đơn đã xác nhận
                     use_all_points: usePoints, // 🎯 Truyền flag dùng điểm
-                    customer_points: customerPoints // 🎯 Số điểm customer có
+                    customer_points: customerPoints, // 🎯 Số điểm customer có
+                    print_bill: printBill // 🖨️ Thông tin in hóa đơn
                 })
             };
 
@@ -845,7 +855,7 @@ export default function PaymentPage() {
                         axios.post(`${REACT_APP_API_URL}/payment`, {
                             order_id: order.id,
                             method: paymentMethod,
-                            print_bill: false
+                            print_bill: printBill // 🖨️ Gửi thông tin in hóa đơn
                         })
                     );
 
@@ -888,7 +898,7 @@ export default function PaymentPage() {
                 axios.post(`${REACT_APP_API_URL}/payment`, {
                     order_id: order.id,
                     method: paymentMethod,
-                    print_bill: false
+                    print_bill: printBill // 🖨️ Gửi thông tin in hóa đơn
                 })
             );
 
@@ -1097,7 +1107,7 @@ export default function PaymentPage() {
                 title: `💳 Yêu cầu xác nhận thanh toán chuyển khoản - Bàn ${table_id}`,
                 message: `Khách hàng ở bàn ${table_id} đã chuyển khoản ${formatPrice(finalAmount)}đ. Vui lòng kiểm tra giao dịch và xác nhận.`,
                 priority: 'high',
-                action_url: `/main/tables?tableId=${table_id}&openPanel=true`,
+                action_url: `/main/tables?tableId=${table_id}&openPanel=true&useAllPoints=${usePoints}&printBill=${printBill}`, // 🖨️ Thêm printBill vào URL
                 metadata: JSON.stringify({
                     table_id,
                     session_id,
@@ -1105,7 +1115,10 @@ export default function PaymentPage() {
                     amount: finalAmount,
                     discount_points: pointsDiscount,
                     original_amount: totalAmount,
-                    order_ids: confirmedOrders.map(o => o.id)
+                    order_ids: confirmedOrders.map(o => o.id),
+                    use_all_points: usePoints, // 🎯 Truyền flag dùng điểm
+                    customer_points: customerPoints, // 🎯 Số điểm customer có
+                    print_bill: printBill // 🖨️ Thông tin in hóa đơn
                 })
             });
 
@@ -1483,6 +1496,82 @@ export default function PaymentPage() {
                                 </Text>
                             </div>
                         ))}
+                    </div>
+                </div>
+
+                {/* ========== IN HÓA ĐƠN TOGGLE ========== */}
+                <div
+                    style={{
+                        background: "#fff",
+                        padding: "16px",
+                        borderRadius: 8,
+                        marginBottom: 12,
+                        boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+                        border: "1px solid #f0f0f0",
+                    }}
+                >
+                    <div
+                        style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                        }}
+                    >
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <PrinterOutlined style={{ fontSize: 18, color: "#226533" }} />
+                            <Text style={{ fontSize: 14, color: "#333", fontWeight: 500 }}>
+                                In hóa đơn
+                            </Text>
+                        </div>
+
+                        {/* Toggle Switch */}
+                        <label
+                            style={{
+                                position: "relative",
+                                display: "inline-block",
+                                width: 44,
+                                height: 24,
+                                cursor: paymentMethod === 'CASH' ? 'not-allowed' : 'pointer',
+                                opacity: paymentMethod === 'CASH' ? 0.7 : 1,
+                            }}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={printBill}
+                                disabled={paymentMethod === 'CASH'} // Tiền mặt không cho tắt
+                                onChange={(e) => {
+                                    if (paymentMethod !== 'CASH') {
+                                        setPrintBill(e.target.checked);
+                                    }
+                                }}
+                                style={{ opacity: 0, width: 0, height: 0 }}
+                            />
+                            <span
+                                style={{
+                                    position: "absolute",
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    backgroundColor: printBill ? "#226533" : "#d9d9d9",
+                                    borderRadius: 24,
+                                    transition: "0.3s",
+                                }}
+                            >
+                                <span
+                                    style={{
+                                        position: "absolute",
+                                        height: 18,
+                                        width: 18,
+                                        left: printBill ? 23 : 3,
+                                        bottom: 3,
+                                        backgroundColor: "white",
+                                        borderRadius: "50%",
+                                        transition: "0.3s",
+                                    }}
+                                />
+                            </span>
+                        </label>
                     </div>
                 </div>
             </Content>

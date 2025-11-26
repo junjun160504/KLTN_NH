@@ -68,7 +68,8 @@ const getInvoiceHTML = (invoiceData) => {
     discount = 0,
     finalAmount = 0,
     paymentTime,
-    staffName = "Nguyễn Văn A"
+    staffName = "Nguyễn Văn A",
+    qrCodeUrl = null // ✅ QR code URL cho chuyển khoản
   } = invoiceData;
 
   // Format số tiền
@@ -352,6 +353,24 @@ const getInvoiceHTML = (invoiceData) => {
           </div>
 
           <div class="divider"></div>
+
+          <!-- QR Code for Payment (if available) -->
+          ${qrCodeUrl ? `
+            <div style="text-align: center; margin: 16px 0;">
+              <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px; color: #333;">
+                Quét mã QR để chuyển khoản
+              </div>
+              <img 
+                src="${qrCodeUrl}" 
+                alt="QR Code" 
+                style="width: 180px; height: 180px; display: block; margin: 0 auto; border: 2px solid #e8e8e8; border-radius: 8px; padding: 4px;"
+              />
+              <div style="font-size: 10px; color: #999; margin-top: 6px; font-style: italic;">
+                Quét bằng app ngân hàng
+              </div>
+            </div>
+            <div class="divider"></div>
+          ` : ''}
 
           <!-- Footer -->
           <div class="footer">

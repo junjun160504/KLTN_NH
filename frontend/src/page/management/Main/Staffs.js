@@ -697,7 +697,7 @@ const StaffsPage = () => {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-gray-800 m-0">Chỉnh sửa nhân viên</h3>
-                  <p className="text-xs text-gray-500 m-0">Cập nhật thông tin nhân viên</p>
+                  <p className="text-xs text-gray-500 m-0">{editingStaff?.name || 'Cập nhật thông tin nhân viên'}</p>
                 </div>
               </div>
             }
@@ -707,8 +707,30 @@ const StaffsPage = () => {
               editForm.resetFields();
               setEditingStaff(null);
             }}
-            footer={null}
             width={700}
+            footer={
+              <div className="flex justify-end gap-3 px-4 py-4">
+                <Button
+                  size="medium"
+                  onClick={() => {
+                    setEditModalOpen(false);
+                    editForm.resetFields();
+                    setEditingStaff(null);
+                  }}
+                  className="rounded-lg px-6 h-11"
+                >
+                  Hủy bỏ
+                </Button>
+                <Button
+                  type="primary"
+                  size="medium"
+                  onClick={() => editForm.submit()}
+                  className="rounded-lg px-8 h-11 bg-gradient-to-r from-blue-500 to-indigo-600 border-0 shadow-md hover:shadow-lg transition-all"
+                >
+                  <EditOutlined /> Cập nhật
+                </Button>
+              </div>
+            }
             centered
             className="japanese-modal"
             destroyOnClose
@@ -817,29 +839,6 @@ const StaffsPage = () => {
                     />
                   </Form.Item>
                 </div>
-              </div>
-
-              {/* Footer Actions */}
-              <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-100">
-                <Button
-                  size="medium"
-                  onClick={() => {
-                    setEditModalOpen(false);
-                    editForm.resetFields();
-                    setEditingStaff(null);
-                  }}
-                  className="rounded-lg px-6 h-11"
-                >
-                  Hủy bỏ
-                </Button>
-                <Button
-                  type="primary"
-                  size="medium"
-                  htmlType="submit"
-                  className="rounded-lg px-8 h-11 bg-gradient-to-r from-blue-500 to-indigo-600 border-0 shadow-md hover:shadow-lg transition-all"
-                >
-                  <EditOutlined /> Cập nhật
-                </Button>
               </div>
             </Form>
           </Modal>

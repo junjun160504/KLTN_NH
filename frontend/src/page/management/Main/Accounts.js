@@ -923,7 +923,7 @@ const AccountsPage = () => {
                     Chỉnh sửa tài khoản
                   </h3>
                   <p className="text-xs text-gray-500 m-0">
-                    Cập nhật thông tin tài khoản
+                    {editingAccount?.username || 'Cập nhật thông tin tài khoản'}
                   </p>
                 </div>
               </div>
@@ -934,8 +934,30 @@ const AccountsPage = () => {
               editForm.resetFields();
               setEditingAccount(null);
             }}
-            footer={null}
             width={700}
+            footer={
+              <div className="flex justify-end gap-3 px-4 py-4">
+                <Button
+                  size="medium"
+                  onClick={() => {
+                    setEditModalOpen(false);
+                    editForm.resetFields();
+                    setEditingAccount(null);
+                  }}
+                  className="rounded-lg px-6 h-11"
+                >
+                  Hủy bỏ
+                </Button>
+                <Button
+                  type="primary"
+                  size="medium"
+                  onClick={() => editForm.submit()}
+                  className="rounded-lg px-8 h-11 bg-gradient-to-r from-blue-500 to-indigo-600 border-0 shadow-md hover:shadow-lg transition-all"
+                >
+                  <EditOutlined /> Cập nhật
+                </Button>
+              </div>
+            }
             centered
             className="japanese-modal"
             destroyOnClose
@@ -1106,29 +1128,6 @@ const AccountsPage = () => {
                     />
                   </div>
                 </div>
-              </div>
-
-              {/* Footer Actions */}
-              <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-100">
-                <Button
-                  size="medium"
-                  onClick={() => {
-                    setEditModalOpen(false);
-                    editForm.resetFields();
-                    setEditingAccount(null);
-                  }}
-                  className="rounded-lg px-6 h-11"
-                >
-                  Hủy bỏ
-                </Button>
-                <Button
-                  type="primary"
-                  size="medium"
-                  htmlType="submit"
-                  className="rounded-lg px-8 h-11 bg-gradient-to-r from-blue-500 to-indigo-600 border-0 shadow-md hover:shadow-lg transition-all"
-                >
-                  <EditOutlined /> Cập nhật
-                </Button>
               </div>
             </Form>
           </Modal>
