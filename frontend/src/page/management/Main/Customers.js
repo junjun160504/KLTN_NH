@@ -499,13 +499,13 @@ const CustomersPage = () => {
               <Form.Item label="Tên khách hàng" name="name">
                 <Input prefix={<UserOutlined />} />
               </Form.Item>
-              <Form.Item
+              {/* <Form.Item
                 label="Email"
                 name="email"
                 rules={[{ type: 'email', message: 'Email không hợp lệ!' }]}
               >
                 <Input prefix={<MailOutlined />} />
-              </Form.Item>
+              </Form.Item> */}
               {editingCustomer && (
                 <div className="bg-gray-50 p-3 rounded">
                   <div className="text-sm">

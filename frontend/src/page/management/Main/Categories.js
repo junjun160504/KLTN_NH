@@ -343,13 +343,15 @@ const CategoriesPage = () => {
                 <Option value="unavailable">Tạm dừng</Option>
               </Select>
 
-              <Button
-                type="primary"
-                style={{ background: "#226533" }}
-                onClick={() => setDrawerOpen(true)}
-              >
-                + Thêm danh mục mới
-              </Button>
+              {canAccess(['OWNER', 'MANAGER']) && (
+                <Button
+                  type="primary"
+                  style={{ background: "#226533" }}
+                  onClick={() => setDrawerOpen(true)}
+                >
+                  + Thêm danh mục mới
+                </Button>
+              )}
             </div>
           </div>
 

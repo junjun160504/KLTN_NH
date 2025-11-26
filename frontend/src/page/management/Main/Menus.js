@@ -658,20 +658,26 @@ const MenuPage = () => {
                     </Option>
                   ))}
                 </Select>
-                <Button onClick={handleExportExcel}>Xuất file Excel</Button>
-                <Button
-                  type="dashed"
-                  onClick={() => setImportModalOpen(true)}
-                >
-                  Nhập từ Excel
-                </Button>
-                <Button
-                  type="primary"
-                  style={{ background: "#226533" }}
-                  onClick={() => setDrawerOpen(true)}
-                >
-                  + Thêm món mới
-                </Button>
+                {canAccess(['OWNER', 'MANAGER']) && (
+                  <Button onClick={handleExportExcel}>Xuất file Excel</Button>
+                )}
+                {canAccess(['OWNER', 'MANAGER']) && (
+                  <Button
+                    type="dashed"
+                    onClick={() => setImportModalOpen(true)}
+                  >
+                    Nhập từ Excel
+                  </Button>
+                )}
+                {canAccess(['OWNER', 'MANAGER']) && (
+                  <Button
+                    type="primary"
+                    style={{ background: "#226533" }}
+                    onClick={() => setDrawerOpen(true)}
+                  >
+                    + Thêm món mới
+                  </Button>
+                )}
               </div>
             </div>
 
