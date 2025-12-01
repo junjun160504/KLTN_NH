@@ -294,10 +294,7 @@ export default function CustomerChatbotPage() {
 
     try {
       // ✅ Build conversation history (last 10 messages for context)
-      const history = messages.slice(-10).map((msg) => ({
-        from: msg.from,
-        text: msg.type === "text" ? msg.text : msg.intro, // Use intro for suggestion messages
-      }));
+      const history = messages;
 
       // Call chatbot API with history
       const response = await axios.post(`${REACT_APP_API_URL}/chatbot`, {

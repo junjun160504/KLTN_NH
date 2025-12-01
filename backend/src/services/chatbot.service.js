@@ -4,7 +4,7 @@ import { query } from "../config/db.js";
 // ✅ Cache menu để tránh query DB mỗi request
 let cachedMenu = null;
 let cacheTime = null;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 phút
+const CACHE_DURATION = 20 * 60 * 1000; // 20 phút
 
 /**
  * Lấy menu từ cache hoặc DB
@@ -16,15 +16,12 @@ async function getMenu() {
 
   // Query menu với đầy đủ thông tin
   const items = await query(`
-    SELECT 
-      id, 
-      name, 
-      price, 
-      description, 
-      image_url
-    FROM menu_items 
-    WHERE is_available = 1 
-    LIMIT 30
+    select mi.*, mc.name as category_name, mc.description as category_description
+	  from menu_items as mi
+    join menu_item_categories as mic on mi.id = mic.item_id
+    join menu_categories as mc on mic.category_id = mc.id
+    where mi.deleted_at is null && mc.deleted_at is null and mi.is_available = 1 and mc.is_available = 1
+    order by mc.name
   `);
 
   cachedMenu = items;
@@ -163,61 +160,84 @@ export async function reply(message, history = []) {
 
     // Format menu cho GPT (chỉ cần name, price, description)
     const menuList = menuItems
-      .map((i) => `- ${i.name} (${i.price}₫): ${i.description || ""}`)
+      .map((i) => `-tên món: ${i.name} - giá: (${i.price}₫) - mô tả: ${i.description || ""} - hình ảnh: ${i.image_url || "https://via.placeholder.com/150?text=No+Image"} - danh mục: ${i.category_name || "Không rõ"} - Thời gian tạo: ${i.created_at || "Không rõ"}`)
       .join("\n");
 
     // Build system prompt với menu
     const systemPrompt = `
-Bạn là trợ lý nhà hàng chuyên nghiệp. 
-Đây là menu hiện có:
+      Bạn là trợ lý AI thân thiện của nhà hàng, chuyên hỗ trợ khách hàng tìm hiểu về menu.
+      Đây là menu hiện có:
+      ${menuList}
 
-${menuList}
+      Nhiệm vụ:
+      - Giới thiệu menu, các món ăn có trong nhà hàng
+      - Gợi ý món ăn theo yêu cầu của khách
+      - Trả lời thắc mắc về giá cả, mô tả món ăn
+      - Cung cấp thông tin về danh mục món ăn
+      - CHỈ chọn món CÓ TRONG MENU, KHÔNG bịa thêm
 
-🎯 Nhiệm vụ:
-1. Phân tích ý định của khách (muốn món gì, giá bao nhiêu, khẩu vị ra sao)
-2. Gợi ý 1 hoặc nhiều món PHÙ HỢP NHẤT từ menu trên
-3. CHỈ chọn món CÓ TRONG MENU, KHÔNG bịa thêm
-4. NHỚ lịch sử hội thoại để đưa ra gợi ý phù hợp
+      ## Không hỗ trợ:
+      - Đặt món (khách hàng tự đặt qua ứng dụng)
+      - Gọi nhân viên (khách dùng nút gọi riêng)
+      - Thanh toán (khách thanh toán qua ứng dụng)
 
-📋 Trả về JSON format (KHÔNG có markdown, chỉ pure JSON):
-{
-  "intro": "Câu trả lời của bạn",
-  "suggestions": [
-    {
-      "name": "Tên món (chính xác từ menu)",
-      "reason": "Lý do gợi ý (1 câu ngắn)"
-    }
-  ]
-}
-
-Nếu khách hỏi thông tin thêm hoặc chat thường, trả về:
-{
-  "intro": "Câu trả lời của bạn",
-  "suggestions": []
-}
+      Trả về JSON format (KHÔNG có markdown, chỉ pure JSON):
+      {
+        "intro": "Câu trả lời của bạn",
+        "suggestions": [
+          {
+            "name": "Tên món (chính xác từ menu)",
+            "reason": "Lý do gợi ý "
+          }
+        ]
+      }
+      Nếu khách hỏi thông tin thêm hoặc chat thường, trả về:
+      {
+        "intro": "Câu trả lời của bạn",
+        "suggestions": []
+      }
     `;
 
-    // ✅ Build conversation messages with history
-    const messages = [
-      {
+
+
+    // add system prompt if no history
+    const messages = [];
+    if (history.length === 0) {
+      messages.push({
         role: "system",
         content: systemPrompt,
-      },
-    ];
+      })
+    }
 
-    // Add last 10 messages from history (limit to prevent token overflow)
-    const recentHistory = history.slice(-10);
+    // if history exists, add history as messages
+
+    const recentHistory = history;
+    console.log("Recent History:", recentHistory);
+    if (recentHistory.length > 0) {
+      messages.push({
+        role: "system",
+        content: systemPrompt,
+      });
+    }
     recentHistory.forEach((msg) => {
       if (msg.from === "user" && msg.text) {
         messages.push({
           role: "user",
           content: msg.text,
         });
-      } else if (msg.from === "bot" && msg.text) {
+      }
+
+      else if (msg.from === "bot" && msg.text) {
         messages.push({
           role: "assistant",
           content: msg.text,
         });
+      }
+      if (msg.from === "bot" && msg.contents) {
+        messages.push({
+          role: "assistant",
+          content: JSON.stringify(msg.contents),
+        })
       }
     });
 
@@ -227,11 +247,13 @@ Nếu khách hỏi thông tin thêm hoặc chat thường, trả về:
       content: message,
     });
 
+    console.debug("[ChatbotV2] Sending messages to OpenAI:", messages);
+
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: messages,
-      temperature: 0.7,
-      max_tokens: 300,
+      // temperature: 0.7,
+      // max_tokens: 100,
       response_format: { type: "json_object" }, // Force JSON response
     });
 

@@ -91,7 +91,7 @@ export const getTopCustomers = async (req, res) => {
  */
 export const getPointDistribution = async (req, res) => {
   try {
-    const result = await reportCustomersService.getPointDistribution()
+    const result = await reportCustomersService.getPointDistributionV2()
     return res.json(result)
   } catch (error) {
     console.error('Error in getPointDistribution controller:', error)

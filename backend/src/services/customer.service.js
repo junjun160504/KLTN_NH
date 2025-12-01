@@ -291,7 +291,7 @@ export function calculateLoyaltyPoints(orderAmount) {
 }
 
 /**
- * 📊 Lấy lịch sử order của customer
+ * 📊 Lấy lịch sử order của customer (group theo phiên)
  */
 export async function getCustomerOrderHistory(customerId) {
   const customer = await getCustomerById(customerId);
@@ -299,6 +299,7 @@ export async function getCustomerOrderHistory(customerId) {
     throw new Error("Customer not found");
   }
 
+  // Lấy tất cả orders với thông tin phiên
   const [orders] = await pool.query(
     `SELECT 
       o.id,
@@ -306,19 +307,60 @@ export async function getCustomerOrderHistory(customerId) {
       o.status,
       o.created_at,
       o.updated_at,
+      o.qr_session_id,
       qs.table_id,
+      qs.status as session_status,
+      qs.created_at as session_created_at,
+      qs.updated_at as session_updated_at,
       t.table_number
     FROM orders o
     JOIN qr_sessions qs ON o.qr_session_id = qs.id
     LEFT JOIN tables t ON qs.table_id = t.id
     WHERE qs.customer_id = ?
-    ORDER BY o.created_at DESC`,
+    ORDER BY qs.created_at DESC, o.created_at ASC`,
     [customerId]
   );
 
+  // Group orders theo qr_session_id
+  const sessionsMap = new Map();
+
+  for (const order of orders) {
+    const sessionId = order.qr_session_id;
+
+    if (!sessionsMap.has(sessionId)) {
+      sessionsMap.set(sessionId, {
+        session_id: sessionId,
+        table_id: order.table_id,
+        table_number: order.table_number,
+        session_status: order.session_status,
+        session_created_at: order.session_created_at,
+        session_updated_at: order.session_updated_at,
+        orders: [],
+        total_amount: 0,
+        order_count: 0
+      });
+    }
+
+    const session = sessionsMap.get(sessionId);
+    session.orders.push({
+      id: order.id,
+      total_price: order.total_price,
+      status: order.status,
+      created_at: order.created_at,
+      updated_at: order.updated_at
+    });
+    session.total_amount += parseFloat(order.total_price || 0);
+    session.order_count += 1;
+  }
+
+  const sessions = Array.from(sessionsMap.values());
+
   return {
     customer,
+    totalSessions: sessions.length,
     totalOrders: orders.length,
+    sessions,
+    // Giữ lại orders để backward compatible
     orders,
   };
 }

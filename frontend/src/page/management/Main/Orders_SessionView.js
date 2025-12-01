@@ -165,7 +165,8 @@ function OrderSessionPage() {
         createdAt: order.created_at,
         items: order.items || [],
         note: order.note || order.notes || '',
-        rawData: order
+        rawData: order,
+        phone: order.customer_phone || ''
       })
 
       session.totalAmount += parseFloat(order.total_amount || 0)

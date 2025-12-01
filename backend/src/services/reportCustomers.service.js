@@ -231,3 +231,114 @@ export const getPointDistribution = async () => {
     throw error
   }
 }
+
+const getSmartRoundTo = (max) => {
+  if (max <= 200) return 5;
+  if (max <= 500) return 10;
+  if (max <= 1000) return 50;
+}
+
+
+
+export const getPointDistributionV2 = async () => {
+  try {
+    // get max points
+
+    const [maxPointsResult] = await pool.query(`SELECT MAX(points) as max_points FROM customers WHERE points > 0`);
+    const maxPoints = parseInt(maxPointsResult[0].max_points || 0);
+    // if maxPoints is 0 return empty distribution
+    if (maxPoints === 0) {
+      return {
+        success: true,
+        data: []
+      }
+    }
+
+    const roundTo = getSmartRoundTo(maxPoints) || 10;
+    const nice = (x) => Math.round(x / roundTo) * roundTo;
+
+    // Tính mốc dựa trên % 
+    const marks = [
+      0,
+      nice(maxPoints * 0.2),
+      nice(maxPoints * 0.4),
+      nice(maxPoints * 0.6),
+      nice(maxPoints * 0.8),
+      nice(maxPoints)
+    ]
+
+    // Tạo các range từ marks
+    const ranges = [];
+    for (let i = 0; i < marks.length - 1; i++) {
+      if (i === marks.length - 2) {
+        ranges.push({
+          label: `${marks[i]}+`,
+          start: marks[i],
+          end: null
+        })
+      }
+      else {
+        ranges.push({
+          label: `${marks[i]} - ${marks[i + 1]}`,
+          start: marks[i],
+          end: marks[i + 1] - 1
+        })
+      }
+    }
+
+    // Tạo case sql
+    const caseClauses = [];
+    const orderClauses = [];
+    ranges.forEach((range, index) => {
+      if (range.end === null) {
+        caseClauses.push(`WHEN points >= ${range.start} THEN '${range.label}'`);
+        orderClauses.push(`WHEN '${range.label}' THEN ${index + 1}`);
+      } else {
+        caseClauses.push(`WHEN points BETWEEN ${range.start} AND ${range.end} THEN '${range.label}'`);
+        orderClauses.push(`WHEN '${range.label}' THEN ${index + 1}`)
+      }
+    })
+
+    // Query db
+    const query = `
+      SELECT 
+        CASE
+          ${caseClauses.join('\n')}
+        END as point_range,
+        COUNT(*) AS customer_count
+      FROM customers
+      WHERE points > 0
+      GROUP BY point_range
+      ORDER BY
+        CASE 
+          ${orderClauses.join('\n')}
+        END
+    `
+    const [rows] = await pool.query(query);
+
+    // Tinh phan tram
+    const totalCustomers = rows.reduce((sum, row) => sum + parseInt(row.customer_count || 0), 0);
+
+    const distribution = rows.map(row => ({
+      range: row.point_range,
+      count: parseInt(row.customer_count || 0),
+      percentage: totalCustomers > 0
+        ? ((parseInt(row.customer_count || 0) / totalCustomers) * 100).toFixed(1)
+        : 0
+    }))
+
+    return {
+      success: true,
+      data: distribution,
+      metadata: {
+        maxPoints,
+        roundTo,
+        marks,
+        totalCustomers
+      }
+    }
+
+  } catch (error) {
+    throw new Error('found error in getPointDistributionV2 service' + error.message)
+  }
+}

@@ -587,12 +587,13 @@ export async function getAllOrders(filters = {}) {
       qs.table_id,
       qs.status as session_status,
       t.table_number,
+      c.phone as customer_phone,
       COUNT(oi.id) as total_items
     FROM orders o
     LEFT JOIN qr_sessions qs ON o.qr_session_id = qs.id
     LEFT JOIN tables t ON qs.table_id = t.id
     LEFT JOIN order_items oi ON o.id = oi.order_id
-    WHERE 1=1
+    LEFT JOIN customers c ON qs.customer_id = c.id
   `;
 
   const params = [];
