@@ -47,91 +47,6 @@ import * as XLSX from 'xlsx'
 const { Content } = Layout
 const { Title, Text } = Typography
 
-// ==================== MOCK DATA ====================
-// 1. Mock Xu Hướng Kinh Doanh (linh hoạt theo thời gian)
-const generateMockBusinessTrend = (viewType = 'day', dateRange) => {
-  const data = []
-  const start = dateRange[0]
-  const end = dateRange[1]
-
-  if (viewType === 'hour') {
-    // 24 giờ trong ngày
-    for (let i = 0; i < 24; i++) {
-      const baseRevenue = 500000 + Math.random() * 1500000
-      const orders = Math.floor(3 + Math.random() * 10)
-      const customers = Math.floor(2 + Math.random() * 8)
-
-      data.push({
-        date: start.hour(i).format('YYYY-MM-DD HH:00'),
-        label: `${i}h`,
-        revenue: Math.floor(baseRevenue),
-        orders: orders,
-        customers: customers,
-        profit: Math.floor(baseRevenue * 0.35),
-        avgOrderValue: orders > 0 ? Math.floor(baseRevenue / orders) : 0
-      })
-    }
-  } else if (viewType === 'day') {
-    // Số ngày giữa dateRange
-    const days = end.diff(start, 'day') + 1
-    for (let i = 0; i < days; i++) {
-      const date = start.add(i, 'day')
-      const baseRevenue = 15000000 + Math.random() * 10000000
-      const orders = Math.floor(80 + Math.random() * 50)
-      const customers = Math.floor(60 + Math.random() * 40)
-
-      data.push({
-        date: date.format('YYYY-MM-DD'),
-        label: date.format('DD/MM'),
-        revenue: Math.floor(baseRevenue),
-        orders: orders,
-        customers: customers,
-        profit: Math.floor(baseRevenue * 0.35),
-        avgOrderValue: Math.floor(baseRevenue / orders)
-      })
-    }
-  } else if (viewType === 'week') {
-    // Theo tuần
-    const weeks = Math.ceil(end.diff(start, 'week', true))
-    for (let i = 0; i < weeks; i++) {
-      const weekStart = start.add(i, 'week')
-      const baseRevenue = 100000000 + Math.random() * 50000000
-      const orders = Math.floor(500 + Math.random() * 300)
-      const customers = Math.floor(400 + Math.random() * 250)
-
-      data.push({
-        date: weekStart.format('YYYY-MM-DD'),
-        label: `Tuần ${i + 1}`,
-        revenue: Math.floor(baseRevenue),
-        orders: orders,
-        customers: customers,
-        profit: Math.floor(baseRevenue * 0.35),
-        avgOrderValue: Math.floor(baseRevenue / orders)
-      })
-    }
-  } else if (viewType === 'month') {
-    // Theo tháng
-    const months = Math.ceil(end.diff(start, 'month', true))
-    for (let i = 0; i < months; i++) {
-      const monthStart = start.add(i, 'month')
-      const baseRevenue = 400000000 + Math.random() * 200000000
-      const orders = Math.floor(2000 + Math.random() * 1000)
-      const customers = Math.floor(1600 + Math.random() * 800)
-
-      data.push({
-        date: monthStart.format('YYYY-MM-DD'),
-        label: monthStart.format('MM/YYYY'),
-        revenue: Math.floor(baseRevenue),
-        orders: orders,
-        customers: customers,
-        profit: Math.floor(baseRevenue * 0.35),
-        avgOrderValue: Math.floor(baseRevenue / orders)
-      })
-    }
-  }
-
-  return data
-}
 
 const ReportsSalesPage = () => {
   const [collapsed, setCollapsed] = useSidebarCollapse()
@@ -992,7 +907,7 @@ const ReportsSalesPage = () => {
                   title="Tổng doanh thu"
                   value={formatCurrency(totalRevenue)}
                   trend={`${summaryMetrics.growth?.revenue > 0 ? '+' : ''}${summaryMetrics.growth?.revenue || 0}%`}
-                  trendLabel="từ kỳ trước"
+                  trendLabel=""
                   valueSize="medium"
                 />
               </Col>
@@ -1002,7 +917,7 @@ const ReportsSalesPage = () => {
                   title="Tổng đơn hàng"
                   value={totalOrders.toLocaleString()}
                   trend={`${summaryMetrics.growth?.orders > 0 ? '+' : ''}${summaryMetrics.growth?.orders || 0}%`}
-                  trendLabel="từ kỳ trước"
+                  trendLabel=""
                   valueSize="large"
                 />
               </Col>
@@ -1012,7 +927,7 @@ const ReportsSalesPage = () => {
                   title="Tổng khách hàng"
                   value={totalCustomers.toLocaleString()}
                   trend={`${summaryMetrics.growth?.customers > 0 ? '+' : ''}${summaryMetrics.growth?.customers || 0}%`}
-                  trendLabel="từ kỳ trước"
+                  trendLabel=""
                   valueSize="large"
                 />
               </Col>
@@ -1024,16 +939,16 @@ const ReportsSalesPage = () => {
                   className="rounded-2xl border border-gray-100 shadow-sm"
                   title={
                     <div className="flex items-center justify-between flex-wrap gap-4">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 py-4">
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
                           <Clock size={20} strokeWidth={2.5} color="#1890ff" />
                         </div>
                         <div>
-                          <Text strong className="text-lg text-gray-800 block leading-tight">
+                          <Text strong className="text-base text-gray-800 block leading-tight">
                             Xu Hướng Kinh Doanh
                           </Text>
                           <Text className="text-xs text-gray-500">
-                            Doanh thu và đơn hàng theo thời gian (30 ngày)
+                            Doanh thu và đơn hàng theo thời gian
                           </Text>
                         </div>
                       </div>
@@ -1262,12 +1177,12 @@ const ReportsSalesPage = () => {
                   className="rounded-2xl border border-gray-100 shadow-sm"
                   title={
                     <div className="flex items-center justify-between flex-wrap gap-4">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 py-4">
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-50 to-purple-100 flex items-center justify-center">
                           <Package size={20} strokeWidth={2.5} color="#722ed1" />
                         </div>
                         <div>
-                          <Text strong className="text-lg text-gray-800 block leading-tight">
+                          <Text strong className="text-base text-gray-800 block leading-tight">
                             Doanh Thu Theo Món Ăn
                           </Text>
                           <Text className="text-xs text-gray-500">
@@ -1437,12 +1352,12 @@ const ReportsSalesPage = () => {
                   bordered={false}
                   className="rounded-2xl border border-gray-100 shadow-sm h-full"
                   title={
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 py-4">
                       <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center">
                         <Award size={20} strokeWidth={2.5} color="#fa8c16" />
                       </div>
                       <div>
-                        <Text strong className="text-lg text-gray-800 block leading-tight">
+                        <Text strong className="text-base text-gray-800 block leading-tight">
                           Doanh Thu Theo Danh Mục
                         </Text>
                         <Text className="text-xs text-gray-500">

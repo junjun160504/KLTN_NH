@@ -68,14 +68,19 @@ const AppHeader = ({ collapsed, setCollapsed, pageTitle }) => {
           getPopupContainer={(trigger) => trigger.parentElement}
         >
           <Badge
+            className="mr-5"
+            style={{
+              fontSize: 12,
+              height: 20,
+              maxWidth: 24,
+            }}
             count={unreadCount}
-            overflowCount={99}
-            offset={[-4, 4]}
+            overflowCount={9}
           >
             <BellOutlined
               style={{
-                fontSize: 22,
-                marginRight: 20,
+                fontSize: 24,
+                marginRight: 0,
                 color: "#226533",
                 cursor: "pointer",
               }}

@@ -58,11 +58,11 @@ export const getLoyaltyTrend = async (req, res) => {
 
 /**
  * Get top customers by points
- * GET /api/dashboard/customers/top?limit=10
+ * GET /api/dashboard/customers/top?limit=10&startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
  */
 export const getTopCustomers = async (req, res) => {
   try {
-    const { limit = 10 } = req.query
+    const { limit = 10, startDate, endDate } = req.query
 
     // Validate limit
     const limitNum = parseInt(limit)
@@ -73,7 +73,7 @@ export const getTopCustomers = async (req, res) => {
       })
     }
 
-    const result = await reportCustomersService.getTopCustomers(limitNum)
+    const result = await reportCustomersService.getTopCustomers(limitNum, startDate, endDate)
     return res.json(result)
   } catch (error) {
     console.error('Error in getTopCustomers controller:', error)

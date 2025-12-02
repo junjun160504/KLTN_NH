@@ -9,6 +9,7 @@ import StaffPage from "./page/management/Main/Staffs";
 import AccountPage from "./page/management/Main/Accounts";
 import ReportsSalesPage from "./page/management/Main/ReportsSales";
 import ReportsCustomersPage from "./page/management/Main/ReportsCustomers";
+import ReportReviewPage from "./page/management/Main/ReportReview";
 import ReportsChatbotPage from "./page/management/Main/ReportsChatbots";
 
 import HomecsPage from "./page/cus/HomesCus";
@@ -17,6 +18,7 @@ import CartcsPage from "./page/cus/CartsCus";
 import BillcsPage from "./page/cus/BillsCus";
 import PaymentcsPage from "./page/cus/PaymentCus";
 import ChatbotcsPage from "./page/cus/ChatbotsCus";
+import ChatbotV2Page from "./page/cus/ChatbotV2Page";
 import ReviewcsPage from "./page/cus/ReviewsCus";
 import FoodReviewcsPage from "./page/cus/FoodReviewsCus";
 import LoyaltycsPage from "./page/cus/LoyaltysCus";
@@ -128,6 +130,14 @@ const routes = [
     ),
   },
   {
+    path: "/main/reports/reviews",
+    element: (
+      <ProtectedAdminRoute>
+        <AdminLayout><ReportReviewPage /></AdminLayout>
+      </ProtectedAdminRoute>
+    ),
+  },
+  {
     path: "/main/reports/chatbots",
     element: (
       <ProtectedAdminRoute>
@@ -160,6 +170,10 @@ const routes = [
   {
     path: "/cus/chatbot",
     element: <CustomerLayout><ChatbotcsPage /></CustomerLayout>,
+  },
+  {
+    path: "/cus/chatbot-v2",
+    element: <CustomerLayout><ChatbotV2Page /></CustomerLayout>,
   },
   {
     path: "/cus/reviews",

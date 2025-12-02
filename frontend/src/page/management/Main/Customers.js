@@ -32,7 +32,9 @@ import {
   TrophyOutlined,
   ShoppingCartOutlined,
   DollarOutlined,
-  EyeOutlined
+  EyeOutlined,
+  CalendarOutlined,
+  TableOutlined
 } from '@ant-design/icons'
 import axios from 'axios'
 import dayjs from 'dayjs'
@@ -204,7 +206,9 @@ const CustomersPage = () => {
       if (response.data.status === 200) {
         setSelectedCustomer({
           ...customer,
-          orderHistory: response.data.data.orders || []
+          sessions: response.data.data.sessions || [],
+          totalSessions: response.data.data.totalSessions || 0,
+          totalOrders: response.data.data.totalOrders || 0
         })
       }
     } catch (error) {
@@ -518,14 +522,19 @@ const CustomersPage = () => {
 
           {/* Detail Modal */}
           <Modal
-            title="Chi tiết khách hàng"
+            title={
+              <div className='flex flex-col'>
+                <span>Chi tiết khách hàng</span>
+                <span className='text-sm text-gray-500 mb-2'>{selectedCustomer?.name}</span>
+              </div>
+            }
             open={detailModalOpen}
             onCancel={() => {
               setDetailModalOpen(false)
               setSelectedCustomer(null)
             }}
             footer={null}
-            width={800}
+            width={900}
           >
             {selectedCustomer ? (
               <div>
@@ -535,56 +544,148 @@ const CustomersPage = () => {
                       <div className="text-gray-500">Số điện thoại</div>
                       <div className="font-semibold">{selectedCustomer.phone}</div>
                     </Col>
+
                     <Col span={12}>
                       <div className="text-gray-500">Điểm tích lũy</div>
                       <div className="font-bold text-orange-600">{selectedCustomer.points || 0}</div>
                     </Col>
-                    <Col span={12}>
-                      <div className="text-gray-500">Tên</div>
-                      <div>{selectedCustomer.name || '—'}</div>
-                    </Col>
-                    <Col span={12}>
-                      <div className="text-gray-500">Email</div>
-                      <div>{selectedCustomer.email || '—'}</div>
-                    </Col>
                   </Row>
+                  {selectedCustomer.totalSessions > 0 && (
+                    <Row gutter={[16, 16]} className="mt-4 pt-4 border-t">
+                      <Col span={12}>
+                        <div className="text-gray-500">Tổng số phiên</div>
+                        <div className="font-semibold text-blue-600">{selectedCustomer.totalSessions}</div>
+                      </Col>
+                      <Col span={12}>
+                        <div className="text-gray-500">Tổng số đơn</div>
+                        <div className="font-semibold text-green-600">{selectedCustomer.totalOrders}</div>
+                      </Col>
+                    </Row>
+                  )}
                 </Card>
 
-                <h3 className="font-semibold mb-3">Lịch sử đơn hàng</h3>
+                <h3 className="font-semibold mb-3">Lịch sử theo phiên</h3>
                 {loadingDetail ? (
                   <div className="text-center py-8">Đang tải...</div>
-                ) : selectedCustomer.orderHistory && selectedCustomer.orderHistory.length > 0 ? (
+                ) : selectedCustomer.sessions && selectedCustomer.sessions.length > 0 ? (
                   <Table
                     size="small"
                     bordered
-                    dataSource={selectedCustomer.orderHistory}
-                    rowKey="id"
+                    dataSource={selectedCustomer.sessions}
+                    rowKey="session_id"
                     pagination={{ pageSize: 5 }}
+                    expandable={{
+                      expandedRowRender: (record) => (
+                        <Table
+                          size="small"
+                          dataSource={record.orders}
+                          rowKey="id"
+                          pagination={false}
+                          columns={[
+                            {
+                              title: 'Mã đơn',
+                              dataIndex: 'id',
+                              key: 'id',
+                              width: 80,
+                              render: (id) => <span className="text-blue-600">#{id}</span>
+                            },
+                            {
+                              title: 'Tổng tiền',
+                              dataIndex: 'total_price',
+                              key: 'total_price',
+                              render: (price) => `${parseFloat(price || 0).toLocaleString('vi-VN')}đ`
+                            },
+                            {
+                              title: 'Trạng thái',
+                              dataIndex: 'status',
+                              key: 'status',
+                              render: (status) => {
+                                const map = {
+                                  NEW: { text: 'Mới', color: 'orange' },
+                                  IN_PROGRESS: { text: 'Đang xử lý', color: 'blue' },
+                                  DONE: { text: 'Hoàn tất', color: 'green' },
+                                  PAID: { text: 'Đã thanh toán', color: 'purple' },
+                                  CANCELLED: { text: 'Đã hủy', color: 'red' }
+                                }
+                                const config = map[status] || { text: status, color: 'default' }
+                                return <Tag color={config.color}>{config.text}</Tag>
+                              }
+                            },
+                            {
+                              title: 'Thời gian',
+                              dataIndex: 'created_at',
+                              key: 'created_at',
+                              render: (date) => dayjs(date).format('HH:mm:ss')
+                            }
+                          ]}
+                        />
+                      ),
+                      rowExpandable: (record) => record.orders && record.orders.length > 0
+                    }}
                     columns={[
-                      { title: 'Mã đơn', dataIndex: 'id', key: 'id', render: (id) => `#${id}` },
-                      { title: 'Bàn', dataIndex: 'table_number', key: 'table_number', render: (num) => num ? `Bàn ${num}` : '—' },
-                      { title: 'Tổng tiền', dataIndex: 'total_price', key: 'total_price', render: (price) => `${parseFloat(price || 0).toLocaleString('vi-VN')}đ` },
                       {
-                        title: 'Trạng thái',
-                        dataIndex: 'status',
-                        key: 'status',
+                        title: 'Phiên',
+                        dataIndex: 'session_id',
+                        key: 'session_id',
+                        width: 80,
+                        render: (id) => <span className="font-medium">#{id}</span>
+                      },
+                      {
+                        title: 'Bàn',
+                        dataIndex: 'table_number',
+                        key: 'table_number',
+                        width: 80,
+                        render: (num) => num ? (
+                          <Tag icon={<TableOutlined />} color="blue">Bàn {num}</Tag>
+                        ) : '—'
+                      },
+                      {
+                        title: 'Số đơn',
+                        dataIndex: 'order_count',
+                        key: 'order_count',
+                        width: 80,
+                        align: 'center',
+                        render: (count) => <Tag color="cyan">{count} đơn</Tag>
+                      },
+                      {
+                        title: 'Tổng tiền',
+                        dataIndex: 'total_amount',
+                        key: 'total_amount',
+                        render: (amount) => (
+                          <span className="font-semibold text-green-600">
+                            {parseFloat(amount || 0).toLocaleString('vi-VN')}đ
+                          </span>
+                        )
+                      },
+                      {
+                        title: 'Trạng thái phiên',
+                        dataIndex: 'session_status',
+                        key: 'session_status',
                         render: (status) => {
                           const map = {
-                            NEW: { text: 'Mới', color: 'orange' },
-                            IN_PROGRESS: { text: 'Đang xử lý', color: 'blue' },
-                            DONE: { text: 'Hoàn tất', color: 'green' },
-                            PAID: { text: 'Đã thanh toán', color: 'purple' },
-                            CANCELLED: { text: 'Đã hủy', color: 'red' }
+                            ACTIVE: { text: 'Đang hoạt động', color: 'processing' },
+                            COMPLETED: { text: 'Hoàn thành', color: 'success' },
+                            CANCELLED: { text: 'Đã hủy', color: 'error' }
                           }
                           const config = map[status] || { text: status, color: 'default' }
                           return <Tag color={config.color}>{config.text}</Tag>
                         }
                       },
-                      { title: 'Ngày tạo', dataIndex: 'created_at', key: 'created_at', render: (date) => dayjs(date).format('DD/MM/YYYY HH:mm') }
+                      {
+                        title: 'Ngày',
+                        dataIndex: 'session_created_at',
+                        key: 'session_created_at',
+                        render: (date) => (
+                          <span>
+                            <CalendarOutlined className="mr-1" />
+                            {dayjs(date).format('DD/MM/YYYY HH:mm')}
+                          </span>
+                        )
+                      }
                     ]}
                   />
                 ) : (
-                  <div className="text-center py-8 bg-gray-50 rounded">Chưa có đơn hàng</div>
+                  <div className="text-center py-8 bg-gray-50 rounded">Chưa có lịch sử phiên nào</div>
                 )}
               </div>
             ) : null}

@@ -128,9 +128,18 @@ export const getLoyaltyTrend = async (startDate, endDate) => {
 /**
  * Get top customers by loyalty points
  * Chỉ tính visits từ sessions đã thanh toán
+ * Hỗ trợ filter theo khoảng thời gian
  */
-export const getTopCustomers = async (limit = 10) => {
+export const getTopCustomers = async (limit = 10, startDate = null, endDate = null) => {
   try {
+    let dateFilter = ''
+    let params = []
+
+    if (startDate && endDate) {
+      dateFilter = 'AND p.paid_at BETWEEN ? AND ?'
+      params = [startDate, endDate]
+    }
+
     const query = `
       SELECT 
         c.id,
@@ -138,8 +147,12 @@ export const getTopCustomers = async (limit = 10) => {
         c.phone,
         c.points,
         COUNT(DISTINCT CASE 
-          WHEN p.payment_status = 'PAID' THEN qs.id 
-        END) as visits,
+          WHEN p.payment_status = 'PAID' ${dateFilter ? 'AND p.paid_at BETWEEN ? AND ?' : ''} THEN qs.id 
+        END) as visits_in_period,
+        SUM(CASE 
+          WHEN p.payment_status = 'PAID' ${dateFilter ? 'AND p.paid_at BETWEEN ? AND ?' : ''} THEN pt.points_earned 
+          ELSE 0 
+        END) as points_in_period,
         MAX(CASE 
           WHEN p.payment_status = 'PAID' THEN p.paid_at 
         END) as last_visit
@@ -147,20 +160,33 @@ export const getTopCustomers = async (limit = 10) => {
       LEFT JOIN qr_sessions qs ON c.id = qs.customer_id
       LEFT JOIN orders o ON qs.id = o.qr_session_id
       LEFT JOIN payments p ON o.id = p.order_id
+      LEFT JOIN point_transactions pt ON c.id = pt.customer_id AND pt.transaction_type = 'EARN'
       WHERE c.points > 0
       GROUP BY c.id, c.name, c.phone, c.points
-      ORDER BY c.points DESC
+      HAVING ${startDate && endDate ? 'points_in_period > 0 OR visits_in_period > 0' : 'c.points > 0'}
+      ORDER BY ${startDate && endDate ? 'points_in_period DESC, visits_in_period DESC' : 'c.points DESC'}
       LIMIT ?
     `
 
-    const [rows] = await pool.query(query, [limit])
+    // Build params array based on date filter
+    let queryParams = []
+    if (startDate && endDate) {
+      // For visits_in_period
+      queryParams.push(startDate, endDate)
+      // For points_in_period
+      queryParams.push(startDate, endDate)
+    }
+    queryParams.push(limit)
+
+    const [rows] = await pool.query(query, queryParams)
 
     const customers = rows.map(row => ({
       id: row.id,
       name: row.name || 'Khách hàng ẩn danh',
       phone: row.phone,
       points: parseInt(row.points || 0),
-      visits: parseInt(row.visits || 0),
+      pointsInPeriod: parseInt(row.points_in_period || 0),
+      visits: parseInt(row.visits_in_period || 0),
       lastVisit: row.last_visit
     }))
 

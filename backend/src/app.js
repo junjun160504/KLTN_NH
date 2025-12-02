@@ -12,6 +12,7 @@ import paymentRoutes from './routes/payment.routes.js';
 import customerRoutes from './routes/customer.routes.js';
 import callStaffRoutes from './routes/callStaff.routes.js';
 import chatbotRoutes from './routes/chatbot.routes.js';
+import chatbotV2Routes from './routes/chatbotV2.routes.js';  // Chatbot V2 with Assistants API
 import reviewRoutes from './routes/review.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import qrSessionRoutes from './routes/qrSession.routes.js';   // QR sessions
@@ -25,6 +26,7 @@ import employeeRoutes from './routes/employee.routes.js';     // Employee manage
 import dashboardRoutes from './routes/dashboard.routes.js';   // Dashboard analytics
 import reportSalesRoutes from './routes/reportSales.routes.js'; // Report Sales (detailed analytics)
 import reportCustomersRoutes from './routes/reportCustomers.routes.js'; // Report Customers (loyalty analytics)
+import reportReviewsRoutes from './routes/reportReviews.routes.js'; // Report Reviews (reviews analytics)
 import pointRoutes from './routes/point.routes.js';           // Point system
 
 const app = express();
@@ -44,6 +46,7 @@ app.use('/api/payment', paymentRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/call-staff', callStaffRoutes);
 app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/chatbot-v2', chatbotV2Routes);  // Chatbot V2 with Assistants API
 app.use('/api/review', reviewRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/qr-sessions', qrSessionRoutes);
@@ -57,6 +60,7 @@ app.use('/api/employees', employeeRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/dashboard/sales', reportSalesRoutes);
 app.use('/api/dashboard/customers', reportCustomersRoutes);
+app.use('/api/dashboard/reviews', reportReviewsRoutes);
 app.use('/api/points', pointRoutes);
 
 

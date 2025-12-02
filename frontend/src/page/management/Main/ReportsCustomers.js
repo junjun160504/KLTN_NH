@@ -59,7 +59,7 @@ const ReportsCustomerPage = () => {
   // Loading States
   const [loading, setLoading] = useState(false)
 
-  // Data States
+  // Data States - Loyalty
   const [loyaltyData, setLoyaltyData] = useState([])
   const [topCustomersData, setTopCustomersData] = useState([])
   const [pointDistributionData, setPointDistributionData] = useState([])
@@ -92,7 +92,7 @@ const ReportsCustomerPage = () => {
       // Fetch all data in parallel
       const [trendResponse, topCustomersResponse, distributionResponse] = await Promise.all([
         reportCustomersService.getLoyaltyTrend(start, end),
-        reportCustomersService.getTopCustomers(10), // Fetch top 10, filter by topLimit later
+        reportCustomersService.getTopCustomers(10, start, end),
         reportCustomersService.getPointDistribution()
       ])
 
@@ -112,7 +112,6 @@ const ReportsCustomerPage = () => {
       if (distributionResponse.success) {
         setPointDistributionData(distributionResponse.data)
       }
-
     } catch (error) {
       console.error('Error fetching report data:', error)
       message.error('Không thể tải dữ liệu báo cáo. Vui lòng thử lại.')
@@ -216,23 +215,21 @@ const ReportsCustomerPage = () => {
 
       // ========== 1️⃣ SHEET "TOP KHÁCH HÀNG TÍCH ĐIỂM" ==========
 
-      const customerHeaders = ['STT', 'Tên khách hàng', 'Số điện thoại', 'Điểm tích lũy', 'Số lần ghé', 'Lần ghé gần nhất', 'Trạng thái']
+      const customerHeaders = ['STT', 'Tên khách hàng', 'Số điện thoại', 'Tổng điểm', 'Điểm trong kỳ', 'Số lần ghé', 'Lần ghé gần nhất']
 
       const customerDataRows = topCustomers.map((c, index) => {
-        const points = c.points || 0
-        let status = 'Khách mới'
-        if (points >= 3000) status = 'VIP'
-        else if (points >= 2000) status = 'Khách cũ'
-        else if (points >= 500) status = 'Khách quen'
+        const totalPoints = c.points || 0
+        const pointsInPeriod = c.pointsInPeriod || 0
+        const visits = c.visits || 0
 
         return [
           index + 1,
           c.name || 'Khách hàng ẩn danh',
           c.phone || '',
-          points,
-          c.visits || 0,
-          c.lastVisit ? dayjs(c.lastVisit).format('DD/MM/YYYY HH:mm') : 'Chưa có',
-          status
+          totalPoints,
+          pointsInPeriod,
+          visits,
+          c.lastVisit ? dayjs(c.lastVisit).format('DD/MM/YYYY HH:mm') : 'Chưa có'
         ]
       })
 
@@ -243,7 +240,7 @@ const ReportsCustomerPage = () => {
         `${customerDataRows.length} khách hàng`,
         customerDataRows.reduce((sum, row) => sum + row[3], 0),
         customerDataRows.reduce((sum, row) => sum + row[4], 0),
-        '',
+        customerDataRows.reduce((sum, row) => sum + row[5], 0),
         ''
       ]
 
@@ -292,13 +289,13 @@ const ReportsCustomerPage = () => {
           const cellRef = XLSX.utils.encode_cell({ r: rowIdx + 3, c: colIdx })
           if (!customerWs[cellRef]) customerWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
 
-          if (colIdx === 0 || colIdx === 6) {
-            // STT, Trạng thái - center align
+          if (colIdx === 0) {
+            // STT - center align
             customerWs[cellRef].s = textCellStyle
-          } else if (colIdx === 1 || colIdx === 2 || colIdx === 5) {
-            // Tên, SĐT, Lần ghé - left/center align
+          } else if (colIdx === 1 || colIdx === 2 || colIdx === 6) {
+            // Tên, SĐT, Lần ghé gần nhất - left/center align
             customerWs[cellRef].s = {
-              alignment: { horizontal: colIdx === 2 || colIdx === 5 ? 'center' : 'left', vertical: 'center' },
+              alignment: { horizontal: colIdx === 2 || colIdx === 6 ? 'center' : 'left', vertical: 'center' },
               border: {
                 top: { style: 'thin', color: { rgb: 'D9D9D9' } },
                 bottom: { style: 'thin', color: { rgb: 'D9D9D9' } },
@@ -307,7 +304,7 @@ const ReportsCustomerPage = () => {
               }
             }
           } else {
-            // Number columns - right align
+            // Number columns (3,4,5) - right align
             customerWs[cellRef].s = dataCellStyle
             if (typeof val === 'number') {
               customerWs[cellRef].z = '#,##0'
@@ -332,10 +329,10 @@ const ReportsCustomerPage = () => {
         { wch: 6 },  // STT
         { wch: 25 }, // Tên khách hàng
         { wch: 15 }, // Số điện thoại
-        { wch: 16 }, // Điểm tích lũy
-        { wch: 14 }, // Số lần ghé
-        { wch: 20 }, // Lần ghé gần nhất
-        { wch: 14 }  // Trạng thái
+        { wch: 14 }, // Tổng điểm
+        { wch: 14 }, // Điểm trong kỳ
+        { wch: 12 }, // Số lần ghé
+        { wch: 20 }  // Lần ghé gần nhất
       ]
 
       // Set row heights
@@ -580,7 +577,7 @@ const ReportsCustomerPage = () => {
                   title="Lượt tích điểm"
                   value={totalRegistrations.toLocaleString()}
                   trend={parseFloat(summaryMetrics.growth?.registrations || 0)}
-                  trendLabel="so với kỳ trước"
+                  trendLabel=""
                   valueSize="large"
                 />
               </Col>
@@ -590,7 +587,7 @@ const ReportsCustomerPage = () => {
                   title="Điểm đã cấp"
                   value={totalPointsIssued.toLocaleString()}
                   trend={parseFloat(summaryMetrics.growth?.pointsIssued || 0)}
-                  trendLabel="so với kỳ trước"
+                  trendLabel=""
                   valueSize="large"
                 />
               </Col>
@@ -601,7 +598,7 @@ const ReportsCustomerPage = () => {
                   value={participationRate}
                   suffix="%"
                   trend={parseFloat(summaryMetrics.growth?.participationRate || 0)}
-                  trendLabel="so với kỳ trước"
+                  trendLabel=""
                   valueSize="large"
                 />
               </Col>
@@ -625,16 +622,13 @@ const ReportsCustomerPage = () => {
                   className="rounded-2xl border border-gray-100 shadow-sm"
                   title={
                     <div className="flex items-center justify-between flex-wrap gap-4">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 py-4">
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
                           <TrendingUp size={20} strokeWidth={2.5} color="#1890ff" />
                         </div>
                         <div>
-                          <Text strong className="text-lg text-gray-800 block leading-tight">
+                          <Text strong className="text-base text-gray-800 block leading-tight">
                             Xu Hướng Tích Điểm
-                          </Text>
-                          <Text className="text-xs text-gray-500">
-                            Theo lượt đăng ký và điểm phát hành
                           </Text>
                         </div>
                       </div>
@@ -806,17 +800,15 @@ const ReportsCustomerPage = () => {
                   bordered={false}
                   className="rounded-2xl border border-gray-100 shadow-sm"
                   title={
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 py-4">
                       <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-50 to-green-100 flex items-center justify-center">
                         <Users size={20} strokeWidth={2.5} color="#52c41a" />
                       </div>
                       <div>
-                        <Text strong className="text-lg text-gray-800 block leading-tight">
+                        <Text strong className="text-base text-gray-800 block leading-tight">
                           Phân Bổ Điểm Tích Lũy
                         </Text>
-                        <Text className="text-xs text-gray-500">
-                          Theo khoảng điểm khách hàng
-                        </Text>
+
                       </div>
                     </div>
                   }
@@ -904,17 +896,15 @@ const ReportsCustomerPage = () => {
                   className="rounded-2xl border border-gray-100 shadow-sm"
                   title={
                     <div className="flex items-center justify-between flex-wrap gap-4">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 py-4">
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-50 to-purple-100 flex items-center justify-center">
                           <Award size={20} strokeWidth={2.5} color="#722ed1" />
                         </div>
                         <div>
-                          <Text strong className="text-lg text-gray-800 block leading-tight">
+                          <Text strong className="text-base text-gray-800 block leading-tight">
                             Top Khách Hàng Tích Điểm
                           </Text>
-                          <Text className="text-xs text-gray-500">
-                            Khách hàng VIP với điểm tích lũy cao nhất
-                          </Text>
+
                         </div>
                       </div>
 
@@ -979,7 +969,8 @@ const ReportsCustomerPage = () => {
                           border: '1px solid #f0f0f0',
                           borderRadius: '12px',
                           boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
-                          padding: '16px'
+                          padding: '16px',
+                          fontSize: '12px'
                         }}
                         formatter={(value, name, props) => {
                           const customer = props.payload
@@ -989,8 +980,7 @@ const ReportsCustomerPage = () => {
                               <div><strong>Điểm:</strong> {customer.points.toLocaleString()}</div>
                               <div><strong>Lượt ghé:</strong> {customer.visits}</div>
                               <div><strong>Ghé gần nhất:</strong> {customer.lastVisit ? dayjs(customer.lastVisit).format('DD/MM/YYYY HH:mm') : 'Chưa có'}</div>
-                            </div>,
-                            customer.name
+                            </div>
                           ]
                         }}
                         cursor={{ fill: 'rgba(114, 46, 209, 0.05)' }}

@@ -429,7 +429,7 @@ const Home = () => {
                   title="Đơn hàng"
                   value={stats.orders.value}
                   trend={`${Number(stats.orders.growth) > 0 ? '+' : ''}${stats.orders.growth}%`}
-                  trendLabel="từ kỳ trước"
+                  trendLabel=""
                   valueSize="large"
                 />
               </Col>
@@ -439,7 +439,7 @@ const Home = () => {
                   title="Doanh thu"
                   value={formatCurrency(stats.revenue.value)}
                   trend={`${stats.revenue.growth > 0 ? '+' : ''}${stats.revenue.growth}%`}
-                  trendLabel="từ kỳ trước"
+                  trendLabel=""
                   valueSize="medium"
                 />
               </Col>
@@ -449,7 +449,7 @@ const Home = () => {
                   title="Khách hàng"
                   value={stats.customers.value}
                   trend={`${stats.customers.growth > 0 ? '+' : ''}${stats.customers.growth}%`}
-                  trendLabel="từ kỳ trước"
+                  trendLabel=""
                   valueSize="large"
                 />
               </Col>
@@ -459,7 +459,7 @@ const Home = () => {
                   title="Trung bình/đơn"
                   value={formatCurrency(stats.avgOrderValue.value)}
                   trend={`${stats.avgOrderValue.growth > 0 ? '+' : ''}${stats.avgOrderValue.growth}%`}
-                  trendLabel="từ kỳ trước"
+                  trendLabel=""
                   valueSize="medium"
                 />
               </Col>
