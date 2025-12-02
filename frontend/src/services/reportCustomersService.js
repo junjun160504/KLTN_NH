@@ -29,14 +29,22 @@ export const getLoyaltyTrend = async (startDate, endDate) => {
 
 /**
  * Get top customers by loyalty points
+ * Supports date range filtering
  */
-export const getTopCustomers = async (limit = 10) => {
+export const getTopCustomers = async (limit = 10, startDate = null, endDate = null) => {
   try {
     const token = localStorage.getItem('token')
+    const params = { limit }
+
+    if (startDate && endDate) {
+      params.startDate = startDate.format('YYYY-MM-DD')
+      params.endDate = endDate.format('YYYY-MM-DD')
+    }
+
     const response = await axios.get(
       `${API_BASE_URL}/dashboard/customers/top`,
       {
-        params: { limit },
+        params,
         headers: {
           Authorization: `Bearer ${token}`
         }
