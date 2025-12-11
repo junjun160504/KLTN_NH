@@ -21,8 +21,6 @@ const CustomDateRangePicker = ({ value, onChange, className }) => {
     const [endMinutes, setEndMinutes] = useState(1439); // 23:59
     // State để control việc mở/đóng dropdown
     const [open, setOpen] = useState(false);
-    // Flag để prevent auto-close khi chọn xong dates
-    const [shouldPreventClose, setShouldPreventClose] = useState(true);
     // State để control calendar view (tháng nào đang hiển thị)
     const [activeStartMonth, setActiveStartMonth] = useState(null);
 
@@ -42,14 +40,14 @@ const CustomDateRangePicker = ({ value, onChange, className }) => {
 
     // Preset shortcuts
     const presets = [
-        {
-            key: 'all',
-            label: 'Tất cả',
-            getValue: () => [
-                dayjs().subtract(1, 'year').startOf('day'), // 1 năm trước
-                dayjs().endOf('day') // Hôm nay
-            ]
-        },
+        // {
+        //     key: 'all',
+        //     label: 'Tất cả',
+        //     getValue: () => [
+        //         dayjs().subtract(1, 'year').startOf('day'), // 1 năm trước
+        //         dayjs().endOf('day') // Hôm nay
+        //     ]
+        // },
         { key: 'today', label: 'Hôm nay', getValue: () => [dayjs().startOf('day'), dayjs().endOf('day')] },
         { key: 'yesterday', label: 'Hôm qua', getValue: () => [dayjs().subtract(1, 'day').startOf('day'), dayjs().subtract(1, 'day').endOf('day')] },
         { key: 'last7days', label: '7 ngày qua', getValue: () => [dayjs().subtract(6, 'day').startOf('day'), dayjs().endOf('day')] },
@@ -72,12 +70,8 @@ const CustomDateRangePicker = ({ value, onChange, className }) => {
             ];
 
             onChange?.(finalRange);
-            setShouldPreventClose(false); // Cho phép đóng dropdown
-            // Đóng dropdown sau một chút để state update
-            setTimeout(() => {
-                setOpen(false);
-                setShouldPreventClose(true); // Reset flag
-            }, 0);
+            // Đóng dropdown
+            setOpen(false);
         }
     };
 
@@ -176,7 +170,7 @@ const CustomDateRangePicker = ({ value, onChange, className }) => {
         }}>
             {/* Time Range Slider */}
             <div style={{ paddingLeft: '8px', paddingRight: '8px' }}>
-                <Slider
+                {/* <Slider
                     range
                     min={0}
                     max={1439}
@@ -196,7 +190,7 @@ const CustomDateRangePicker = ({ value, onChange, className }) => {
                             background: 'linear-gradient(90deg, #1890ff 0%, #52c41a 100%)'
                         }
                     }}
-                />
+                /> */}
             </div>
         </div>
     );
@@ -228,12 +222,7 @@ const CustomDateRangePicker = ({ value, onChange, className }) => {
                 value={internalValue}
                 open={open}
                 defaultPickerValue={activeStartMonth ? [activeStartMonth, activeStartMonth.add(1, 'month')] : undefined}
-                onOpenChange={(isOpen, mode) => {
-                    // Nếu đang trong chế độ prevent close và RangePicker muốn đóng
-                    if (!isOpen && shouldPreventClose) {
-                        // KHÔNG cho phép đóng, keep dropdown mở
-                        return;
-                    }
+                onOpenChange={(isOpen) => {
                     setOpen(isOpen);
                 }}
                 onCalendarChange={(dates, dateStrings, info) => {
@@ -256,19 +245,13 @@ const CustomDateRangePicker = ({ value, onChange, className }) => {
                     }
                 }}
                 onChange={(dates) => {
-                    // onChange chỉ trigger khi RangePicker muốn "commit" value
-                    // Chúng ta KHÔNG làm gì ở đây để prevent auto-close
-                    // Chỉ handle clear
+                    // Handle clear
                     if (!dates) {
                         // Khi clear (dates = null)
                         setInternalValue(null);
                         setSelectedPreset('all');
                         onChange?.(null);
-                        setShouldPreventClose(false);
-                        setTimeout(() => {
-                            setOpen(false);
-                            setShouldPreventClose(true);
-                        }, 0);
+                        setOpen(false);
                     }
                 }}
                 className={`custom-range-picker ${className || ''}`}

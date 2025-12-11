@@ -266,9 +266,17 @@ function OrderPage() {
 
   const updateOrderStatusAPI = useCallback(async (orderId, newStatus) => {
     try {
+      // Lấy adminId từ localStorage khi thanh toán
+      let adminId = null
+      if (newStatus === 'PAID') {
+        const userStr = localStorage.getItem('user') || sessionStorage.getItem('user')
+        const user = userStr ? JSON.parse(userStr) : null
+        adminId = user?.id || null
+      }
+
       const response = await axios.put(
         `${REACT_APP_API_URL}/orders/${orderId}/status`,
-        { status: newStatus }
+        { status: newStatus, adminId: adminId }
       )
 
       if (response.data.status === 200) {

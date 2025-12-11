@@ -520,12 +520,29 @@ export async function payOrderByAdmin({ sessionId, adminId, useAllPoints = false
           WHERE id IN (${placeholders})
         `, [adminId, ...orderIdsToConfirm]);
 
-        // Update payment records to PAID
+        // Update payment records to PAID và lưu admin_id
         await connect.query(`
           UPDATE payments
-          SET payment_status = 'PAID', confirmed_at = NOW(), updated_at = NOW()
+          SET payment_status = 'PAID', admin_id = ?, confirmed_at = NOW(), updated_at = NOW()
           WHERE order_id IN (${placeholders}) AND payment_status = 'PENDING'
-        `, [...orderIdsToConfirm]);
+        `, [adminId, ...orderIdsToConfirm]);
+
+        // Tạo payment record mới nếu chưa có (trường hợp admin thanh toán trực tiếp)
+        for (const order of ordersToConfirm) {
+          const [[existingPayment]] = await connect.query(
+            `SELECT id FROM payments WHERE order_id = ?`,
+            [order.id]
+          );
+
+          if (!existingPayment) {
+            await connect.query(
+              `INSERT INTO payments (order_id, admin_id, method, amount, payment_status, paid_at)
+               VALUES (?, ?, 'CASH', ?, 'PAID', NOW())`,
+              [order.id, adminId, order.total_price]
+            );
+            console.log(`✅ Payment record created for order #${order.id} by admin #${adminId}`);
+          }
+        }
       }
 
       // 🎉 LOGIC TÍCH ĐIỂM TỰ ĐỘNG (SAU KHI THANH TOÁN)

@@ -193,7 +193,7 @@ const Home = () => {
       const response = await dashboardApi.getTopDishes(
         dateRange[0].toDate(),
         dateRange[1].toDate(),
-        5 // TOP 5
+        3
       )
 
       if (response.status === 200) {
@@ -351,20 +351,20 @@ const Home = () => {
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center flex-shrink-0">
             <Icon size={22} strokeWidth={2} color="#1890ff" />
           </div>
-          <Text className="text-gray-500 text-xs font-medium tracking-wide mt-1">
+          <Text className="text-gray-500 text-sm font-medium tracking-wide mt-1">
             {title}
           </Text>
         </div>
         <div>
           <Title
             level={2}
-            className={`text-gray-800 ${valueSize === 'large' ? 'text-3xl' : 'text-2xl'} font-semibold leading-none tracking-tight`}
+            className={`text-gray-800 ${valueSize === 'large' ? 'text-3xl' : 'text-2xl'} font-semibold leading-none tracking-tight float-end`}
             style={{ margin: '12px 0 4px 0' }}
           >
             {value}
           </Title>
           <div className="flex items-center gap-1">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            {/* <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
               <path
                 d="M6 10L6 2M6 2L9 5M6 2L3 5"
                 stroke={isPositive ? '#52c41a' : '#ff4d4f'}
@@ -373,7 +373,7 @@ const Home = () => {
                 strokeLinejoin="round"
                 transform={arrowRotation}
               />
-            </svg>
+            </svg> */}
             <Text className={`${trendColor} text-xs font-medium`}>{trend}</Text>
             <Text className="text-gray-400 text-xs">{trendLabel}</Text>
           </div>
@@ -428,8 +428,8 @@ const Home = () => {
                   icon={ShoppingCart}
                   title="Đơn hàng"
                   value={stats.orders.value}
-                  trend={`${Number(stats.orders.growth) > 0 ? '+' : ''}${stats.orders.growth}%`}
-                  trendLabel=""
+                  // trend={`${Number(stats.orders.growth) > 0 ? '+' : ''}${stats.orders.growth}%`}
+                  // trendLabel=""
                   valueSize="large"
                 />
               </Col>
@@ -438,7 +438,7 @@ const Home = () => {
                   icon={DollarSign}
                   title="Doanh thu"
                   value={formatCurrency(stats.revenue.value)}
-                  trend={`${stats.revenue.growth > 0 ? '+' : ''}${stats.revenue.growth}%`}
+                  // trend={`${stats.revenue.growth > 0 ? '+' : ''}${stats.revenue.growth}%`}
                   trendLabel=""
                   valueSize="medium"
                 />
@@ -448,7 +448,7 @@ const Home = () => {
                   icon={Users}
                   title="Khách hàng"
                   value={stats.customers.value}
-                  trend={`${stats.customers.growth > 0 ? '+' : ''}${stats.customers.growth}%`}
+                  // trend={`${stats.customers.growth > 0 ? '+' : ''}${stats.customers.growth}%`}
                   trendLabel=""
                   valueSize="large"
                 />
@@ -458,7 +458,7 @@ const Home = () => {
                   icon={TrendingUp}
                   title="Trung bình/đơn"
                   value={formatCurrency(stats.avgOrderValue.value)}
-                  trend={`${stats.avgOrderValue.growth > 0 ? '+' : ''}${stats.avgOrderValue.growth}%`}
+                  // trend={`${stats.avgOrderValue.growth > 0 ? '+' : ''}${stats.avgOrderValue.growth}%`}
                   trendLabel=""
                   valueSize="medium"
                 />
@@ -712,7 +712,7 @@ const Home = () => {
                 </Spin>
 
                 {/* Summary Stats */}
-                <div style={{
+                {/* <div style={{
                   marginTop: '24px',
                   padding: '16px',
                   background: '#fafafa',
@@ -753,7 +753,7 @@ const Home = () => {
                       {formatCurrency(Math.max(...getCurrentRevenueData().map(item => item.value)))}
                     </Text>
                   </div>
-                </div>
+                </div> */}
 
                 {/* Performance Metrics - Integrated */}
                 <Spin spinning={performanceLoading}>
@@ -785,7 +785,7 @@ const Home = () => {
                           <Title level={3} style={{ color: '#262626', margin: '0 0 4px', fontWeight: 600, fontSize: '20px', letterSpacing: '-0.3px' }}>
                             {performanceMetrics.completionRate}%
                           </Title>
-                          <Text style={{ color: '#8c8c8c', fontSize: '12px', fontWeight: 500, display: 'block', marginBottom: '8px' }}>
+                          <Text style={{ color: '#8c8c8c', fontSize: '14px', fontWeight: 500, display: 'block', marginBottom: '8px' }}>
                             Tỷ lệ hoàn thành
                           </Text>
                           <Progress
@@ -795,9 +795,7 @@ const Home = () => {
                             showInfo={false}
                             strokeWidth={6}
                           />
-                          <Text style={{ fontSize: '11px', color: '#52c41a', marginTop: '8px', display: 'block' }}>
-                            +2.4% từ tuần trước
-                          </Text>
+
                         </div>
                       </Col>
 
@@ -824,7 +822,7 @@ const Home = () => {
                           <Title level={3} style={{ color: '#262626', margin: '0 0 4px', fontWeight: 600, fontSize: '20px', letterSpacing: '-0.3px' }}>
                             {performanceMetrics.avgServiceTime}
                           </Title>
-                          <Text style={{ color: '#8c8c8c', fontSize: '12px', fontWeight: 500, display: 'block', marginBottom: '8px' }}>
+                          <Text style={{ color: '#8c8c8c', fontSize: '14px', fontWeight: 500, display: 'block', marginBottom: '8px' }}>
                             Thời gian TB (phút)
                           </Text>
                           <Progress
@@ -834,9 +832,6 @@ const Home = () => {
                             showInfo={false}
                             strokeWidth={6}
                           />
-                          <Text style={{ fontSize: '11px', color: '#52c41a', marginTop: '8px', display: 'block' }}>
-                            Giảm 3 phút
-                          </Text>
                         </div>
                       </Col>
 
@@ -863,7 +858,7 @@ const Home = () => {
                           <Title level={3} style={{ color: '#262626', margin: '0 0 4px', fontWeight: 600, fontSize: '20px', letterSpacing: '-0.3px' }}>
                             {performanceMetrics.occupancyRate}%
                           </Title>
-                          <Text style={{ color: '#8c8c8c', fontSize: '12px', fontWeight: 500, display: 'block', marginBottom: '8px' }}>
+                          <Text style={{ color: '#8c8c8c', fontSize: '14px', fontWeight: 500, display: 'block', marginBottom: '8px' }}>
                             Lấp đầy bàn
                           </Text>
                           <Progress
@@ -873,9 +868,6 @@ const Home = () => {
                             showInfo={false}
                             strokeWidth={6}
                           />
-                          <Text style={{ fontSize: '11px', color: '#52c41a', marginTop: '8px', display: 'block' }}>
-                            +5% từ tuần trước
-                          </Text>
                         </div>
                       </Col>
                     </Row>

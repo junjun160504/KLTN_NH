@@ -140,8 +140,8 @@ export async function getOrderById(req, res) {
 export async function updateOrderStatus(req, res) {
   try {
     const { id } = req.params;
-    const { status } = req.body;
-    const updated = await orderService.updateStatus(id, status);
+    const { status, adminId } = req.body;
+    const updated = await orderService.updateStatus(id, status, adminId);
     res.json({ status: 200, data: updated });
   } catch (err) {
     console.error("updateOrderStatus error:", err);

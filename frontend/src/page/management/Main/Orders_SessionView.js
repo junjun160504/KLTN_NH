@@ -14,7 +14,6 @@ import {
   App,
   Spin,
   Card,
-  Statistic,
   Row,
   Col,
   Table,
@@ -22,7 +21,8 @@ import {
   Pagination,
   ConfigProvider,
   Drawer,
-  InputNumber
+  InputNumber,
+  Typography
 } from 'antd'
 import vi_VN from 'antd/lib/locale/vi_VN'
 import {
@@ -39,7 +39,7 @@ import {
   EditOutlined,
   DeleteOutlined
 } from '@ant-design/icons'
-import { Download } from 'react-feather'
+import { Download, ShoppingCart, Clock, DollarSign, Grid } from 'react-feather'
 import * as XLSX from 'xlsx'
 import dayjs from 'dayjs'
 import isBetween from 'dayjs/plugin/isBetween'
@@ -52,6 +52,7 @@ const REACT_APP_API_URL = process.env.REACT_APP_API_URL || 'http://localhost:800
 
 const { Content } = Layout
 const { Option } = Select
+const { Title, Text } = Typography
 
 // ==================== STATUS MAPPING ====================
 const STATUS_MAP = {
@@ -673,10 +674,16 @@ function OrderSessionPage() {
       },
       onOk: async () => {
         try {
-          // Process payment for all confirmed orders
+          // Lấy adminId từ localStorage
+          const userStr = localStorage.getItem('user') || sessionStorage.getItem('user')
+          const user = userStr ? JSON.parse(userStr) : null
+          const adminId = user?.id || null
+
+          // Process payment for all confirmed orders (gửi kèm adminId)
           const paymentPromises = confirmedOrders.map(order =>
             axios.put(`${REACT_APP_API_URL}/orders/${order.id}/status`, {
-              status: 'PAID'
+              status: 'PAID',
+              adminId: adminId
             })
           )
 
@@ -695,7 +702,6 @@ function OrderSessionPage() {
           if (session.sessionId !== null && session.sessionStatus === 'ACTIVE') {
             try {
               await axios.put(`${REACT_APP_API_URL}/qr-sessions/${session.sessionId}/end`)
-              message.success('Phiên đã kết thúc!')
             } catch (error) {
               console.error('[Sessions] End session error:', error)
               message.error('Không thể kết thúc phiên QR!')
@@ -1444,47 +1450,134 @@ function OrderSessionPage() {
         />
         <Content className="mt-16 p-5 bg-gray-50 min-h-[calc(100vh-64px)] overflow-auto">
           <Spin spinning={loading} tip="Đang tải danh sách phiên...">
-            {/* Statistics Cards */}
-            <Row gutter={[16, 16]} className="mb-6">
+            {/* Statistics Cards - Japanese Minimalist Design */}
+            <Row gutter={[20, 20]} className="mb-6">
               <Col xs={24} sm={12} lg={6}>
-                <Card>
-                  <Statistic
-                    title="Tổng phiên"
-                    value={statistics.totalSessions}
-                    prefix={<ShopOutlined />}
-                    valueStyle={{ color: '#1890ff' }}
-                  />
+                <Card
+                  bordered={false}
+                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                  bodyStyle={{
+                    padding: '24px',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}
+                  hoverable
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center flex-shrink-0">
+                      <Grid size={22} strokeWidth={2} color="#1890ff" />
+                    </div>
+                    <Text className="text-gray-500 text-sm font-medium tracking-wide mt-1">
+                      Tổng phiên
+                    </Text>
+                  </div>
+                  <div>
+                    <Title
+                      level={2}
+                      className="text-gray-800 text-3xl font-semibold leading-none tracking-tight float-end"
+                      style={{ margin: '12px 0 4px 0' }}
+                    >
+                      {statistics.totalSessions}
+                    </Title>
+                  </div>
                 </Card>
               </Col>
               <Col xs={24} sm={12} lg={6}>
-                <Card>
-                  <Statistic
-                    title="Phiên đang hoạt động"
-                    value={statistics.activeSessions}
-                    prefix={<ClockCircleOutlined />}
-                    valueStyle={{ color: '#52c41a' }}
-                  />
+                <Card
+                  bordered={false}
+                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                  bodyStyle={{
+                    padding: '24px',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}
+                  hoverable
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-50 to-green-100 flex items-center justify-center flex-shrink-0">
+                      <Clock size={22} strokeWidth={2} color="#52c41a" />
+                    </div>
+                    <Text className="text-gray-500 text-sm font-medium tracking-wide mt-1">
+                      Phiên hoạt động
+                    </Text>
+                  </div>
+                  <div>
+                    <Title
+                      level={2}
+                      className="text-gray-800 text-3xl font-semibold leading-none tracking-tight float-end"
+                      style={{ margin: '12px 0 4px 0' }}
+                    >
+                      {statistics.activeSessions}
+                    </Title>
+                  </div>
                 </Card>
               </Col>
               <Col xs={24} sm={12} lg={6}>
-                <Card>
-                  <Statistic
-                    title="Tổng đơn hàng"
-                    value={statistics.totalOrders}
-                    prefix={<ShoppingCartOutlined />}
-                    valueStyle={{ color: '#faad14' }}
-                  />
+                <Card
+                  bordered={false}
+                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                  bodyStyle={{
+                    padding: '24px',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}
+                  hoverable
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center flex-shrink-0">
+                      <ShoppingCart size={22} strokeWidth={2} color="#faad14" />
+                    </div>
+                    <Text className="text-gray-500 text-sm font-medium tracking-wide mt-1">
+                      Tổng đơn hàng
+                    </Text>
+                  </div>
+                  <div>
+                    <Title
+                      level={2}
+                      className="text-gray-800 text-3xl font-semibold leading-none tracking-tight float-end"
+                      style={{ margin: '12px 0 4px 0' }}
+                    >
+                      {statistics.totalOrders}
+                    </Title>
+                  </div>
                 </Card>
               </Col>
               <Col xs={24} sm={12} lg={6}>
-                <Card>
-                  <Statistic
-                    title="Doanh thu"
-                    value={statistics.revenue}
-                    prefix={<DollarOutlined />}
-                    valueStyle={{ color: '#226533' }}
-                    suffix="đ"
-                  />
+                <Card
+                  bordered={false}
+                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                  bodyStyle={{
+                    padding: '24px',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}
+                  hoverable
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100 flex items-center justify-center flex-shrink-0">
+                      <DollarSign size={22} strokeWidth={2} color="#226533" />
+                    </div>
+                    <Text className="text-gray-500 text-sm font-medium tracking-wide mt-1">
+                      Doanh thu
+                    </Text>
+                  </div>
+                  <div>
+                    <Title
+                      level={2}
+                      className="text-gray-800 text-2xl font-semibold leading-none tracking-tight float-end"
+                      style={{ margin: '12px 0 4px 0' }}
+                    >
+                      {statistics.revenue?.toLocaleString('vi-VN')}đ
+                    </Title>
+                  </div>
                 </Card>
               </Col>
             </Row>
@@ -1821,25 +1914,27 @@ function OrderSessionPage() {
                   </div>
                 </div>
 
-                {/* Tổng tiền - Summary Card */}
-                <Card className='mb-2'>
-                  <div className='space-y-2'>
-                    {selectedOrder.point > 0 && (
-                      <div className='flex justify-between items-center pb-2 border-b'>
-                        <span className='text-xs text-gray-600'>Điểm tích lũy sử dụng</span>
-                        <span className='font-semibold text-sm text-orange-600'>
-                          -{selectedOrder.point} điểm
+                {/* Tổng tiền - Summary Card (ẩn với đơn đã hủy) */}
+                {selectedOrder.status !== 'CANCELLED' && (
+                  <Card className='mb-2'>
+                    <div className='space-y-2'>
+                      {selectedOrder.point > 0 && (
+                        <div className='flex justify-between items-center pb-2 border-b'>
+                          <span className='text-xs text-gray-600'>Điểm tích lũy sử dụng</span>
+                          <span className='font-semibold text-sm text-orange-600'>
+                            -{selectedOrder.point} điểm
+                          </span>
+                        </div>
+                      )}
+                      <div className='flex justify-between items-center'>
+                        <span className='text-base font-bold'>Tổng thanh toán</span>
+                        <span className='text-2xl font-bold' style={{ color: '#226533' }}>
+                          {selectedOrder.total}
                         </span>
                       </div>
-                    )}
-                    <div className='flex justify-between items-center'>
-                      <span className='text-base font-bold'>Tổng thanh toán</span>
-                      <span className='text-2xl font-bold' style={{ color: '#226533' }}>
-                        {selectedOrder.total}
-                      </span>
                     </div>
-                  </div>
-                </Card>
+                  </Card>
+                )}
 
                 {/* Meta info - Compact */}
                 {selectedOrder.updatedAt && (

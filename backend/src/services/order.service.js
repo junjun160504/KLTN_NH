@@ -779,13 +779,13 @@ export async function getOrdersByTableId(table_id) {
 }
 
 // Cập nhật trạng thái đơn
-export async function updateStatus(orderId, status) {
+export async function updateStatus(orderId, status, adminId = null) {
   const valid = ["NEW", "IN_PROGRESS", "DONE", "PAID", "CANCELLED"];
   if (!valid.includes(status)) throw new Error("Invalid order status");
 
   // Lấy thông tin order trước khi update
   const [[order]] = await pool.query(
-    "SELECT id, qr_session_id FROM orders WHERE id = ?",
+    "SELECT id, qr_session_id, total_price FROM orders WHERE id = ?",
     [orderId]
   );
 
@@ -793,17 +793,45 @@ export async function updateStatus(orderId, status) {
     throw new Error("Order not found");
   }
 
-  // Update order status
-  await pool.query("UPDATE orders SET status = ? WHERE id = ?", [status, orderId]);
+  // Update order status (và admin_id nếu có)
+  if (adminId) {
+    await pool.query("UPDATE orders SET status = ?, admin_id = ? WHERE id = ?", [status, adminId, orderId]);
+  } else {
+    await pool.query("UPDATE orders SET status = ? WHERE id = ?", [status, orderId]);
+  }
 
-  // ✅ Nếu status = PAID và có qr_session_id → Đóng session
-  if (status === 'PAID' && order.qr_session_id) {
+  // ✅ Nếu status = PAID → Tạo payment record với admin_id
+  if (status === 'PAID') {
     try {
-      await closeSession(order.qr_session_id);
-      console.log(`✅ Session ${order.qr_session_id} closed after order #${orderId} marked as PAID`);
-    } catch (error) {
-      console.error(`⚠️ Failed to close session ${order.qr_session_id}:`, error);
+      // Kiểm tra đã có payment PAID cho order này chưa
+      const [[existingPayment]] = await pool.query(
+        "SELECT id FROM payments WHERE order_id = ? AND payment_status = 'PAID'",
+        [orderId]
+      );
+
+      if (!existingPayment) {
+        // Tạo payment record mới
+        await pool.query(
+          `INSERT INTO payments (order_id, admin_id, method, amount, payment_status, paid_at)
+           VALUES (?, ?, 'CASH', ?, 'PAID', NOW())`,
+          [orderId, adminId, order.total_price]
+        );
+        console.log(`✅ Payment record created for order #${orderId} by admin #${adminId}`);
+      }
+    } catch (paymentError) {
+      console.error(`⚠️ Failed to create payment record:`, paymentError);
       // Không throw error vì order status đã update thành công
+    }
+
+    // Đóng session nếu có
+    if (order.qr_session_id) {
+      try {
+        await closeSession(order.qr_session_id);
+        console.log(`✅ Session ${order.qr_session_id} closed after order #${orderId} marked as PAID`);
+      } catch (error) {
+        console.error(`⚠️ Failed to close session ${order.qr_session_id}:`, error);
+        // Không throw error vì order status đã update thành công
+      }
     }
   }
 
