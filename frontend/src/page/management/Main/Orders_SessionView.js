@@ -1193,7 +1193,7 @@ function OrderSessionPage() {
       title: 'Mã phiên',
       dataIndex: 'sessionCode',
       key: 'sessionCode',
-      width: '15%',
+      width: '12%',
       align: 'left',
       render: (code) => <span className="font-semibold text-blue-600">{code}</span>
     },
@@ -1202,7 +1202,7 @@ function OrderSessionPage() {
       dataIndex: 'table',
       key: 'table',
       width: '10%',
-      align: 'left',
+      align: 'center',
       sorter: (a, b) => (parseInt(a.tableNumber) || 0) - (parseInt(b.tableNumber) || 0),
       render: (text) => <span className="font-medium">{text}</span>
     },
@@ -1210,8 +1210,8 @@ function OrderSessionPage() {
       title: 'SĐT khách',
       dataIndex: 'phone',
       key: 'phone',
-      width: '13%',
-      align: 'left'
+      width: '15%',
+      align: 'center'
     },
     {
       title: 'Tổng tiền',
@@ -1233,19 +1233,15 @@ function OrderSessionPage() {
       key: 'createdAt',
       width: '14%',
       sorter: (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
-      render: (time) => (
-        <div className="text-gray-600 text-sm">
-          <div>{dayjs(time).format('DD/MM/YYYY')}</div>
-          <div className="text-xs text-gray-400">{dayjs(time).format('HH:mm')}</div>
-        </div>
-      )
+      render: (time) => <span className="text-sm text-gray-600">{dayjs(time).format('HH:mm DD/MM/YYYY')}</span>
+
     },
     {
       title: 'Trạng thái',
       dataIndex: 'sessionStatus',
       key: 'sessionStatus',
       width: '13%',
-      align: 'left',
+      align: 'center',
       render: (status) => <SessionStatusBadge status={status} />
     },
     {
@@ -1297,6 +1293,7 @@ function OrderSessionPage() {
       dataIndex: 'code',
       key: 'code',
       width: '18%',
+      align: 'center',
       render: (code) => <span className="font-medium text-gray-700 text-sm">{code}</span>
     },
     {
@@ -1304,14 +1301,15 @@ function OrderSessionPage() {
       dataIndex: 'total',
       key: 'total',
       width: '18%',
-      align: 'right',
-      render: (text) => <span className="font-semibold text-green-700 text-sm">{text}</span>
+      align: 'center',
+      render: (text) => <span className="font-semibold text-green-700 text-sm float-end">{text}</span>
     },
     {
       title: 'Thời gian',
       dataIndex: 'createdAt',
       key: 'createdAt',
       width: '22%',
+      align: 'center',
       render: (time) => <span className="text-sm text-gray-600">{dayjs(time).format('HH:mm DD/MM/YYYY')}</span>
     },
     {
@@ -1319,6 +1317,7 @@ function OrderSessionPage() {
       dataIndex: 'status',
       key: 'status',
       width: '17%',
+      align: 'center',
       render: (status) => <StatusBadge status={status} />
     },
     {
@@ -1337,7 +1336,7 @@ function OrderSessionPage() {
                 icon={<EyeOutlined />}
                 onClick={() => handleViewDetail(order)}
               >
-                Xem chi tiết
+
               </Button>
               <Popconfirm
                 title="Hủy đơn hàng"
@@ -1469,7 +1468,7 @@ function OrderSessionPage() {
                     <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center flex-shrink-0">
                       <Grid size={22} strokeWidth={2} color="#1890ff" />
                     </div>
-                    <Text className="text-gray-500 text-sm font-medium tracking-wide mt-1">
+                    <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
                       Tổng phiên
                     </Text>
                   </div>
@@ -1501,7 +1500,7 @@ function OrderSessionPage() {
                     <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-50 to-green-100 flex items-center justify-center flex-shrink-0">
                       <Clock size={22} strokeWidth={2} color="#52c41a" />
                     </div>
-                    <Text className="text-gray-500 text-sm font-medium tracking-wide mt-1">
+                    <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
                       Phiên hoạt động
                     </Text>
                   </div>
@@ -1533,7 +1532,7 @@ function OrderSessionPage() {
                     <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center flex-shrink-0">
                       <ShoppingCart size={22} strokeWidth={2} color="#faad14" />
                     </div>
-                    <Text className="text-gray-500 text-sm font-medium tracking-wide mt-1">
+                    <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
                       Tổng đơn hàng
                     </Text>
                   </div>
@@ -1565,7 +1564,7 @@ function OrderSessionPage() {
                     <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100 flex items-center justify-center flex-shrink-0">
                       <DollarSign size={22} strokeWidth={2} color="#226533" />
                     </div>
-                    <Text className="text-gray-500 text-sm font-medium tracking-wide mt-1">
+                    <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
                       Doanh thu
                     </Text>
                   </div>
@@ -1587,7 +1586,7 @@ function OrderSessionPage() {
               <Space wrap className="w-full justify-between">
                 <Space wrap>
                   <Input
-                    placeholder="Tìm mã phiên, SĐT, số bàn..."
+                    placeholder="Tìm mã phiên, số bàn"
                     prefix={<SearchOutlined />}
                     value={searchText}
                     onChange={(e) => setSearchText(e.target.value)}
@@ -1600,7 +1599,7 @@ function OrderSessionPage() {
                     className="w-40"
                     suffixIcon={<FilterOutlined />}
                   >
-                    <Option value="ALL">Tất cả trạng thái</Option>
+                    <Option value="ALL">Trạng thái đơn</Option>
                     <Option value="NEW">Chờ xác nhận</Option>
                     <Option value="IN_PROGRESS">Đang phục vụ</Option>
                     <Option value="PAID">Đã thanh toán</Option>

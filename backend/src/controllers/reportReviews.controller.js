@@ -200,3 +200,64 @@ export const getCombinedRatingDistribution = async (req, res) => {
         })
     }
 }
+
+/**
+ * Get restaurant reviews detail by date range
+ */
+export const getRestaurantReviewsDetail = async (req, res) => {
+    try {
+        const { startDate, endDate, page = 1, limit = 10 } = req.query
+
+        if (!startDate || !endDate) {
+            return res.status(400).json({
+                success: false,
+                message: 'startDate and endDate are required'
+            })
+        }
+
+        const result = await reportReviewsService.getRestaurantReviewsDetail(
+            startDate,
+            endDate,
+            parseInt(page),
+            parseInt(limit)
+        )
+        res.json(result)
+    } catch (error) {
+        console.error('Error in getRestaurantReviewsDetail:', error)
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error'
+        })
+    }
+}
+
+/**
+ * Get menu reviews detail by date range
+ */
+export const getMenuReviewsDetail = async (req, res) => {
+    try {
+        const { startDate, endDate, page = 1, limit = 10 } = req.query
+
+        if (!startDate || !endDate) {
+            return res.status(400).json({
+                success: false,
+                message: 'startDate and endDate are required'
+            })
+        }
+
+        const result = await reportReviewsService.getMenuReviewsDetail(
+            startDate,
+            endDate,
+            parseInt(page),
+            parseInt(limit)
+        )
+        res.json(result)
+    } catch (error) {
+        console.error('Error in getMenuReviewsDetail:', error)
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error'
+        })
+    }
+}
+

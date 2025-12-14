@@ -183,3 +183,45 @@ export const getCombinedRatingDistribution = async (startDate, endDate) => {
         throw error
     }
 }
+
+export const getRestaurantReviewsDetail = async (startDate, endDate, page = 1, limit = 10) => {
+    try {
+        const response = await axios.get(
+            `${API_URL}/dashboard/reviews/restaurant/detail`,
+            {
+                ...getAuthHeader(),
+                params: {
+                    startDate: startDate.format('YYYY-MM-DD'),
+                    endDate: endDate.format('YYYY-MM-DD'),
+                    page,
+                    limit
+                }
+            }
+        )
+        return response.data
+    } catch (error) {
+        console.error('Error fetching restaurant reviews detail:', error)
+        throw error
+    }
+}
+
+export const getMenuReviewsDetail = async (startDate, endDate, page = 1, limit = 10) => {
+    try {
+        const response = await axios.get(
+            `${API_URL}/dashboard/reviews/menu/detail`,
+            {
+                ...getAuthHeader(),
+                params: {
+                    startDate: startDate.format('YYYY-MM-DD'),
+                    endDate: endDate.format('YYYY-MM-DD'),
+                    page,
+                    limit
+                }
+            }
+        )
+        return response.data
+    } catch (error) {
+        console.error('Error fetching menu reviews detail:', error)
+        throw error
+    }
+}

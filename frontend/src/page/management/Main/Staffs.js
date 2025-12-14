@@ -446,8 +446,9 @@ const StaffsPage = () => {
       sorter: (a, b) => a.name.localeCompare(b.name),
       sortDirections: ["ascend", "descend"],
       width: 220,
+      align: "center",
       render: (name) => (
-        <div className="flex justify-center gap-2 py-1">
+        <div className="flex justify-start gap-2 py-1 ml-8">
           <span className="font-semibold text-gray-800 text-sm">{name}</span>
         </div>
       ),
@@ -459,7 +460,7 @@ const StaffsPage = () => {
       align: "center",
       width: 260,
       render: (email) => (
-        <span className="text-sm text-gray-600">{email || "—"}</span>
+        <span className="text-sm text-gray-600 float-start ml-4">{email || "—"}</span>
       ),
     },
     {
@@ -495,7 +496,7 @@ const StaffsPage = () => {
       align: "center",
       width: '205px',
       render: (address) => (
-        <span className="text-sm text-gray-500 line-clamp-1" title={address}>
+        <span className="text-sm text-gray-500 line-clamp-1 float-start ml-4" title={address}>
           {address || "—"}
         </span>
       ),
@@ -615,8 +616,8 @@ const StaffsPage = () => {
               }}
             >
               <Input.Search
-                placeholder="Tìm nhân viên theo tên, email, số điện thoại..."
-                style={{ width: 450 }}
+                placeholder="Tìm nhân viên theo tên, email, số điện thoại"
+                style={{ maxWidth: 350 }}
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
                 allowClear
@@ -773,7 +774,7 @@ const StaffsPage = () => {
                       <Input
                         placeholder="Ví dụ: Nguyễn Văn A"
                         className="rounded-lg h-11"
-                        maxLength={100}
+                        maxLength={50}
                         showCount
                       />
                     </Form.Item>
@@ -850,7 +851,7 @@ const StaffsPage = () => {
                       placeholder="Nhập địa chỉ (tùy chọn)"
                       rows={3}
                       className="rounded-lg"
-                      maxLength={200}
+                      maxLength={100}
                       showCount
                     />
                   </Form.Item>
@@ -952,7 +953,7 @@ const StaffsPage = () => {
                       <Input
                         placeholder="Ví dụ: Nguyễn Văn A"
                         className="rounded-lg h-11"
-                        maxLength={100}
+                        maxLength={50}
                         showCount
                       />
                     </Form.Item>
@@ -1027,7 +1028,7 @@ const StaffsPage = () => {
                       placeholder="Nhập địa chỉ (tùy chọn)"
                       rows={3}
                       className="rounded-lg"
-                      maxLength={200}
+                      maxLength={100}
                       showCount
                     />
                   </Form.Item>

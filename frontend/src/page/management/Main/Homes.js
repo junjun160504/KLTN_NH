@@ -351,7 +351,7 @@ const Home = () => {
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center flex-shrink-0">
             <Icon size={22} strokeWidth={2} color="#1890ff" />
           </div>
-          <Text className="text-gray-500 text-sm font-medium tracking-wide mt-1">
+          <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
             {title}
           </Text>
         </div>

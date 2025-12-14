@@ -193,6 +193,7 @@ const TablesPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [loadingMenu, setLoadingMenu] = useState(false)
   const [addingItem, setAddingItem] = useState(false)
+  const [menuSearchText, setMenuSearchText] = useState('')
 
   // Print invoice state
   const [shouldPrintInvoice, setShouldPrintInvoice] = useState(true)
@@ -2489,7 +2490,9 @@ const TablesPage = () => {
                   boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
                 }}
               >
-                <Space size="large">
+                <Space size="large"
+                  className='flex justify-around'
+                >
                   <Text>
                     <span style={{ fontWeight: 'bold', color: '#1890ff' }}>
                       {filteredTables.length}
@@ -2695,16 +2698,25 @@ const TablesPage = () => {
             {/* Drawer: Menu Selection - Simplified Layout */}
             <Drawer
               title={
-                <Title level={4} style={{ margin: 0 }}>
-                  {/* Chọn món cho Bàn {selectedTable?.table_number} */}
-                  Thực đơn
-                </Title>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'start', width: '100%', gap: '88px' }}>
+                  <Title level={4} style={{ margin: 0 }}>
+                    Thực đơn
+                  </Title>
+                  <Input.Search
+                    placeholder="Tìm kiếm món ăn..."
+                    value={menuSearchText}
+                    onChange={(e) => setMenuSearchText(e.target.value)}
+                    allowClear
+                    style={{ width: 400 }}
+                  />
+                </div>
               }
               placement="left"
               open={menuModalOpen}
               onClose={() => {
                 setMenuModalOpen(false)
                 setSelectedCategory('all')
+                setMenuSearchText('')
               }}
               width={`calc(100vw - 480px)`}
               styles={{
@@ -2793,14 +2805,18 @@ const TablesPage = () => {
                         </Col>
                       ))}
                     </Row>
-                  ) : menuItems.length === 0 ? (
-                    <Empty description="Không có món ăn" style={{ marginTop: 60 }} />
+                  ) : menuItems.filter(item =>
+                    item.name.toLowerCase().includes(menuSearchText.toLowerCase())
+                  ).length === 0 ? (
+                    <Empty description={menuSearchText ? "Không tìm thấy món ăn" : "Không có món ăn"} style={{ marginTop: 60 }} />
                   ) : (
                     <Row
                       gutter={[32, 24]}
                       className="menu-items-container menu-items-loaded"
                     >
-                      {menuItems.map((item) => (
+                      {menuItems.filter(item =>
+                        item.name.toLowerCase().includes(menuSearchText.toLowerCase())
+                      ).map((item) => (
                         <Col key={item.id} xs={24} sm={12} md={8} lg={8} xl={8}>
                           <Card
                             hoverable

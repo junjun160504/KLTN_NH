@@ -39,7 +39,7 @@ import {
   CartesianGrid,
   ResponsiveContainer
 } from 'recharts'
-import * as XLSX from 'xlsx'
+import XLSX from 'xlsx-js-style'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -93,7 +93,7 @@ const ReportsCustomerPage = () => {
       const [trendResponse, topCustomersResponse, distributionResponse] = await Promise.all([
         reportCustomersService.getLoyaltyTrend(start, end),
         reportCustomersService.getTopCustomers(10, start, end),
-        reportCustomersService.getPointDistribution()
+        reportCustomersService.getPointDistribution(start, end)
       ])
 
       // Process trend data
@@ -163,54 +163,12 @@ const ReportsCustomerPage = () => {
       const wb = XLSX.utils.book_new()
       const [start, end] = dateRange
 
-      // ========== HELPER STYLES ==========
-
-      // Style cho header
-      const headerStyle = {
-        fill: { fgColor: { rgb: '1890FF' } },
-        font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 12 },
-        alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
-        border: {
-          top: { style: 'thin', color: { rgb: '000000' } },
-          bottom: { style: 'thin', color: { rgb: '000000' } },
-          left: { style: 'thin', color: { rgb: '000000' } },
-          right: { style: 'thin', color: { rgb: '000000' } }
-        }
-      }
-
-      // Style cho data cell
-      const dataCellStyle = {
-        alignment: { horizontal: 'right', vertical: 'center' },
-        border: {
-          top: { style: 'thin', color: { rgb: 'D9D9D9' } },
-          bottom: { style: 'thin', color: { rgb: 'D9D9D9' } },
-          left: { style: 'thin', color: { rgb: 'D9D9D9' } },
-          right: { style: 'thin', color: { rgb: 'D9D9D9' } }
-        }
-      }
-
-      // Style cho text cell
-      const textCellStyle = {
-        alignment: { horizontal: 'center', vertical: 'center' },
-        border: {
-          top: { style: 'thin', color: { rgb: 'D9D9D9' } },
-          bottom: { style: 'thin', color: { rgb: 'D9D9D9' } },
-          left: { style: 'thin', color: { rgb: 'D9D9D9' } },
-          right: { style: 'thin', color: { rgb: 'D9D9D9' } }
-        }
-      }
-
-      // Style cho total row
-      const totalCellStyle = {
-        fill: { fgColor: { rgb: 'F0F0F0' } },
-        font: { bold: true, sz: 11 },
-        alignment: { horizontal: 'right', vertical: 'center' },
-        border: {
-          top: { style: 'medium', color: { rgb: '000000' } },
-          bottom: { style: 'medium', color: { rgb: '000000' } },
-          left: { style: 'thin', color: { rgb: '000000' } },
-          right: { style: 'thin', color: { rgb: '000000' } }
-        }
+      // ========== COMMON BORDER STYLE ==========
+      const thinBorder = {
+        top: { style: 'thin', color: { rgb: '000000' } },
+        bottom: { style: 'thin', color: { rgb: '000000' } },
+        left: { style: 'thin', color: { rgb: '000000' } },
+        right: { style: 'thin', color: { rgb: '000000' } }
       }
 
       // ========== 1️⃣ SHEET "TOP KHÁCH HÀNG TÍCH ĐIỂM" ==========
@@ -244,85 +202,106 @@ const ReportsCustomerPage = () => {
         ''
       ]
 
-      // Create worksheet data
-      const customerWsData = [
-        // Title row
-        [{ v: `TOP ${topLimit} KHÁCH HÀNG TÍCH ĐIỂM (${start.format('DD/MM/YYYY')} - ${end.format('DD/MM/YYYY')})`, t: 's' }],
-        [], // Empty row
-        // Header row
-        customerHeaders,
-        // Data rows
-        ...customerDataRows,
-        // Total row
-        customerTotals
-      ]
+      // Create worksheet with proper cell objects for styling
+      const customerWs = {}
 
-      const customerWs = XLSX.utils.aoa_to_sheet(customerWsData)
-
-      // Merge title cell
-      customerWs['!merges'] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }
-      ]
-
-      // Apply styles - Title
-      customerWs['A1'].s = {
-        fill: { fgColor: { rgb: '722ED1' } },
-        font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 14 },
-        alignment: { horizontal: 'center', vertical: 'center' }
+      // Title row (row 0) - merged across all columns
+      const customerTitleText = `TOP ${topLimit} KHÁCH HÀNG TÍCH ĐIỂM (${start.format('DD/MM/YYYY')} - ${end.format('DD/MM/YYYY')})`
+      customerWs['A1'] = {
+        v: customerTitleText,
+        t: 's',
+        s: {
+          font: { bold: true, sz: 14 },
+          alignment: { horizontal: 'center', vertical: 'center' },
+          border: thinBorder
+        }
+      }
+      // Fill empty merged cells with border
+      for (let i = 1; i < customerHeaders.length; i++) {
+        const cellRef = XLSX.utils.encode_cell({ r: 0, c: i })
+        customerWs[cellRef] = {
+          v: '',
+          t: 's',
+          s: { border: thinBorder }
+        }
       }
 
-      // Headers (row 3)
-      const customerHeaderStyle = {
-        ...headerStyle,
-        fill: { fgColor: { rgb: '722ED1' } }
-      }
-
-      customerHeaders.forEach((_, colIdx) => {
-        const cellRef = XLSX.utils.encode_cell({ r: 2, c: colIdx })
-        if (!customerWs[cellRef]) customerWs[cellRef] = { t: 's', v: '' }
-        customerWs[cellRef].s = customerHeaderStyle
+      // Header row (row 2, index 1)
+      customerHeaders.forEach((header, colIdx) => {
+        const cellRef = XLSX.utils.encode_cell({ r: 1, c: colIdx })
+        customerWs[cellRef] = {
+          v: header,
+          t: 's',
+          s: {
+            fill: { fgColor: { rgb: 'D9E8FB' } },
+            font: { bold: true, sz: 11 },
+            alignment: { horizontal: 'center', vertical: 'center' },
+            border: thinBorder
+          }
+        }
       })
 
-      // Data cells
+      // Data rows (starting from row 3, index 2)
       customerDataRows.forEach((row, rowIdx) => {
         row.forEach((val, colIdx) => {
-          const cellRef = XLSX.utils.encode_cell({ r: rowIdx + 3, c: colIdx })
-          if (!customerWs[cellRef]) customerWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
+          const cellRef = XLSX.utils.encode_cell({ r: rowIdx + 2, c: colIdx })
 
-          if (colIdx === 0) {
-            // STT - center align
-            customerWs[cellRef].s = textCellStyle
-          } else if (colIdx === 1 || colIdx === 2 || colIdx === 6) {
-            // Tên, SĐT, Lần ghé gần nhất - left/center align
-            customerWs[cellRef].s = {
-              alignment: { horizontal: colIdx === 2 || colIdx === 6 ? 'center' : 'left', vertical: 'center' },
-              border: {
-                top: { style: 'thin', color: { rgb: 'D9D9D9' } },
-                bottom: { style: 'thin', color: { rgb: 'D9D9D9' } },
-                left: { style: 'thin', color: { rgb: 'D9D9D9' } },
-                right: { style: 'thin', color: { rgb: 'D9D9D9' } }
-              }
+          let horizontalAlign = 'right'
+          if (colIdx === 0) horizontalAlign = 'center' // STT
+          else if (colIdx === 1) horizontalAlign = 'left' // Tên khách hàng
+          else if (colIdx === 2 || colIdx === 6) horizontalAlign = 'center' // SĐT, Lần ghé gần nhất
+
+          customerWs[cellRef] = {
+            v: val,
+            t: typeof val === 'number' ? 'n' : 's',
+            s: {
+              alignment: {
+                horizontal: horizontalAlign,
+                vertical: 'center'
+              },
+              border: thinBorder
             }
-          } else {
-            // Number columns (3,4,5) - right align
-            customerWs[cellRef].s = dataCellStyle
-            if (typeof val === 'number') {
-              customerWs[cellRef].z = '#,##0'
-            }
+          }
+
+          // Number format with thousand separator
+          if (typeof val === 'number' && (colIdx === 3 || colIdx === 4 || colIdx === 5)) {
+            customerWs[cellRef].z = '#,##0'
           }
         })
       })
 
       // Total row
-      const customerTotalRowIdx = customerDataRows.length + 3
+      const customerTotalRowIdx = customerDataRows.length + 2
       customerTotals.forEach((val, colIdx) => {
         const cellRef = XLSX.utils.encode_cell({ r: customerTotalRowIdx, c: colIdx })
-        if (!customerWs[cellRef]) customerWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
-        customerWs[cellRef].s = totalCellStyle
+        customerWs[cellRef] = {
+          v: val,
+          t: typeof val === 'number' ? 'n' : 's',
+          s: {
+            fill: { fgColor: { rgb: 'F5F5F5' } },
+            font: { bold: true, sz: 11 },
+            alignment: {
+              horizontal: colIdx === 1 ? 'center' : 'right',
+              vertical: 'center'
+            },
+            border: thinBorder
+          }
+        }
         if (typeof val === 'number') {
           customerWs[cellRef].z = '#,##0'
         }
       })
+
+      // Set range for worksheet
+      customerWs['!ref'] = XLSX.utils.encode_range({
+        s: { r: 0, c: 0 },
+        e: { r: customerTotalRowIdx, c: customerHeaders.length - 1 }
+      })
+
+      // Merge title cell across all columns
+      customerWs['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: customerHeaders.length - 1 } }
+      ]
 
       // Set column widths
       customerWs['!cols'] = [
@@ -336,11 +315,11 @@ const ReportsCustomerPage = () => {
       ]
 
       // Set row heights
-      customerWs['!rows'] = [
-        { hpt: 30 }, // Title row
-        { hpt: 5 },  // Empty row
-        { hpt: 25 }  // Header row
-      ]
+      const customerRowHeights = [{ hpt: 25 }] // Title row
+      for (let i = 0; i <= customerDataRows.length; i++) {
+        customerRowHeights.push({ hpt: 22 })
+      }
+      customerWs['!rows'] = customerRowHeights
 
       XLSX.utils.book_append_sheet(wb, customerWs, 'Top khách hàng')
 
@@ -363,74 +342,104 @@ const ReportsCustomerPage = () => {
         100.0
       ]
 
-      // Create worksheet data
-      const distributionWsData = [
-        // Title row
-        [{ v: `PHÂN BỔ ĐIỂM TÍCH LŨY THEO KHOẢNG (${start.format('DD/MM/YYYY')} - ${end.format('DD/MM/YYYY')})`, t: 's' }],
-        [], // Empty row
-        // Header row
-        distributionHeaders,
-        // Data rows
-        ...distributionDataRows,
-        // Total row
-        distributionTotals
-      ]
+      // Create worksheet with proper cell objects for styling
+      const distributionWs = {}
 
-      const distributionWs = XLSX.utils.aoa_to_sheet(distributionWsData)
-
-      // Merge title cell
-      distributionWs['!merges'] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }
-      ]
-
-      // Apply styles - Title
-      distributionWs['A1'].s = {
-        fill: { fgColor: { rgb: '52C41A' } },
-        font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 14 },
-        alignment: { horizontal: 'center', vertical: 'center' }
+      // Title row (row 0) - merged across all columns
+      const distributionTitleText = `PHÂN BỔ ĐIỂM TÍCH LŨY THEO KHOẢNG (${start.format('DD/MM/YYYY')} - ${end.format('DD/MM/YYYY')})`
+      distributionWs['A1'] = {
+        v: distributionTitleText,
+        t: 's',
+        s: {
+          font: { bold: true, sz: 14 },
+          alignment: { horizontal: 'center', vertical: 'center' },
+          border: thinBorder
+        }
+      }
+      // Fill empty merged cells with border
+      for (let i = 1; i < distributionHeaders.length; i++) {
+        const cellRef = XLSX.utils.encode_cell({ r: 0, c: i })
+        distributionWs[cellRef] = {
+          v: '',
+          t: 's',
+          s: { border: thinBorder }
+        }
       }
 
-      // Headers (row 3)
-      const distributionHeaderStyle = {
-        ...headerStyle,
-        fill: { fgColor: { rgb: '52C41A' } }
-      }
-
-      distributionHeaders.forEach((_, colIdx) => {
-        const cellRef = XLSX.utils.encode_cell({ r: 2, c: colIdx })
-        if (!distributionWs[cellRef]) distributionWs[cellRef] = { t: 's', v: '' }
-        distributionWs[cellRef].s = distributionHeaderStyle
+      // Header row (row 2, index 1)
+      distributionHeaders.forEach((header, colIdx) => {
+        const cellRef = XLSX.utils.encode_cell({ r: 1, c: colIdx })
+        distributionWs[cellRef] = {
+          v: header,
+          t: 's',
+          s: {
+            fill: { fgColor: { rgb: 'D9E8FB' } },
+            font: { bold: true, sz: 11 },
+            alignment: { horizontal: 'center', vertical: 'center' },
+            border: thinBorder
+          }
+        }
       })
 
-      // Data cells
+      // Data rows (starting from row 3, index 2)
       distributionDataRows.forEach((row, rowIdx) => {
         row.forEach((val, colIdx) => {
-          const cellRef = XLSX.utils.encode_cell({ r: rowIdx + 3, c: colIdx })
-          if (!distributionWs[cellRef]) distributionWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
+          const cellRef = XLSX.utils.encode_cell({ r: rowIdx + 2, c: colIdx })
 
-          if (colIdx === 0 || colIdx === 1) {
-            // STT, Khoảng điểm - center align
-            distributionWs[cellRef].s = textCellStyle
-          } else {
-            // Number columns - right align
-            distributionWs[cellRef].s = dataCellStyle
-            if (typeof val === 'number') {
-              distributionWs[cellRef].z = colIdx === 3 ? '#,##0.0' : '#,##0'
+          distributionWs[cellRef] = {
+            v: val,
+            t: typeof val === 'number' ? 'n' : 's',
+            s: {
+              alignment: {
+                horizontal: colIdx === 0 || colIdx === 1 ? 'center' : 'right',
+                vertical: 'center'
+              },
+              border: thinBorder
             }
+          }
+
+          // Number format
+          if (typeof val === 'number' && colIdx === 2) {
+            distributionWs[cellRef].z = '#,##0'
+          }
+          if (typeof val === 'number' && colIdx === 3) {
+            distributionWs[cellRef].z = '#,##0.0'
           }
         })
       })
 
       // Total row
-      const distributionTotalRowIdx = distributionDataRows.length + 3
+      const distributionTotalRowIdx = distributionDataRows.length + 2
       distributionTotals.forEach((val, colIdx) => {
         const cellRef = XLSX.utils.encode_cell({ r: distributionTotalRowIdx, c: colIdx })
-        if (!distributionWs[cellRef]) distributionWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
-        distributionWs[cellRef].s = totalCellStyle
+        distributionWs[cellRef] = {
+          v: val,
+          t: typeof val === 'number' ? 'n' : 's',
+          s: {
+            fill: { fgColor: { rgb: 'F5F5F5' } },
+            font: { bold: true, sz: 11 },
+            alignment: {
+              horizontal: colIdx === 1 ? 'center' : 'right',
+              vertical: 'center'
+            },
+            border: thinBorder
+          }
+        }
         if (typeof val === 'number') {
           distributionWs[cellRef].z = colIdx === 3 ? '#,##0.0' : '#,##0'
         }
       })
+
+      // Set range for worksheet
+      distributionWs['!ref'] = XLSX.utils.encode_range({
+        s: { r: 0, c: 0 },
+        e: { r: distributionTotalRowIdx, c: distributionHeaders.length - 1 }
+      })
+
+      // Merge title cell across all columns
+      distributionWs['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: distributionHeaders.length - 1 } }
+      ]
 
       // Set column widths
       distributionWs['!cols'] = [
@@ -441,11 +450,11 @@ const ReportsCustomerPage = () => {
       ]
 
       // Set row heights
-      distributionWs['!rows'] = [
-        { hpt: 30 }, // Title row
-        { hpt: 5 },  // Empty row
-        { hpt: 25 }  // Header row
-      ]
+      const distributionRowHeights = [{ hpt: 25 }] // Title row
+      for (let i = 0; i <= distributionDataRows.length; i++) {
+        distributionRowHeights.push({ hpt: 22 })
+      }
+      distributionWs['!rows'] = distributionRowHeights
 
       XLSX.utils.book_append_sheet(wb, distributionWs, 'Phân bổ điểm')
 
@@ -572,44 +581,132 @@ const ReportsCustomerPage = () => {
           <Spin spinning={loading}>
             <Row gutter={[20, 20]} className="mb-6">
               <Col xs={24} sm={12} lg={6}>
-                <MetricCard
-                  icon={Users}
-                  title="Lượt tích điểm"
-                  value={totalRegistrations.toLocaleString()}
-                  trend={parseFloat(summaryMetrics.growth?.registrations || 0)}
-                  trendLabel=""
-                  valueSize="large"
-                />
+                <Card
+                  bordered={false}
+                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                  bodyStyle={{
+                    padding: '24px',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}
+                  hoverable
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center flex-shrink-0">
+                      <Users size={22} strokeWidth={2} color="#1890ff" />
+                    </div>
+                    <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
+                      Lượt tích điểm
+                    </Text>
+                  </div>
+                  <div>
+                    <Title
+                      level={2}
+                      className="text-gray-800 text-3xl font-semibold leading-none tracking-tight float-end"
+                      style={{ margin: '12px 0 4px 0' }}
+                    >
+                      {totalRegistrations.toLocaleString()}
+                    </Title>
+                  </div>
+                </Card>
               </Col>
               <Col xs={24} sm={12} lg={6}>
-                <MetricCard
-                  icon={Award}
-                  title="Điểm đã cấp"
-                  value={totalPointsIssued.toLocaleString()}
-                  trend={parseFloat(summaryMetrics.growth?.pointsIssued || 0)}
-                  trendLabel=""
-                  valueSize="large"
-                />
+                <Card
+                  bordered={false}
+                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                  bodyStyle={{
+                    padding: '24px',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}
+                  hoverable
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-50 to-purple-100 flex items-center justify-center flex-shrink-0">
+                      <Award size={22} strokeWidth={2} color="#722ed1" />
+                    </div>
+                    <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
+                      Điểm đã cấp
+                    </Text>
+                  </div>
+                  <div>
+                    <Title
+                      level={2}
+                      className="text-gray-800 text-3xl font-semibold leading-none tracking-tight float-end"
+                      style={{ margin: '12px 0 4px 0' }}
+                    >
+                      {totalPointsIssued.toLocaleString()}
+                    </Title>
+                  </div>
+                </Card>
               </Col>
               <Col xs={24} sm={12} lg={6}>
-                <MetricCard
-                  icon={UserCheck}
-                  title="Tỷ lệ tham gia"
-                  value={participationRate}
-                  suffix="%"
-                  trend={parseFloat(summaryMetrics.growth?.participationRate || 0)}
-                  trendLabel=""
-                  valueSize="large"
-                />
+                <Card
+                  bordered={false}
+                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                  bodyStyle={{
+                    padding: '24px',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}
+                  hoverable
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100 flex items-center justify-center flex-shrink-0">
+                      <UserCheck size={22} strokeWidth={2} color="#226533" />
+                    </div>
+                    <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
+                      Tỷ lệ tham gia
+                    </Text>
+                  </div>
+                  <div>
+                    <Title
+                      level={2}
+                      className="text-gray-800 text-3xl font-semibold leading-none tracking-tight float-end"
+                      style={{ margin: '12px 0 4px 0' }}
+                    >
+                      {participationRate}%
+                    </Title>
+                  </div>
+                </Card>
               </Col>
               <Col xs={24} sm={12} lg={6}>
-                <MetricCard
-                  icon={TrendingUp}
-                  title="TB điểm/khách"
-                  value={avgPointsPerCustomer}
-                  suffix=" điểm"
-                  valueSize="large"
-                />
+                <Card
+                  bordered={false}
+                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                  bodyStyle={{
+                    padding: '24px',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}
+                  hoverable
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center flex-shrink-0">
+                      <TrendingUp size={22} strokeWidth={2} color="#faad14" />
+                    </div>
+                    <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
+                      TB điểm/khách
+                    </Text>
+                  </div>
+                  <div>
+                    <Title
+                      level={2}
+                      className="text-gray-800 text-3xl font-semibold leading-none tracking-tight float-end"
+                      style={{ margin: '12px 0 4px 0' }}
+                    >
+                      {avgPointsPerCustomer} điểm
+                    </Title>
+                  </div>
+                </Card>
               </Col>
             </Row>
 
@@ -942,8 +1039,8 @@ const ReportsCustomerPage = () => {
                     <BarChart data={topCustomers} layout="vertical">
                       <defs>
                         <linearGradient id="topCustomerGradient" x1="0" y1="0" x2="1" y2="0">
-                          <stop offset="0%" stopColor="#722ed1" stopOpacity={1} />
-                          <stop offset="100%" stopColor="#9254de" stopOpacity={0.8} />
+                          <stop offset="0%" stopColor="#3b82f6" stopOpacity={1} />
+                          <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.8} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />

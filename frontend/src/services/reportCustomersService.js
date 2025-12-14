@@ -59,13 +59,22 @@ export const getTopCustomers = async (limit = 10, startDate = null, endDate = nu
 
 /**
  * Get point distribution by ranges
+ * Supports date range filtering
  */
-export const getPointDistribution = async () => {
+export const getPointDistribution = async (startDate = null, endDate = null) => {
   try {
     const token = localStorage.getItem('token')
+    const params = {}
+
+    if (startDate && endDate) {
+      params.startDate = startDate.format('YYYY-MM-DD')
+      params.endDate = endDate.format('YYYY-MM-DD')
+    }
+
     const response = await axios.get(
       `${API_BASE_URL}/dashboard/customers/point-distribution`,
       {
+        params,
         headers: {
           Authorization: `Bearer ${token}`
         }

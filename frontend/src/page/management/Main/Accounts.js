@@ -360,8 +360,8 @@ const AccountsPage = () => {
       sortDirections: ["ascend", "descend"],
       width: 280,
       render: (username) => (
-        <div className="flex justify-center gap-2 py-1">
-          <span className="font-semibold text-gray-800 text-sm">{username}</span>
+        <div className="flex justify-start gap-2 py-1">
+          <span className="ml-14 font-semibold text-gray-800 text-sm">{username}</span>
         </div>
       ),
     },
@@ -374,22 +374,22 @@ const AccountsPage = () => {
       render: (role) => {
         const roleConfig = {
           OWNER: { color: "red", text: "OWNER" },
-          MANAGER: { color: "blue", text: "MANAGER" },
-          STAFF: { color: "green", text: "STAFF" },
+          MANAGER: { color: "blue", text: "Quản lý" },
+          STAFF: { color: "green", text: "Nhân viên" },
         };
         const config = roleConfig[role] || roleConfig.STAFF;
         return <Tag color={config.color}>{config.text}</Tag>;
       },
     },
     {
-      title: "Nhân viên",
+      title: "Tên nhân viên",
       dataIndex: "employee_name",
       key: "employee_name",
       align: "center",
       width: 160,
       render: (employee_name, record) => (
-        <div className="flex flex-col items-center">
-          <span className="text-sm font-medium text-gray-800">
+        <div className="flex flex-col items-start">
+          <span className="text-sm ml-3 font-medium text-gray-800">
             {employee_name || "—"}
           </span>
           {/* <span className="text-xs text-gray-500">
@@ -602,9 +602,9 @@ const AccountsPage = () => {
                 placeholder="Chọn vai trò..."
               >
                 <Option value="all">Tất cả vai trò</Option>
-                <Option value="OWNER">OWNER</Option>
-                <Option value="MANAGER">MANAGER</Option>
-                <Option value="STAFF">STAFF</Option>
+                {/* <Option value="OWNER">OWNER</Option> */}
+                <Option value="MANAGER">Quản lý</Option>
+                <Option value="STAFF">Nhân viên</Option>
               </Select>
 
               <Select
@@ -749,6 +749,90 @@ const AccountsPage = () => {
               className="mt-6"
             >
               <div className="space-y-6">
+
+
+                {/* Phân quyền */}
+                <div className="bg-gray-50 rounded-xl p-6 border border-gray-100">
+                  <h4 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
+                    <span className="w-1 h-4 bg-emerald-500 rounded-full"></span>
+                    Phân quyền
+                  </h4>
+
+                  <Form.Item
+                    label={
+                      <span className="text-sm font-medium text-gray-700">
+                        Chọn nhân viên
+                      </span>
+                    }
+                    name="employee_id"
+                    rules={[
+                      {
+                        required: true,
+                        message: "Vui lòng chọn nhân viên!",
+                      },
+                    ]}
+                    className="mb-0"
+                  >
+                    <Select
+                      placeholder="Chọn nhân viên"
+                      className="rounded-lg"
+                      showSearch
+                      optionFilterProp="children"
+                      filterOption={(input, option) =>
+                        option.children.toLowerCase().includes(input.toLowerCase())
+                      }
+                      loading={loadingEmployees}
+                      notFoundContent={loadingEmployees ? "Đang tải..." : "Không có nhân viên chưa tạo tài khoản"}
+                    >
+                      {employees.map((emp) => (
+                        <Option key={emp.id} value={emp.id}>
+                          {emp.name} - {emp.phone || "N/A"}
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+
+                  <Form.Item
+                    label={
+                      <span className="text-sm font-medium text-gray-700 mt-4">
+                        Vai trò
+                      </span>
+                    }
+                    name="role"
+                    className="mb-4"
+                  >
+                    <Radio.Group className="w-full">
+                      <div className="flex flex-col gap-3 pt-2">
+                        {user?.role === 'OWNER' && (
+                          <Radio value="OWNER">
+                            <span className="text-sm font-medium">Chủ</span>
+                            <span className="text-xs text-gray-500 ml-2">
+                              - Toàn quyền quản trị
+                            </span>
+                          </Radio>
+                        )}
+                        {user?.role === 'OWNER' && (
+                          <Radio value="MANAGER">
+                            <span className="text-sm font-medium">Quản lý</span>
+                            <span className="text-xs text-gray-500 ml-2">
+                              - Quản lý và xem báo cáo
+                            </span>
+                          </Radio>
+                        )}
+                        <Radio value="STAFF">
+                          <span className="text-sm font-medium">Nhân viên</span>
+                          <span className="text-xs text-gray-500 ml-2">
+                            - Nhân viên bình thường
+                          </span>
+                        </Radio>
+                      </div>
+                    </Radio.Group>
+                  </Form.Item>
+
+
+                </div>
+
+
                 {/* Thông tin đăng nhập */}
                 <div className="bg-gray-50 rounded-xl p-6 border border-gray-200 shadow-sm">
                   <h4 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
@@ -802,87 +886,8 @@ const AccountsPage = () => {
                     <Input.Password
                       placeholder="Nhập mật khẩu"
                       className="rounded-lg h-11"
-                      maxLength={100}
+                      maxLength={50}
                     />
-                  </Form.Item>
-                </div>
-
-                {/* Phân quyền */}
-                <div className="bg-gray-50 rounded-xl p-6 border border-gray-100">
-                  <h4 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
-                    <span className="w-1 h-4 bg-emerald-500 rounded-full"></span>
-                    Phân quyền
-                  </h4>
-
-                  <Form.Item
-                    label={
-                      <span className="text-sm font-medium text-gray-700">
-                        Vai trò
-                      </span>
-                    }
-                    name="role"
-                    className="mb-4"
-                  >
-                    <Radio.Group className="w-full">
-                      <div className="flex flex-col gap-3 pt-2">
-                        {user?.role === 'OWNER' && (
-                          <Radio value="OWNER">
-                            <span className="text-sm font-medium">OWNER</span>
-                            <span className="text-xs text-gray-500 ml-2">
-                              - Toàn quyền quản trị
-                            </span>
-                          </Radio>
-                        )}
-                        {user?.role === 'OWNER' && (
-                          <Radio value="MANAGER">
-                            <span className="text-sm font-medium">MANAGER</span>
-                            <span className="text-xs text-gray-500 ml-2">
-                              - Quản lý và xem báo cáo
-                            </span>
-                          </Radio>
-                        )}
-                        <Radio value="STAFF">
-                          <span className="text-sm font-medium">STAFF</span>
-                          <span className="text-xs text-gray-500 ml-2">
-                            - Nhân viên bình thường
-                          </span>
-                        </Radio>
-                      </div>
-                    </Radio.Group>
-                  </Form.Item>
-
-                  <Form.Item
-                    label={
-                      <span className="text-sm font-medium text-gray-700">
-                        Chọn nhân viên
-                      </span>
-                    }
-                    name="employee_id"
-                    rules={[
-                      {
-                        required: true,
-                        message: "Vui lòng chọn nhân viên!",
-                      },
-                    ]}
-                    className="mb-0"
-                  >
-                    <Select
-                      placeholder="Chọn nhân viên"
-                      className="rounded-lg"
-                      showSearch
-                      optionFilterProp="children"
-                      filterOption={(input, option) =>
-                        option.children.toLowerCase().includes(input.toLowerCase())
-                      }
-                      loading={loadingEmployees}
-                      notFoundContent={loadingEmployees ? "Đang tải..." : "Không có nhân viên chưa tạo tài khoản"}
-                    >
-                      {employees.map((emp) => (
-                        <Option key={emp.id} value={emp.id}>
-                          {emp.name} - {emp.phone || "N/A"}
-                        </Option>
-                      ))}
-                    </Select>
                   </Form.Item>
                 </div>
               </div>
@@ -1024,7 +1029,7 @@ const AccountsPage = () => {
                       <div className="flex flex-col gap-3 pt-2">
                         {user?.role === 'OWNER' && (
                           <Radio value="OWNER">
-                            <span className="text-sm font-medium">OWNER</span>
+                            <span className="text-sm font-medium">Chủ</span>
                             <span className="text-xs text-gray-500 ml-2">
                               - Toàn quyền quản trị
                             </span>
@@ -1032,14 +1037,14 @@ const AccountsPage = () => {
                         )}
                         {user?.role === 'OWNER' && (
                           <Radio value="MANAGER">
-                            <span className="text-sm font-medium">MANAGER</span>
+                            <span className="text-sm font-medium">Quản lý</span>
                             <span className="text-xs text-gray-500 ml-2">
                               - Quản lý và xem báo cáo
                             </span>
                           </Radio>
                         )}
                         <Radio value="STAFF">
-                          <span className="text-sm font-medium">STAFF</span>
+                          <span className="text-sm font-medium">Nhân viên</span>
                           <span className="text-xs text-gray-500 ml-2">
                             - Nhân viên bình thường
                           </span>

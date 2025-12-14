@@ -420,3 +420,139 @@ export const getCombinedRatingDistribution = async (startDate, endDate) => {
         throw error
     }
 }
+
+/**
+ * Get restaurant reviews detail by date range
+ */
+export const getRestaurantReviewsDetail = async (startDate, endDate, page = 1, limit = 10) => {
+    try {
+        const offset = (page - 1) * limit
+
+        // Get total count
+        const [countResult] = await pool.query(`
+            SELECT COUNT(*) as total
+            FROM reviews r
+            WHERE r.created_at BETWEEN ? AND ?
+        `, [startDate, endDate])
+
+        const total = countResult[0].total
+
+        // Get reviews with pagination
+        const [rows] = await pool.query(`
+            SELECT 
+                r.id,
+                r.rating,
+                r.comment,
+                r.created_at,
+                qs.id as session_id,
+                t.table_number,
+                c.name as customer_name,
+                c.phone as customer_phone
+            FROM reviews r
+            LEFT JOIN qr_sessions qs ON r.qr_session_id = qs.id
+            LEFT JOIN tables t ON qs.table_id = t.id
+            LEFT JOIN customers c ON qs.customer_id = c.id
+            WHERE r.created_at BETWEEN ? AND ?
+            ORDER BY r.created_at DESC
+            LIMIT ? OFFSET ?
+        `, [startDate, endDate, limit, offset])
+
+        return {
+            success: true,
+            data: {
+                reviews: rows.map(row => ({
+                    id: row.id,
+                    rating: row.rating,
+                    comment: row.comment,
+                    createdAt: row.created_at,
+                    tableNumber: row.table_number,
+                    customerName: row.customer_name || 'Khách hàng',
+                    customerPhone: row.customer_phone
+                })),
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    totalPages: Math.ceil(total / limit)
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error in getRestaurantReviewsDetail:', error)
+        throw error
+    }
+}
+
+/**
+ * Get menu reviews detail by date range
+ */
+export const getMenuReviewsDetail = async (startDate, endDate, page = 1, limit = 10) => {
+    try {
+        const offset = (page - 1) * limit
+
+        // Get total count
+        const [countResult] = await pool.query(`
+            SELECT COUNT(*) as total
+            FROM menu_reviews mr
+            WHERE mr.created_at BETWEEN ? AND ?
+        `, [startDate, endDate])
+
+        const total = countResult[0].total
+
+        // Get reviews with pagination
+        const [rows] = await pool.query(`
+            SELECT 
+                mr.id,
+                mr.rating,
+                mr.comment,
+                mr.created_at,
+                mi.id as item_id,
+                mi.name as item_name,
+                mi.image_url as item_image,
+                MAX(mc.name) as category_name,
+                t.table_number,
+                c.name as customer_name,
+                c.phone as customer_phone
+            FROM menu_reviews mr
+            LEFT JOIN menu_items mi ON mr.item_id = mi.id
+            LEFT JOIN menu_item_categories mic ON mi.id = mic.item_id
+            LEFT JOIN menu_categories mc ON mic.category_id = mc.id
+            LEFT JOIN qr_sessions qs ON mr.qr_session_id = qs.id
+            LEFT JOIN tables t ON qs.table_id = t.id
+            LEFT JOIN customers c ON qs.customer_id = c.id
+            WHERE mr.created_at BETWEEN ? AND ?
+            GROUP BY mr.id, mr.rating, mr.comment, mr.created_at, mi.id, mi.name, mi.image_url, t.table_number, c.name, c.phone
+            ORDER BY mr.created_at DESC
+            LIMIT ? OFFSET ?
+        `, [startDate, endDate, limit, offset])
+
+        return {
+            success: true,
+            data: {
+                reviews: rows.map(row => ({
+                    id: row.id,
+                    rating: row.rating,
+                    comment: row.comment,
+                    createdAt: row.created_at,
+                    itemId: row.item_id,
+                    itemName: row.item_name,
+                    itemImage: row.item_image,
+                    categoryName: row.category_name,
+                    tableNumber: row.table_number,
+                    customerName: row.customer_name || 'Khách hàng',
+                    customerPhone: row.customer_phone
+                })),
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    totalPages: Math.ceil(total / limit)
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error in getMenuReviewsDetail:', error)
+        throw error
+    }
+}
+

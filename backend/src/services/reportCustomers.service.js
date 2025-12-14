@@ -127,66 +127,80 @@ export const getLoyaltyTrend = async (startDate, endDate) => {
 
 /**
  * Get top customers by loyalty points
- * Chỉ tính visits từ sessions đã thanh toán
- * Hỗ trợ filter theo khoảng thời gian
+ * Chỉ tính visits và điểm tích lũy trong khoảng thời gian được chọn
  */
 export const getTopCustomers = async (limit = 10, startDate = null, endDate = null) => {
   try {
-    let dateFilter = ''
-    let params = []
+    let query
+    let params
 
     if (startDate && endDate) {
-      dateFilter = 'AND p.paid_at BETWEEN ? AND ?'
-      params = [startDate, endDate]
+      // Lọc theo khoảng thời gian: tính điểm tích được trong khoảng thời gian đó
+      query = `
+        SELECT 
+          c.id,
+          c.name,
+          c.phone,
+          c.points as total_points,
+          COUNT(DISTINCT CASE 
+            WHEN p.payment_status = 'PAID' AND DATE(p.paid_at) BETWEEN ? AND ? THEN qs.id 
+          END) as visits,
+          COALESCE(SUM(CASE 
+            WHEN p.payment_status = 'PAID' AND DATE(p.paid_at) BETWEEN ? AND ? 
+            THEN FLOOR(p.amount / 10000) 
+            ELSE 0 
+          END), 0) as points_in_period,
+          MAX(CASE 
+            WHEN p.payment_status = 'PAID' AND DATE(p.paid_at) BETWEEN ? AND ? THEN p.paid_at 
+          END) as last_visit
+        FROM customers c
+        INNER JOIN qr_sessions qs ON c.id = qs.customer_id
+        INNER JOIN orders o ON qs.id = o.qr_session_id
+        INNER JOIN payments p ON o.id = p.order_id
+        WHERE p.payment_status = 'PAID'
+          AND DATE(p.paid_at) BETWEEN ? AND ?
+        GROUP BY c.id, c.name, c.phone, c.points
+        HAVING visits > 0
+        ORDER BY points_in_period DESC
+        LIMIT ?
+      `
+      params = [startDate, endDate, startDate, endDate, startDate, endDate, startDate, endDate, limit]
+    } else {
+      // Không lọc thời gian: lấy theo tổng điểm
+      query = `
+        SELECT 
+          c.id,
+          c.name,
+          c.phone,
+          c.points,
+          c.points as points_in_period,
+          COUNT(DISTINCT CASE 
+            WHEN p.payment_status = 'PAID' THEN qs.id 
+          END) as visits,
+          MAX(CASE 
+            WHEN p.payment_status = 'PAID' THEN p.paid_at 
+          END) as last_visit
+        FROM customers c
+        LEFT JOIN qr_sessions qs ON c.id = qs.customer_id
+        LEFT JOIN orders o ON qs.id = o.qr_session_id
+        LEFT JOIN payments p ON o.id = p.order_id
+        WHERE c.points > 0
+        GROUP BY c.id, c.name, c.phone, c.points
+        ORDER BY c.points DESC
+        LIMIT ?
+      `
+      params = [limit]
     }
 
-    const query = `
-      SELECT 
-        c.id,
-        c.name,
-        c.phone,
-        c.points,
-        COUNT(DISTINCT CASE 
-          WHEN p.payment_status = 'PAID' ${dateFilter ? 'AND p.paid_at BETWEEN ? AND ?' : ''} THEN qs.id 
-        END) as visits_in_period,
-        SUM(CASE 
-          WHEN p.payment_status = 'PAID' ${dateFilter ? 'AND p.paid_at BETWEEN ? AND ?' : ''} THEN pt.points_earned 
-          ELSE 0 
-        END) as points_in_period,
-        MAX(CASE 
-          WHEN p.payment_status = 'PAID' THEN p.paid_at 
-        END) as last_visit
-      FROM customers c
-      LEFT JOIN qr_sessions qs ON c.id = qs.customer_id
-      LEFT JOIN orders o ON qs.id = o.qr_session_id
-      LEFT JOIN payments p ON o.id = p.order_id
-      LEFT JOIN point_transactions pt ON c.id = pt.customer_id AND pt.transaction_type = 'EARN'
-      WHERE c.points > 0
-      GROUP BY c.id, c.name, c.phone, c.points
-      HAVING ${startDate && endDate ? 'points_in_period > 0 OR visits_in_period > 0' : 'c.points > 0'}
-      ORDER BY ${startDate && endDate ? 'points_in_period DESC, visits_in_period DESC' : 'c.points DESC'}
-      LIMIT ?
-    `
-
-    // Build params array based on date filter
-    let queryParams = []
-    if (startDate && endDate) {
-      // For visits_in_period
-      queryParams.push(startDate, endDate)
-      // For points_in_period
-      queryParams.push(startDate, endDate)
-    }
-    queryParams.push(limit)
-
-    const [rows] = await pool.query(query, queryParams)
+    const [rows] = await pool.query(query, params)
 
     const customers = rows.map(row => ({
       id: row.id,
       name: row.name || 'Khách hàng ẩn danh',
       phone: row.phone,
-      points: parseInt(row.points || 0),
-      pointsInPeriod: parseInt(row.points_in_period || 0),
-      visits: parseInt(row.visits_in_period || 0),
+      points: parseInt(row.points_in_period || row.points || 0),
+      totalPoints: parseInt(row.total_points || row.points || 0),
+      visits: parseInt(row.visits || 0),
       lastVisit: row.last_visit
     }))
 
@@ -266,105 +280,225 @@ const getSmartRoundTo = (max) => {
 
 
 
-export const getPointDistributionV2 = async () => {
+export const getPointDistributionV2 = async (startDate = null, endDate = null) => {
   try {
-    // get max points
+    let maxPointsQuery, customerPointsQuery
 
-    const [maxPointsResult] = await pool.query(`SELECT MAX(points) as max_points FROM customers WHERE points > 0`);
-    const maxPoints = parseInt(maxPointsResult[0].max_points || 0);
-    // if maxPoints is 0 return empty distribution
-    if (maxPoints === 0) {
+    if (startDate && endDate) {
+      // Tính điểm tích lũy trong khoảng thời gian từ payments
+      // Điểm = FLOOR(amount / 10000)
+      maxPointsQuery = `
+        SELECT MAX(period_points) as max_points
+        FROM (
+          SELECT 
+            c.id,
+            COALESCE(SUM(FLOOR(p.amount / 10000)), 0) as period_points
+          FROM customers c
+          INNER JOIN qr_sessions qs ON c.id = qs.customer_id
+          INNER JOIN orders o ON qs.id = o.qr_session_id
+          INNER JOIN payments p ON o.id = p.order_id
+          WHERE p.payment_status = 'PAID'
+            AND DATE(p.paid_at) BETWEEN ? AND ?
+          GROUP BY c.id
+          HAVING period_points > 0
+        ) as customer_points
+      `
+
+      const [maxPointsResult] = await pool.query(maxPointsQuery, [startDate, endDate])
+      const maxPoints = parseInt(maxPointsResult[0]?.max_points || 0)
+
+      if (maxPoints === 0) {
+        return {
+          success: true,
+          data: [],
+          metadata: { maxPoints: 0, totalCustomers: 0 }
+        }
+      }
+
+      const roundTo = getSmartRoundTo(maxPoints) || 10
+      const nice = (x) => Math.round(x / roundTo) * roundTo
+
+      // Tính mốc dựa trên %
+      const marks = [
+        0,
+        nice(maxPoints * 0.2),
+        nice(maxPoints * 0.4),
+        nice(maxPoints * 0.6),
+        nice(maxPoints * 0.8),
+        nice(maxPoints)
+      ]
+
+      // Tạo các range từ marks
+      const ranges = []
+      for (let i = 0; i < marks.length - 1; i++) {
+        if (i === marks.length - 2) {
+          ranges.push({
+            label: `${marks[i]}+`,
+            start: marks[i],
+            end: null
+          })
+        } else {
+          ranges.push({
+            label: `${marks[i]} - ${marks[i + 1]}`,
+            start: marks[i],
+            end: marks[i + 1] - 1
+          })
+        }
+      }
+
+      // Tạo case sql
+      const caseClauses = []
+      const orderClauses = []
+      ranges.forEach((range, index) => {
+        if (range.end === null) {
+          caseClauses.push(`WHEN period_points >= ${range.start} THEN '${range.label}'`)
+          orderClauses.push(`WHEN '${range.label}' THEN ${index + 1}`)
+        } else {
+          caseClauses.push(`WHEN period_points BETWEEN ${range.start} AND ${range.end} THEN '${range.label}'`)
+          orderClauses.push(`WHEN '${range.label}' THEN ${index + 1}`)
+        }
+      })
+
+      // Query với filter thời gian
+      customerPointsQuery = `
+        SELECT 
+          CASE
+            ${caseClauses.join('\n            ')}
+          END as point_range,
+          COUNT(*) AS customer_count
+        FROM (
+          SELECT 
+            c.id,
+            COALESCE(SUM(FLOOR(p.amount / 10000)), 0) as period_points
+          FROM customers c
+          INNER JOIN qr_sessions qs ON c.id = qs.customer_id
+          INNER JOIN orders o ON qs.id = o.qr_session_id
+          INNER JOIN payments p ON o.id = p.order_id
+          WHERE p.payment_status = 'PAID'
+            AND DATE(p.paid_at) BETWEEN ? AND ?
+          GROUP BY c.id
+          HAVING period_points > 0
+        ) as customer_points
+        GROUP BY point_range
+        ORDER BY
+          CASE point_range
+            ${orderClauses.join('\n            ')}
+          END
+      `
+
+      const [rows] = await pool.query(customerPointsQuery, [startDate, endDate])
+
+      const totalCustomers = rows.reduce((sum, row) => sum + parseInt(row.customer_count || 0), 0)
+
+      const distribution = rows.map(row => ({
+        range: row.point_range,
+        count: parseInt(row.customer_count || 0),
+        percentage: totalCustomers > 0
+          ? ((parseInt(row.customer_count || 0) / totalCustomers) * 100).toFixed(1)
+          : 0
+      }))
+
       return {
         success: true,
-        data: []
+        data: distribution,
+        metadata: {
+          maxPoints,
+          roundTo,
+          marks,
+          totalCustomers
+        }
+      }
+    } else {
+      // Không filter thời gian - sử dụng tổng điểm từ bảng customers
+      const [maxPointsResult] = await pool.query(`SELECT MAX(points) as max_points FROM customers WHERE points > 0`)
+      const maxPoints = parseInt(maxPointsResult[0].max_points || 0)
+
+      if (maxPoints === 0) {
+        return {
+          success: true,
+          data: []
+        }
+      }
+
+      const roundTo = getSmartRoundTo(maxPoints) || 10
+      const nice = (x) => Math.round(x / roundTo) * roundTo
+
+      const marks = [
+        0,
+        nice(maxPoints * 0.2),
+        nice(maxPoints * 0.4),
+        nice(maxPoints * 0.6),
+        nice(maxPoints * 0.8),
+        nice(maxPoints)
+      ]
+
+      const ranges = []
+      for (let i = 0; i < marks.length - 1; i++) {
+        if (i === marks.length - 2) {
+          ranges.push({
+            label: `${marks[i]}+`,
+            start: marks[i],
+            end: null
+          })
+        } else {
+          ranges.push({
+            label: `${marks[i]} - ${marks[i + 1]}`,
+            start: marks[i],
+            end: marks[i + 1] - 1
+          })
+        }
+      }
+
+      const caseClauses = []
+      const orderClauses = []
+      ranges.forEach((range, index) => {
+        if (range.end === null) {
+          caseClauses.push(`WHEN points >= ${range.start} THEN '${range.label}'`)
+          orderClauses.push(`WHEN '${range.label}' THEN ${index + 1}`)
+        } else {
+          caseClauses.push(`WHEN points BETWEEN ${range.start} AND ${range.end} THEN '${range.label}'`)
+          orderClauses.push(`WHEN '${range.label}' THEN ${index + 1}`)
+        }
+      })
+
+      const query = `
+        SELECT 
+          CASE
+            ${caseClauses.join('\n          ')}
+          END as point_range,
+          COUNT(*) AS customer_count
+        FROM customers
+        WHERE points > 0
+        GROUP BY point_range
+        ORDER BY
+          CASE point_range
+            ${orderClauses.join('\n          ')}
+          END
+      `
+      const [rows] = await pool.query(query)
+
+      const totalCustomers = rows.reduce((sum, row) => sum + parseInt(row.customer_count || 0), 0)
+
+      const distribution = rows.map(row => ({
+        range: row.point_range,
+        count: parseInt(row.customer_count || 0),
+        percentage: totalCustomers > 0
+          ? ((parseInt(row.customer_count || 0) / totalCustomers) * 100).toFixed(1)
+          : 0
+      }))
+
+      return {
+        success: true,
+        data: distribution,
+        metadata: {
+          maxPoints,
+          roundTo,
+          marks,
+          totalCustomers
+        }
       }
     }
-
-    const roundTo = getSmartRoundTo(maxPoints) || 10;
-    const nice = (x) => Math.round(x / roundTo) * roundTo;
-
-    // Tính mốc dựa trên % 
-    const marks = [
-      0,
-      nice(maxPoints * 0.2),
-      nice(maxPoints * 0.4),
-      nice(maxPoints * 0.6),
-      nice(maxPoints * 0.8),
-      nice(maxPoints)
-    ]
-
-    // Tạo các range từ marks
-    const ranges = [];
-    for (let i = 0; i < marks.length - 1; i++) {
-      if (i === marks.length - 2) {
-        ranges.push({
-          label: `${marks[i]}+`,
-          start: marks[i],
-          end: null
-        })
-      }
-      else {
-        ranges.push({
-          label: `${marks[i]} - ${marks[i + 1]}`,
-          start: marks[i],
-          end: marks[i + 1] - 1
-        })
-      }
-    }
-
-    // Tạo case sql
-    const caseClauses = [];
-    const orderClauses = [];
-    ranges.forEach((range, index) => {
-      if (range.end === null) {
-        caseClauses.push(`WHEN points >= ${range.start} THEN '${range.label}'`);
-        orderClauses.push(`WHEN '${range.label}' THEN ${index + 1}`);
-      } else {
-        caseClauses.push(`WHEN points BETWEEN ${range.start} AND ${range.end} THEN '${range.label}'`);
-        orderClauses.push(`WHEN '${range.label}' THEN ${index + 1}`)
-      }
-    })
-
-    // Query db
-    const query = `
-      SELECT 
-        CASE
-          ${caseClauses.join('\n')}
-        END as point_range,
-        COUNT(*) AS customer_count
-      FROM customers
-      WHERE points > 0
-      GROUP BY point_range
-      ORDER BY
-        CASE 
-          ${orderClauses.join('\n')}
-        END
-    `
-    const [rows] = await pool.query(query);
-
-    // Tinh phan tram
-    const totalCustomers = rows.reduce((sum, row) => sum + parseInt(row.customer_count || 0), 0);
-
-    const distribution = rows.map(row => ({
-      range: row.point_range,
-      count: parseInt(row.customer_count || 0),
-      percentage: totalCustomers > 0
-        ? ((parseInt(row.customer_count || 0) / totalCustomers) * 100).toFixed(1)
-        : 0
-    }))
-
-    return {
-      success: true,
-      data: distribution,
-      metadata: {
-        maxPoints,
-        roundTo,
-        marks,
-        totalCustomers
-      }
-    }
-
   } catch (error) {
-    throw new Error('found error in getPointDistributionV2 service' + error.message)
+    throw new Error('found error in getPointDistributionV2 service: ' + error.message)
   }
 }

@@ -263,7 +263,7 @@ const CategoriesPage = () => {
               title={<span className="font-semibold">Xác nhận xóa danh mục?</span>}
               description={
                 <div className="text-sm text-gray-600">
-                  Danh mục <span className="font-medium text-gray-800">"{record.name}"</span> sẽ bị xóa vĩnh viễn
+                  Danh mục <span className="font-medium text-gray-800">"{record.name}"</span> sẽ bị xóa
                 </div>
               }
               onConfirm={() => handleDeleteCategory(record.id)}

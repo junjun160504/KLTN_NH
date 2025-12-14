@@ -87,11 +87,12 @@ export const getTopCustomers = async (req, res) => {
 
 /**
  * Get point distribution
- * GET /api/dashboard/customers/point-distribution
+ * GET /api/dashboard/customers/point-distribution?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
  */
 export const getPointDistribution = async (req, res) => {
   try {
-    const result = await reportCustomersService.getPointDistributionV2()
+    const { startDate, endDate } = req.query
+    const result = await reportCustomersService.getPointDistributionV2(startDate, endDate)
     return res.json(result)
   } catch (error) {
     console.error('Error in getPointDistribution controller:', error)

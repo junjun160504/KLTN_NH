@@ -15,10 +15,10 @@ import {
   ConfigProvider,
   Tag,
   Card,
-  Statistic,
   Row,
   Col,
-  App
+  App,
+  Typography
 } from 'antd'
 import vi_VN from 'antd/lib/locale/vi_VN'
 import {
@@ -36,11 +36,13 @@ import {
   CalendarOutlined,
   TableOutlined
 } from '@ant-design/icons'
+import { Users, Award, TrendingUp, UserCheck } from 'react-feather'
 import axios from 'axios'
 import dayjs from 'dayjs'
 import { authService } from '../../../services/authService'
 
 const { Content } = Layout
+const { Title, Text } = Typography
 const REACT_APP_API_URL = process.env.REACT_APP_API_URL
 
 const CustomersPage = () => {
@@ -283,7 +285,7 @@ const CustomersPage = () => {
       key: 'name',
       width: '25%',
       align: 'center',
-      render: (name) => name || <span className="text-gray-400">—</span>
+      render: (name) => <span className="mx-8 text-gray-800 float-start">{name || '—'}</span>
     },
     {
       title: 'Điểm',
@@ -291,6 +293,7 @@ const CustomersPage = () => {
       key: 'points',
       align: 'center',
       width: '12%',
+      sorter: (a, b) => (a.points || 0) - (b.points || 0),
       render: (points) => (
         <Tag color="orange" className="font-semibold">
           {points || 0}
@@ -331,6 +334,7 @@ const CustomersPage = () => {
               onConfirm={() => handleDeleteCustomer(record.id)}
               okText="Xóa"
               cancelText="Hủy"
+              okButtonProps={{ danger: true }}
             >
               <Button type="text" size="small" danger icon={<DeleteOutlined />} />
             </Popconfirm>
@@ -346,46 +350,134 @@ const CustomersPage = () => {
       <Layout style={{ marginLeft: collapsed ? 80 : 220 }}>
         <AppHeader collapsed={collapsed} setCollapsed={setCollapsed} pageTitle={pageTitle} />
         <Content style={{ marginTop: 64, padding: 20, background: '#f0f2f5' }}>
-          {/* Statistics */}
-          <Row gutter={[16, 16]} className="mb-6">
+          {/* Statistics - Japanese Minimalist Design */}
+          <Row gutter={[20, 20]} className="mb-6">
             <Col xs={24} sm={12} lg={6}>
-              <Card>
-                <Statistic
-                  title="Tổng khách hàng"
-                  value={statistics.totalCustomers}
-                  prefix={<UserOutlined />}
-                  valueStyle={{ color: '#1890ff' }}
-                />
+              <Card
+                bordered={false}
+                className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                bodyStyle={{
+                  padding: '24px',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between'
+                }}
+                hoverable
+              >
+                <div className="flex items-start justify-between">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center flex-shrink-0">
+                    <Users size={22} strokeWidth={2} color="#1890ff" />
+                  </div>
+                  <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
+                    Tổng khách hàng
+                  </Text>
+                </div>
+                <div>
+                  <Title
+                    level={2}
+                    className="text-gray-800 text-3xl font-semibold leading-none tracking-tight float-end"
+                    style={{ margin: '12px 0 4px 0' }}
+                  >
+                    {statistics.totalCustomers}
+                  </Title>
+                </div>
               </Card>
             </Col>
             <Col xs={24} sm={12} lg={6}>
-              <Card>
-                <Statistic
-                  title="Tổng điểm"
-                  value={statistics.totalPoints}
-                  prefix={<TrophyOutlined />}
-                  valueStyle={{ color: '#faad14' }}
-                />
+              <Card
+                bordered={false}
+                className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                bodyStyle={{
+                  padding: '24px',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between'
+                }}
+                hoverable
+              >
+                <div className="flex items-start justify-between">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center flex-shrink-0">
+                    <Award size={22} strokeWidth={2} color="#faad14" />
+                  </div>
+                  <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
+                    Tổng điểm
+                  </Text>
+                </div>
+                <div>
+                  <Title
+                    level={2}
+                    className="text-gray-800 text-3xl font-semibold leading-none tracking-tight float-end"
+                    style={{ margin: '12px 0 4px 0' }}
+                  >
+                    {statistics.totalPoints?.toLocaleString('vi-VN')}
+                  </Title>
+                </div>
               </Card>
             </Col>
             <Col xs={24} sm={12} lg={6}>
-              <Card>
-                <Statistic
-                  title="TB/khách"
-                  value={statistics.avgPoints}
-                  prefix={<DollarOutlined />}
-                  valueStyle={{ color: '#52c41a' }}
-                />
+              <Card
+                bordered={false}
+                className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                bodyStyle={{
+                  padding: '24px',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between'
+                }}
+                hoverable
+              >
+                <div className="flex items-start justify-between">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-50 to-green-100 flex items-center justify-center flex-shrink-0">
+                    <TrendingUp size={22} strokeWidth={2} color="#52c41a" />
+                  </div>
+                  <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
+                    TB/khách
+                  </Text>
+                </div>
+                <div>
+                  <Title
+                    level={2}
+                    className="text-gray-800 text-3xl font-semibold leading-none tracking-tight float-end"
+                    style={{ margin: '12px 0 4px 0' }}
+                  >
+                    {statistics.avgPoints}
+                  </Title>
+                </div>
               </Card>
             </Col>
             <Col xs={24} sm={12} lg={6}>
-              <Card>
-                <Statistic
-                  title="KH có điểm"
-                  value={statistics.activeCustomers}
-                  prefix={<ShoppingCartOutlined />}
-                  valueStyle={{ color: '#226533' }}
-                />
+              <Card
+                bordered={false}
+                className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                bodyStyle={{
+                  padding: '24px',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between'
+                }}
+                hoverable
+              >
+                <div className="flex items-start justify-between">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100 flex items-center justify-center flex-shrink-0">
+                    <UserCheck size={22} strokeWidth={2} color="#226533" />
+                  </div>
+                  <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
+                    KH có điểm
+                  </Text>
+                </div>
+                <div>
+                  <Title
+                    level={2}
+                    className="text-gray-800 text-3xl font-semibold leading-none tracking-tight float-end"
+                    style={{ margin: '12px 0 4px 0' }}
+                  >
+                    {statistics.activeCustomers}
+                  </Title>
+                </div>
               </Card>
             </Col>
           </Row>
@@ -393,7 +485,7 @@ const CustomersPage = () => {
           {/* Filter & Actions */}
           <div className="mb-4 flex justify-between items-center gap-3 flex-wrap">
             <Input
-              placeholder="Tìm kiếm SĐT, tên, email..."
+              placeholder="Tìm kiếm SĐT, tên"
               prefix={<SearchOutlined />}
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
@@ -586,6 +678,7 @@ const CustomersPage = () => {
                               title: 'Mã đơn',
                               dataIndex: 'id',
                               key: 'id',
+                              align: 'center',
                               width: 80,
                               render: (id) => <span className="text-blue-600">#{id}</span>
                             },
@@ -593,12 +686,15 @@ const CustomersPage = () => {
                               title: 'Tổng tiền',
                               dataIndex: 'total_price',
                               key: 'total_price',
-                              render: (price) => `${parseFloat(price || 0).toLocaleString('vi-VN')}đ`
+                              align: 'center',
+                              width: 160,
+                              render: (price) => (<span className='float-right mr-2'>{`${parseFloat(price || 0).toLocaleString('vi-VN')}đ`}</span>)
                             },
                             {
                               title: 'Trạng thái',
                               dataIndex: 'status',
                               key: 'status',
+                              align: 'center',
                               render: (status) => {
                                 const map = {
                                   NEW: { text: 'Mới', color: 'orange' },
@@ -615,6 +711,7 @@ const CustomersPage = () => {
                               title: 'Thời gian',
                               dataIndex: 'created_at',
                               key: 'created_at',
+                              align: 'center',
                               render: (date) => dayjs(date).format('HH:mm:ss')
                             }
                           ]}
@@ -628,12 +725,14 @@ const CustomersPage = () => {
                         dataIndex: 'session_id',
                         key: 'session_id',
                         width: 80,
+                        align: 'center',
                         render: (id) => <span className="font-medium">#{id}</span>
                       },
                       {
                         title: 'Bàn',
                         dataIndex: 'table_number',
                         key: 'table_number',
+                        align: 'center',
                         width: 80,
                         render: (num) => num ? (
                           <Tag icon={<TableOutlined />} color="blue">Bàn {num}</Tag>
@@ -651,8 +750,9 @@ const CustomersPage = () => {
                         title: 'Tổng tiền',
                         dataIndex: 'total_amount',
                         key: 'total_amount',
+                        align: 'center',
                         render: (amount) => (
-                          <span className="font-semibold text-green-600">
+                          <span className="font-semibold text-green-600 float-right">
                             {parseFloat(amount || 0).toLocaleString('vi-VN')}đ
                           </span>
                         )
@@ -661,6 +761,7 @@ const CustomersPage = () => {
                         title: 'Trạng thái phiên',
                         dataIndex: 'session_status',
                         key: 'session_status',
+                        align: 'center',
                         render: (status) => {
                           const map = {
                             ACTIVE: { text: 'Đang hoạt động', color: 'processing' },
@@ -675,10 +776,11 @@ const CustomersPage = () => {
                         title: 'Ngày',
                         dataIndex: 'session_created_at',
                         key: 'session_created_at',
+                        align: 'center',
                         render: (date) => (
                           <span>
                             <CalendarOutlined className="mr-1" />
-                            {dayjs(date).format('DD/MM/YYYY HH:mm')}
+                            {dayjs(date).format('DD/MM/YYYY')}
                           </span>
                         )
                       }

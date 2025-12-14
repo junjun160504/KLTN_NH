@@ -30,6 +30,7 @@ import {
   EyeOutlined,
   PlusOutlined,
   CloudUploadOutlined,
+  LinkOutlined,
 } from "@ant-design/icons";
 import axios from "axios";
 import * as XLSX from "xlsx";
@@ -85,6 +86,10 @@ const MenuPage = () => {
   // Upload loading state
   const [isUploading, setIsUploading] = useState(false);
   const [isEditUploading, setIsEditUploading] = useState(false);
+
+  // View detail state
+  const [viewDetailOpen, setViewDetailOpen] = useState(false);
+  const [viewingFood, setViewingFood] = useState(null);
 
   // ================= API =================
   // Fetch món ăn dựa trên category (sử dụng useCallback để tránh warning)
@@ -459,24 +464,24 @@ const MenuPage = () => {
             <span className="font-semibold text-gray-800 text-sm leading-tight mb-1" title={record.name}>
               {record.name}
             </span>
-            {record.description && (
+            {/* {record.description && (
               <span className="text-xs text-gray-500 line-clamp-1" title={record.description}>
                 {record.description}
               </span>
-            )}
+            )} */}
           </div>
         </div>
       ),
     },
     {
-      title: "Giá tiền",
+      title: "Giá tiền (VND)",
       dataIndex: "price",
       key: "price",
       width: 130,
       align: 'center',
       sorter: (a, b) => a.price - b.price,
       render: (price) => (
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col items-end">
           <span className="font-bold text-green-600 text-base">
             {Number(price).toLocaleString('vi-VN')}
           </span>
@@ -491,7 +496,7 @@ const MenuPage = () => {
       width: 180,
       align: 'center',
       render: (categories) => (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1 justify-center">
           {categories && categories.length > 0 ? (
             categories.map((cat, index) => (
               <Tag
@@ -538,10 +543,24 @@ const MenuPage = () => {
     {
       title: "Thao tác",
       key: "action",
-      width: 100,
+      width: 130,
       align: 'center',
       render: (_, record) => (
         <div className="flex items-center justify-center gap-2">
+          {/* Nút xem chi tiết */}
+          <div className="group w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200">
+            <Button
+              type="text"
+              size="small"
+              icon={<EyeOutlined className="text-gray-800 group-hover:text-emerald-500" />}
+              onClick={() => {
+                setViewingFood(record);
+                setViewDetailOpen(true);
+              }}
+              title="Xem chi tiết"
+            />
+          </div>
+
           {canAccess(['OWNER', 'MANAGER']) && (
             <div className="group w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200">
               <Button
@@ -559,7 +578,7 @@ const MenuPage = () => {
               title={<span className="font-semibold">Xác nhận xóa món?</span>}
               description={
                 <div className="text-sm text-gray-600">
-                  Món <span className="font-medium text-gray-800">"{record.name}"</span> sẽ bị xóa vĩnh viễn
+                  Món <span className="font-medium text-gray-800">"{record.name}"</span> sẽ bị xóa
                 </div>
               }
               onConfirm={() => handleDeleteFood(record.id)}
@@ -624,7 +643,7 @@ const MenuPage = () => {
               >
                 <Input.Search
                   placeholder="Tìm món ăn..."
-                  style={{ width: 450 }}
+                  style={{ width: 300 }}
                   value={searchText}
                   onChange={(e) => setSearchText(e.target.value)}
                   allowClear
@@ -1108,116 +1127,139 @@ const MenuPage = () => {
               >
                 <div className="space-y-6">
                   {/* Ảnh món ăn */}
-                  <div className="bg-gray-50 rounded-xl p-6 border border-gray-100">
-                    <div className="mb-4">
-                      <span className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-4">
-                        <span className="w-1 h-4 bg-blue-500 rounded-full"></span>
-                        Hình ảnh món ăn
-                      </span>
+                  <div className="bg-gray-50 rounded-xl p-5 border border-gray-100">
+                    <span className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-4">
+                      <span className="w-1 h-4 bg-blue-500 rounded-full"></span>
+                      Hình ảnh món ăn
+                    </span>
 
-                      {/* Current image preview if exists */}
-                      {editingFood?.image_url && !editImageFile && !editForm.getFieldValue('image_url') && (
-                        <div className="mb-4">
-                          <div className="text-xs font-medium text-gray-600 mb-2">Ảnh hiện tại:</div>
-                          <div className="inline-block">
-                            <Image
-                              src={
-                                editingFood.image_url.startsWith('http')
+                    {/* Two column layout */}
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Left: Current image */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-medium text-gray-600">Ảnh hiện tại</span>
+                          <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full font-medium">Đang sử dụng</span>
+                        </div>
+                        <div className="relative bg-white rounded-lg border border-gray-200 overflow-hidden">
+                          <Image
+                            src={
+                              editingFood?.image_url
+                                ? editingFood.image_url.startsWith('http')
                                   ? editingFood.image_url
                                   : `${REACT_APP_API_URL.replace('/api', '')}${editingFood.image_url}`
-                              }
-                              alt="Current"
-                              width={150}
-                              height={150}
-                              className="rounded-lg object-cover border border-gray-200"
-                              fallback="https://via.placeholder.com/150?text=No+Image"
-                            />
-                          </div>
+                                : 'https://via.placeholder.com/200x150?text=No+Image'
+                            }
+                            alt="Current"
+                            width="100%"
+                            height={200}
+                            className="rounded-lg object-cover"
+                            style={{ objectFit: 'cover' }}
+                            fallback="https://via.placeholder.com/200x150?text=No+Image"
+                          />
                         </div>
-                      )}
-
-                      {/* Upload ảnh mới */}
-                      <div className="mb-4">
-                        <div className="text-xs font-medium text-gray-600 mb-2">Tải ảnh mới:</div>
-                        <Upload
-                          listType="picture-card"
-                          maxCount={1}
-                          showUploadList={true}
-                          beforeUpload={(file) => {
-                            // Validate file type
-                            const isImage = file.type.startsWith('image/');
-                            if (!isImage) {
-                              message.error('Chỉ chấp nhận file ảnh!');
-                              return false;
-                            }
-
-                            // Validate file size (5MB)
-                            const isLt5M = file.size / 1024 / 1024 < 5;
-                            if (!isLt5M) {
-                              message.error('Ảnh phải nhỏ hơn 5MB!');
-                              return false;
-                            }
-
-                            // Set image file for upload
-                            setEditImageFile(file);
-
-                            // Create preview
-                            const reader = new FileReader();
-                            reader.onload = (e) => setEditImagePreview(e.target.result);
-                            reader.readAsDataURL(file);
-
-                            // Disable URL input when file is selected
-                            editForm.setFieldValue('image_url', '');
-
-                            return false; // Prevent auto upload
-                          }}
-                          onRemove={() => {
-                            setEditImageFile(null);
-                            setEditImagePreview(null);
-                          }}
-                          fileList={editImageFile ? [{
-                            uid: '-1',
-                            name: editImageFile.name,
-                            status: 'done',
-                            url: editImagePreview
-                          }] : []}
-                        >
-                          {!editImageFile && (
-                            <div>
-                              <CloudUploadOutlined style={{ fontSize: '24px', color: '#1890ff' }} />
-                              <div style={{ marginTop: 8, fontSize: '13px' }}>Tải ảnh mới</div>
-                            </div>
-                          )}
-                        </Upload>
                       </div>
 
-                      {/* Hoặc nhập URL */}
+                      {/* Right: New image upload */}
                       <div>
-                        <Form.Item
-                          name="image_url"
-                          label={<span className="text-xs font-medium text-gray-600">Hoặc nhập URL ảnh mới:</span>}
-                          style={{ marginBottom: 0 }}
-                        >
-                          <Input
-                            prefix={<CloudUploadOutlined className="text-gray-400" />}
-                            placeholder="https://example.com/image.jpg"
-                            className="rounded-lg h-10"
-                            disabled={!!editImageFile}
-                            onChange={(e) => {
-                              // Clear uploaded file when URL is entered
-                              if (e.target.value) {
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-medium text-gray-600">Ảnh mới (Xem trước)</span>
+                          <span className="text-xs px-2 py-0.5 bg-orange-100 text-orange-600 rounded-full font-medium">
+                            {editImageFile || editForm.getFieldValue('image_url') ? 'Sẵn sàng' : 'Chưa lưu'}
+                          </span>
+                        </div>
+
+                        {/* Preview area or Upload zone */}
+                        {editImagePreview ? (
+                          <div className="relative bg-white rounded-lg border-2 border-dashed border-blue-300 overflow-hidden" style={{ height: 200 }}>
+                            <img
+                              src={editImagePreview}
+                              alt="Preview"
+                              className="w-full h-full rounded-lg object-cover"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
                                 setEditImageFile(null);
                                 setEditImagePreview(null);
-                              }
-                            }}
-                          />
-                        </Form.Item>
+                              }}
+                              className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors text-xs"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ) :
+                          <div style={{ height: 200 }}>
+
+                            <Upload.Dragger
+                              maxCount={1}
+                              showUploadList={false}
+                              beforeUpload={(file) => {
+                                const isImage = file.type.startsWith('image/');
+                                if (!isImage) {
+                                  message.error('Chỉ chấp nhận file ảnh!');
+                                  return false;
+                                }
+                                const isLt5M = file.size / 1024 / 1024 < 5;
+                                if (!isLt5M) {
+                                  message.error('Ảnh phải nhỏ hơn 5MB!');
+                                  return false;
+                                }
+                                setEditImageFile(file);
+                                const reader = new FileReader();
+                                reader.onload = (e) => setEditImagePreview(e.target.result);
+                                reader.readAsDataURL(file);
+                                editForm.setFieldValue('image_url', '');
+                                return false;
+                              }}
+                              className="bg-white"
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                borderRadius: 8
+                              }}
+                            >
+                              <div className="flex flex-col items-center justify-center h-full">
+                                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mb-2">
+                                  <CloudUploadOutlined style={{ fontSize: 20, color: '#8c8c8c' }} />
+                                </div>
+                                <p className="text-xs text-gray-600 font-medium mb-0.5">Nhấn để tải ảnh mới</p>
+                                <p className="text-xs text-gray-400">hoặc kéo thả vào đây</p>
+                              </div>
+                            </Upload.Dragger>
+
+                          </div>
+
+                        }
                       </div>
                     </div>
 
-                    <p className="text-xs text-gray-400 mt-3 italic">
-                      💡 Gợi ý: Tải ảnh mới lên hoặc nhập URL. Để trống nếu giữ ảnh cũ (tối đa 5MB)
-                    </p>
+                    {/* Info banner and URL input in same row */}
+                    <div className="flex items-center gap-3 mt-4">
+                      {/* <div className="flex-1 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                        <p className="text-xs text-amber-700 flex items-center gap-2 m-0">
+                          <span>💡</span>
+                          <span>Gợi ý: Tải ảnh mới lên hoặc nhập URL để xem trước ở khung bên phải. Để trống nếu muốn giữ ảnh cũ (tối đa 5MB).</span>
+                        </p>
+                      </div> */}
+                      {/* <Form.Item
+                        name="image_url"
+                        style={{ marginBottom: 0, flex: '0 0 280px' }}
+                      >
+                        <Input
+                          prefix={<LinkOutlined className="text-gray-400" />}
+                          placeholder="https://res.cloudinary.com/..."
+                          className="rounded-lg h-9"
+                          disabled={!!editImageFile}
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              setEditImageFile(null);
+                              setEditImagePreview(null);
+                            }
+                          }}
+                        />
+                      </Form.Item> */}
+                    </div>
                   </div>
 
                   {/* Thông tin cơ bản */}
@@ -1606,43 +1648,194 @@ const MenuPage = () => {
                 </div>
               </div>
             </Modal>
+
+            {/* Modal Xem Chi Tiết Món Ăn - Desktop Optimized */}
+            <Modal
+              open={viewDetailOpen}
+              onCancel={() => {
+                setViewDetailOpen(false);
+                setViewingFood(null);
+              }}
+              width={780}
+              footer={null}
+              centered
+              className="product-detail-modal"
+              closable={false}
+              destroyOnHidden
+              styles={{
+                body: { padding: '12px 8px' },
+                content: { borderRadius: '16px' }
+              }}
+            >
+              {viewingFood && (
+                <div>
+                  {/* Header */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <span className="text-xl font-bold text-gray-900 mb-1">Chi tiết món ăn</span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      {canAccess(['OWNER', 'MANAGER']) && (
+                        <Button
+                          type="primary"
+                          icon={<EditOutlined />}
+                          onClick={() => {
+                            setViewDetailOpen(false);
+                            openEditDrawer(viewingFood);
+                          }}
+                          className="rounded-lg h-10 px-5 bg-emerald-500 hover:bg-emerald-600 border-0 font-medium shadow-sm"
+                        >
+                          Sửa
+                        </Button>
+                      )}
+                      <Button
+                        type="text"
+                        icon={<span className="text-xl text-gray-400 hover:text-gray-600">×</span>}
+                        onClick={() => {
+                          setViewDetailOpen(false);
+                          setViewingFood(null);
+                        }}
+                        className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-100"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="h-px bg-gray-100 my-6"></div>
+
+                  {/* Content */}
+                  <div className="flex gap-12">
+                    {/* Left - Image */}
+                    <div className="flex-shrink-0">
+                      <div className="w-[200px] h-[200px] rounded-xl overflow-hidden bg-gray-100 shadow-sm">
+                        <Image
+                          src={
+                            viewingFood.image_url
+                              ? viewingFood.image_url.startsWith('http')
+                                ? viewingFood.image_url
+                                : `${REACT_APP_API_URL.replace('/api', '')}${viewingFood.image_url}`
+                              : 'https://via.placeholder.com/200x200?text=No+Image'
+                          }
+                          alt={viewingFood.name}
+                          width={200}
+                          height={200}
+                          className="object-cover w-full h-full"
+                          fallback="https://via.placeholder.com/200x200?text=No+Image"
+                          style={{ objectFit: 'cover' }}
+                        />
+                      </div>
+
+                    </div>
+
+                    {/* Right - Info */}
+                    <div className="flex-1 min-w-0">
+                      {/* Product Name */}
+                      <div className="mb-4">
+                        <label className="text-sm font-medium text-gray-500 mb-1 block">Tên món ăn</label>
+                        <span className="text-xl font-bold text-gray-900">{viewingFood.name}</span>
+                      </div>
+
+                      {/* Status & Price Row */}
+                      <div className="flex gap-12 mb-5">
+                        {/* Status */}
+                        <div>
+                          <label className="text-sm font-medium text-gray-500 mb-2 block">Trạng thái</label>
+                          {viewingFood.is_available === 1 ? (
+                            <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200">
+                              Đang bán
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-red-50 text-red-600 border border-red-200">
+                              Ngừng bán
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Price */}
+                        <div>
+                          <label className="text-sm font-medium text-gray-500 mb-2 block">Giá bán (VNĐ)</label>
+                          <span className="text-lg font-bold text-gray-900">
+                            {Number(viewingFood.price).toLocaleString('vi-VN')} đ
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Categories */}
+                      <div>
+                        <label className="text-sm font-medium text-gray-500 mb-2 block">Danh mục</label>
+                        <div className="flex flex-wrap gap-2">
+                          {viewingFood.categories && viewingFood.categories.length > 0 ? (
+                            viewingFood.categories.map((cat, index) => (
+                              <span
+                                key={`${cat.id}-${index}`}
+                                className="inline-flex items-center px-4 py-2 rounded-lg text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200"
+                              >
+                                {cat.name}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-sm text-gray-400 italic">Chưa phân loại</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="h-px bg-gray-100 my-6"></div>
+
+                  {/* Description */}
+                  <div>
+                    <label className="text-sm font-semibold text-gray-700 mb-3 block">Mô tả</label>
+                    <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap text-justify">
+                      {viewingFood.description || (
+                        <span className=" text-gray-400 italic">Chưa có mô tả cho món ăn này</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </Modal>
           </Content>
         </Layout>
-      </Layout>
+      </Layout >
 
       {/* Full Screen Upload Loading Overlay */}
-      {(isUploading || isEditUploading) && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-          zIndex: 9999,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center'
-        }}>
-          <Spin size="large" />
+      {
+        (isUploading || isEditUploading) && (
           <div style={{
-            marginTop: 24,
-            fontSize: '16px',
-            color: '#ffffff',
-            fontWeight: 500
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            zIndex: 9999,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center'
           }}>
-            Đang xử lý và tải ảnh lên...
+            <Spin size="large" />
+            <div style={{
+              marginTop: 24,
+              fontSize: '16px',
+              color: '#ffffff',
+              fontWeight: 500
+            }}>
+              Đang xử lý và tải ảnh lên...
+            </div>
+            <div style={{
+              marginTop: 8,
+              fontSize: '13px',
+              color: 'rgba(255, 255, 255, 0.7)'
+            }}>
+              Vui lòng chờ trong giây lát
+            </div>
           </div>
-          <div style={{
-            marginTop: 8,
-            fontSize: '13px',
-            color: 'rgba(255, 255, 255, 0.7)'
-          }}>
-            Vui lòng chờ trong giây lát
-          </div>
-        </div>
-      )}
+        )
+      }
     </>
   );
 };

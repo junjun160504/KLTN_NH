@@ -42,7 +42,7 @@ import {
   Pie,
   Cell
 } from 'recharts'
-import * as XLSX from 'xlsx'
+import XLSX from 'xlsx-js-style'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -289,91 +289,131 @@ const ReportsSalesPage = () => {
         ''
       ]
 
-      // Create worksheet data
-      const dailyWsData = [
-        // Title row
-        [{ v: `BÁO CÁO DOANH THU THEO NGÀY (${start.format('DD/MM/YYYY')} - ${end.format('DD/MM/YYYY')})`, t: 's' }],
-        [], // Empty row
-        // Header row
-        dailyHeaders,
-        // Data rows
-        ...dailyDataRows,
-        // Total row
-        dailyTotals
-      ]
-
-      const dailyWs = XLSX.utils.aoa_to_sheet(dailyWsData)
-
-      // Merge title cell
-      dailyWs['!merges'] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } } // Merge title across all columns
-      ]
-
-      // Apply styles
-      // Title
-      dailyWs['A1'].s = {
-        fill: { fgColor: { rgb: '1890FF' } },
-        font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 14 },
-        alignment: { horizontal: 'center', vertical: 'center' }
+      // Common border style
+      const thinBorder = {
+        top: { style: 'thin', color: { rgb: '000000' } },
+        bottom: { style: 'thin', color: { rgb: '000000' } },
+        left: { style: 'thin', color: { rgb: '000000' } },
+        right: { style: 'thin', color: { rgb: '000000' } }
       }
 
-      // Headers (row 3)
-      dailyHeaders.forEach((_, colIdx) => {
-        const cellRef = XLSX.utils.encode_cell({ r: 2, c: colIdx })
-        if (!dailyWs[cellRef]) dailyWs[cellRef] = { t: 's', v: '' }
-        dailyWs[cellRef].s = headerStyle
+      // Create worksheet with proper cell objects for styling
+      const dailyWs = {}
+
+      // Title row (row 0) - merged across all columns
+      const titleText = `BÁO CÁO DOANH THU THEO NGÀY (${start.format('DD/MM/YYYY')} - ${end.format('DD/MM/YYYY')})`
+      dailyWs['A1'] = {
+        v: titleText,
+        t: 's',
+        s: {
+          font: { bold: true, sz: 14 },
+          alignment: { horizontal: 'center', vertical: 'center' },
+          border: thinBorder
+        }
+      }
+      // Fill empty merged cells with border
+      for (let i = 1; i < dailyHeaders.length; i++) {
+        const cellRef = XLSX.utils.encode_cell({ r: 0, c: i })
+        dailyWs[cellRef] = {
+          v: '',
+          t: 's',
+          s: { border: thinBorder }
+        }
+      }
+
+      // Header row (row 2, index 1 in Excel = row 2)
+      dailyHeaders.forEach((header, colIdx) => {
+        const cellRef = XLSX.utils.encode_cell({ r: 1, c: colIdx })
+        dailyWs[cellRef] = {
+          v: header,
+          t: 's',
+          s: {
+            fill: { fgColor: { rgb: 'D9E8FB' } },
+            font: { bold: true, sz: 11 },
+            alignment: { horizontal: 'center', vertical: 'center' },
+            border: thinBorder
+          }
+        }
       })
 
-      // Data cells
+      // Data rows (starting from row 3, index 2)
       dailyDataRows.forEach((row, rowIdx) => {
         row.forEach((val, colIdx) => {
-          const cellRef = XLSX.utils.encode_cell({ r: rowIdx + 3, c: colIdx })
-          if (!dailyWs[cellRef]) dailyWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
+          const cellRef = XLSX.utils.encode_cell({ r: rowIdx + 2, c: colIdx })
 
-          // Apply style based on column type
-          if (colIdx === 0 || colIdx === 1 || colIdx === 6) {
-            // STT, Ngày, Khách hàng - center align
-            dailyWs[cellRef].s = textCellStyle
-          } else {
-            // Number columns - right align
-            dailyWs[cellRef].s = dataCellStyle
-            // Format as number with thousand separator
-            if (typeof val === 'number') {
-              dailyWs[cellRef].z = '#,##0'
+          dailyWs[cellRef] = {
+            v: val,
+            t: typeof val === 'number' ? 'n' : 's',
+            s: {
+              alignment: {
+                horizontal: colIdx === 0 ? 'center' : 'right',
+                vertical: 'center'
+              },
+              border: thinBorder
             }
+          }
+
+          // Number format with thousand separator for money columns
+          if (typeof val === 'number' && colIdx >= 3 && colIdx <= 5) {
+            dailyWs[cellRef].z = '#,##0'
+          }
+          if (typeof val === 'number' && colIdx === 7) {
+            dailyWs[cellRef].z = '#,##0'
           }
         })
       })
 
       // Total row
-      const totalRowIdx = dailyDataRows.length + 3
+      const totalRowIdx = dailyDataRows.length + 2
       dailyTotals.forEach((val, colIdx) => {
         const cellRef = XLSX.utils.encode_cell({ r: totalRowIdx, c: colIdx })
-        if (!dailyWs[cellRef]) dailyWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
-        dailyWs[cellRef].s = totalCellStyle
+        dailyWs[cellRef] = {
+          v: val,
+          t: typeof val === 'number' ? 'n' : 's',
+          s: {
+            fill: { fgColor: { rgb: 'F5F5F5' } },
+            font: { bold: true, sz: 11 },
+            alignment: {
+              horizontal: colIdx === 1 ? 'center' : 'right',
+              vertical: 'center'
+            },
+            border: thinBorder
+          }
+        }
         if (typeof val === 'number') {
           dailyWs[cellRef].z = '#,##0'
         }
       })
 
+      // Set range for worksheet
+      dailyWs['!ref'] = XLSX.utils.encode_range({
+        s: { r: 0, c: 0 },
+        e: { r: totalRowIdx, c: dailyHeaders.length - 1 }
+      })
+
+      // Merge title cell across all columns
+      dailyWs['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: dailyHeaders.length - 1 } }
+      ]
+
       // Set column widths
       dailyWs['!cols'] = [
-        { wch: 6 },  // STT
-        { wch: 12 }, // Ngày
-        { wch: 14 }, // Số hóa đơn
-        { wch: 18 }, // Doanh thu
-        { wch: 22 }, // Doanh thu QR Banking
-        { wch: 20 }, // Doanh thu Tiền mặt
-        { wch: 14 }, // Khách hàng
-        { wch: 12 }  // TB/đơn
+        { wch: 6 },   // STT
+        { wch: 12 },  // Ngày
+        { wch: 12 },  // Số hóa đơn
+        { wch: 18 },  // Doanh thu (VNĐ)
+        { wch: 22 },  // Doanh thu QR Banking
+        { wch: 20 },  // Doanh thu Tiền mặt
+        { wch: 12 },  // Khách hàng
+        { wch: 12 }   // TB/đơn
       ]
 
       // Set row heights
-      dailyWs['!rows'] = [
-        { hpt: 30 }, // Title row
-        { hpt: 5 },  // Empty row
-        { hpt: 25 }  // Header row
-      ]
+      const rowHeights = [{ hpt: 25 }] // Title row
+      for (let i = 0; i <= dailyDataRows.length; i++) {
+        rowHeights.push({ hpt: 22 })
+      }
+      dailyWs['!rows'] = rowHeights
 
       XLSX.utils.book_append_sheet(wb, dailyWs, 'Doanh thu theo ngày')
 
@@ -427,91 +467,123 @@ const ReportsSalesPage = () => {
           ''
         ]
 
-        // Create worksheet data
-        const monthlyWsData = [
-          // Title row
-          [{ v: `BÁO CÁO DOANH THU THEO THÁNG (${start.format('DD/MM/YYYY')} - ${end.format('DD/MM/YYYY')})`, t: 's' }],
-          [], // Empty row
-          // Header row
-          monthlyHeaders,
-          // Data rows
-          ...monthlyDataRows,
-          // Total row
-          monthlyTotals
-        ]
+        // Create worksheet with proper cell objects for styling
+        const monthlyWs = {}
 
-        const monthlyWs = XLSX.utils.aoa_to_sheet(monthlyWsData)
-
-        // Merge title cell
-        monthlyWs['!merges'] = [
-          { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }
-        ]
-
-        // Apply styles - Title
-        monthlyWs['A1'].s = {
-          fill: { fgColor: { rgb: '52C41A' } },
-          font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 14 },
-          alignment: { horizontal: 'center', vertical: 'center' }
+        // Title row (row 0) - merged across all columns
+        const monthlyTitleText = `BÁO CÁO DOANH THU THEO THÁNG (${start.format('DD/MM/YYYY')} - ${end.format('DD/MM/YYYY')})`
+        monthlyWs['A1'] = {
+          v: monthlyTitleText,
+          t: 's',
+          s: {
+            font: { bold: true, sz: 14 },
+            alignment: { horizontal: 'center', vertical: 'center' },
+            border: thinBorder
+          }
+        }
+        // Fill empty merged cells with border
+        for (let i = 1; i < monthlyHeaders.length; i++) {
+          const cellRef = XLSX.utils.encode_cell({ r: 0, c: i })
+          monthlyWs[cellRef] = {
+            v: '',
+            t: 's',
+            s: { border: thinBorder }
+          }
         }
 
-        // Headers (row 3)
-        const monthlyHeaderStyle = {
-          ...headerStyle,
-          fill: { fgColor: { rgb: '52C41A' } }
-        }
-
-        monthlyHeaders.forEach((_, colIdx) => {
-          const cellRef = XLSX.utils.encode_cell({ r: 2, c: colIdx })
-          if (!monthlyWs[cellRef]) monthlyWs[cellRef] = { t: 's', v: '' }
-          monthlyWs[cellRef].s = monthlyHeaderStyle
+        // Header row (row 2, index 1)
+        monthlyHeaders.forEach((header, colIdx) => {
+          const cellRef = XLSX.utils.encode_cell({ r: 1, c: colIdx })
+          monthlyWs[cellRef] = {
+            v: header,
+            t: 's',
+            s: {
+              fill: { fgColor: { rgb: 'D9E8FB' } },
+              font: { bold: true, sz: 11 },
+              alignment: { horizontal: 'center', vertical: 'center' },
+              border: thinBorder
+            }
+          }
         })
 
-        // Data cells
+        // Data rows (starting from row 3, index 2)
         monthlyDataRows.forEach((row, rowIdx) => {
           row.forEach((val, colIdx) => {
-            const cellRef = XLSX.utils.encode_cell({ r: rowIdx + 3, c: colIdx })
-            if (!monthlyWs[cellRef]) monthlyWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
+            const cellRef = XLSX.utils.encode_cell({ r: rowIdx + 2, c: colIdx })
 
-            if (colIdx === 0 || colIdx === 1 || colIdx === 6) {
-              monthlyWs[cellRef].s = textCellStyle
-            } else {
-              monthlyWs[cellRef].s = dataCellStyle
-              if (typeof val === 'number') {
-                monthlyWs[cellRef].z = '#,##0'
+            monthlyWs[cellRef] = {
+              v: val,
+              t: typeof val === 'number' ? 'n' : 's',
+              s: {
+                alignment: {
+                  horizontal: colIdx === 0 ? 'center' : 'right',
+                  vertical: 'center'
+                },
+                border: thinBorder
               }
+            }
+
+            // Number format with thousand separator for money columns
+            if (typeof val === 'number' && colIdx >= 3 && colIdx <= 5) {
+              monthlyWs[cellRef].z = '#,##0'
+            }
+            if (typeof val === 'number' && colIdx === 7) {
+              monthlyWs[cellRef].z = '#,##0'
             }
           })
         })
 
         // Total row
-        const monthlyTotalRowIdx = monthlyDataRows.length + 3
+        const monthlyTotalRowIdx = monthlyDataRows.length + 2
         monthlyTotals.forEach((val, colIdx) => {
           const cellRef = XLSX.utils.encode_cell({ r: monthlyTotalRowIdx, c: colIdx })
-          if (!monthlyWs[cellRef]) monthlyWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
-          monthlyWs[cellRef].s = totalCellStyle
+          monthlyWs[cellRef] = {
+            v: val,
+            t: typeof val === 'number' ? 'n' : 's',
+            s: {
+              fill: { fgColor: { rgb: 'F5F5F5' } },
+              font: { bold: true, sz: 11 },
+              alignment: {
+                horizontal: colIdx === 1 ? 'center' : 'right',
+                vertical: 'center'
+              },
+              border: thinBorder
+            }
+          }
           if (typeof val === 'number') {
             monthlyWs[cellRef].z = '#,##0'
           }
         })
 
+        // Set range for worksheet
+        monthlyWs['!ref'] = XLSX.utils.encode_range({
+          s: { r: 0, c: 0 },
+          e: { r: monthlyTotalRowIdx, c: monthlyHeaders.length - 1 }
+        })
+
+        // Merge title cell across all columns
+        monthlyWs['!merges'] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: monthlyHeaders.length - 1 } }
+        ]
+
         // Set column widths
         monthlyWs['!cols'] = [
-          { wch: 6 },  // STT
-          { wch: 12 }, // Tháng
-          { wch: 14 }, // Số hóa đơn
-          { wch: 18 }, // Doanh thu
-          { wch: 22 }, // Doanh thu QR Banking
-          { wch: 20 }, // Doanh thu Tiền mặt
-          { wch: 14 }, // Khách hàng
-          { wch: 12 }  // TB/đơn
+          { wch: 6 },   // STT
+          { wch: 12 },  // Tháng
+          { wch: 12 },  // Số hóa đơn
+          { wch: 18 },  // Doanh thu (VNĐ)
+          { wch: 22 },  // Doanh thu QR Banking
+          { wch: 20 },  // Doanh thu Tiền mặt
+          { wch: 12 },  // Khách hàng
+          { wch: 12 }   // TB/đơn
         ]
 
         // Set row heights
-        monthlyWs['!rows'] = [
-          { hpt: 30 }, // Title row
-          { hpt: 5 },  // Empty row
-          { hpt: 25 }  // Header row
-        ]
+        const monthlyRowHeights = [{ hpt: 25 }] // Title row
+        for (let i = 0; i <= monthlyDataRows.length; i++) {
+          monthlyRowHeights.push({ hpt: 22 })
+        }
+        monthlyWs['!rows'] = monthlyRowHeights
 
         XLSX.utils.book_append_sheet(wb, monthlyWs, 'Doanh thu theo tháng')
       }
@@ -539,106 +611,122 @@ const ReportsSalesPage = () => {
         ''
       ]
 
-      // Create worksheet data
-      const dishWsData = [
-        // Title row
-        [{ v: `TOP ${dishLimit} MÓN CÓ DOANH THU CAO NHẤT (${start.format('DD/MM/YYYY')} - ${end.format('DD/MM/YYYY')})`, t: 's' }],
-        [], // Empty row
-        // Header row
-        dishHeaders,
-        // Data rows
-        ...dishDataRows,
-        // Total row
-        dishTotals
-      ]
+      // Create worksheet with proper cell objects for styling
+      const dishWs = {}
 
-      const dishWs = XLSX.utils.aoa_to_sheet(dishWsData)
-
-      // Merge title cell
-      dishWs['!merges'] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } }
-      ]
-
-      // Apply styles - Title
-      dishWs['A1'].s = {
-        fill: { fgColor: { rgb: '722ED1' } },
-        font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 14 },
-        alignment: { horizontal: 'center', vertical: 'center' }
+      // Title row (row 0) - merged across all columns
+      const dishTitleText = `TOP ${dishLimit} MÓN CÓ DOANH THU CAO NHẤT (${start.format('DD/MM/YYYY')} - ${end.format('DD/MM/YYYY')})`
+      dishWs['A1'] = {
+        v: dishTitleText,
+        t: 's',
+        s: {
+          font: { bold: true, sz: 14 },
+          alignment: { horizontal: 'center', vertical: 'center' },
+          border: thinBorder
+        }
       }
-
-      // Headers (row 3)
-      const dishHeaderStyle = {
-        fill: { fgColor: { rgb: '722ED1' } },
-        font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 12 },
-        alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
-        border: {
-          top: { style: 'thin', color: { rgb: '000000' } },
-          bottom: { style: 'thin', color: { rgb: '000000' } },
-          left: { style: 'thin', color: { rgb: '000000' } },
-          right: { style: 'thin', color: { rgb: '000000' } }
+      // Fill empty merged cells with border
+      for (let i = 1; i < dishHeaders.length; i++) {
+        const cellRef = XLSX.utils.encode_cell({ r: 0, c: i })
+        dishWs[cellRef] = {
+          v: '',
+          t: 's',
+          s: { border: thinBorder }
         }
       }
 
-      dishHeaders.forEach((_, colIdx) => {
-        const cellRef = XLSX.utils.encode_cell({ r: 2, c: colIdx })
-        if (!dishWs[cellRef]) dishWs[cellRef] = { t: 's', v: '' }
-        dishWs[cellRef].s = dishHeaderStyle
+      // Header row (row 2, index 1)
+      dishHeaders.forEach((header, colIdx) => {
+        const cellRef = XLSX.utils.encode_cell({ r: 1, c: colIdx })
+        dishWs[cellRef] = {
+          v: header,
+          t: 's',
+          s: {
+            fill: { fgColor: { rgb: 'D9E8FB' } },
+            font: { bold: true, sz: 11 },
+            alignment: { horizontal: 'center', vertical: 'center' },
+            border: thinBorder
+          }
+        }
       })
 
-      // Data cells
+      // Data rows (starting from row 3, index 2)
       dishDataRows.forEach((row, rowIdx) => {
         row.forEach((val, colIdx) => {
-          const cellRef = XLSX.utils.encode_cell({ r: rowIdx + 3, c: colIdx })
-          if (!dishWs[cellRef]) dishWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
+          const cellRef = XLSX.utils.encode_cell({ r: rowIdx + 2, c: colIdx })
 
-          if (colIdx === 0 || colIdx === 1 || colIdx === 2) {
-            // STT, Tên món, Danh mục - left/center align
-            dishWs[cellRef].s = {
-              alignment: { horizontal: colIdx === 0 ? 'center' : 'left', vertical: 'center' },
-              border: {
-                top: { style: 'thin', color: { rgb: 'D9D9D9' } },
-                bottom: { style: 'thin', color: { rgb: 'D9D9D9' } },
-                left: { style: 'thin', color: { rgb: 'D9D9D9' } },
-                right: { style: 'thin', color: { rgb: 'D9D9D9' } }
-              }
+          dishWs[cellRef] = {
+            v: val,
+            t: typeof val === 'number' ? 'n' : 's',
+            s: {
+              alignment: {
+                horizontal: colIdx === 0 ? 'center' : (colIdx === 1 || colIdx === 2 ? 'left' : 'right'),
+                vertical: 'center',
+                wrapText: colIdx === 1 || colIdx === 2 // Tự xuống dòng cho cột Tên món và Danh mục
+              },
+              border: thinBorder
             }
-          } else {
-            // Number columns - right align
-            dishWs[cellRef].s = dataCellStyle
-            if (typeof val === 'number') {
-              dishWs[cellRef].z = colIdx === 5 ? '#,##0.0' : '#,##0' // Growth với 1 decimal
-            }
+          }
+
+          // Number format
+          if (typeof val === 'number' && colIdx === 4) {
+            dishWs[cellRef].z = '#,##0'
+          }
+          if (typeof val === 'number' && colIdx === 5) {
+            dishWs[cellRef].z = '#,##0.00'
           }
         })
       })
 
       // Total row
-      const dishTotalRowIdx = dishDataRows.length + 3
+      const dishTotalRowIdx = dishDataRows.length + 2
       dishTotals.forEach((val, colIdx) => {
         const cellRef = XLSX.utils.encode_cell({ r: dishTotalRowIdx, c: colIdx })
-        if (!dishWs[cellRef]) dishWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
-        dishWs[cellRef].s = totalCellStyle
+        dishWs[cellRef] = {
+          v: val,
+          t: typeof val === 'number' ? 'n' : 's',
+          s: {
+            fill: { fgColor: { rgb: 'F5F5F5' } },
+            font: { bold: true, sz: 11 },
+            alignment: {
+              horizontal: colIdx === 1 ? 'center' : 'right',
+              vertical: 'center'
+            },
+            border: thinBorder
+          }
+        }
         if (typeof val === 'number') {
           dishWs[cellRef].z = '#,##0'
         }
       })
 
+      // Set range for worksheet
+      dishWs['!ref'] = XLSX.utils.encode_range({
+        s: { r: 0, c: 0 },
+        e: { r: dishTotalRowIdx, c: dishHeaders.length - 1 }
+      })
+
+      // Merge title cell across all columns
+      dishWs['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: dishHeaders.length - 1 } }
+      ]
+
       // Set column widths
       dishWs['!cols'] = [
-        { wch: 6 },  // STT
-        { wch: 30 }, // Tên món
-        { wch: 18 }, // Danh mục
-        { wch: 16 }, // Số lượng bán
-        { wch: 20 }, // Doanh thu
-        { wch: 16 }  // Tăng trưởng
+        { wch: 6 },   // STT
+        { wch: 45 },  // Tên món - tăng độ rộng để hiển thị đầy đủ
+        { wch: 20 },  // Danh mục
+        { wch: 16 },  // Số lượng bán
+        { wch: 20 },  // Doanh thu
+        { wch: 16 }   // Tăng trưởng
       ]
 
       // Set row heights
-      dishWs['!rows'] = [
-        { hpt: 30 }, // Title row
-        { hpt: 5 },  // Empty row
-        { hpt: 25 }  // Header row
-      ]
+      const dishRowHeights = [{ hpt: 25 }] // Title row
+      for (let i = 0; i <= dishDataRows.length; i++) {
+        dishRowHeights.push({ hpt: 22 })
+      }
+      dishWs['!rows'] = dishRowHeights
 
       XLSX.utils.book_append_sheet(wb, dishWs, 'Doanh thu theo món')
 
@@ -665,106 +753,121 @@ const ReportsSalesPage = () => {
         100.0 // Tổng tỷ trọng luôn = 100%
       ]
 
-      // Create worksheet data
-      const categoryWsData = [
-        // Title row
-        [{ v: `DOANH THU THEO DANH MỤC (${start.format('DD/MM/YYYY')} - ${end.format('DD/MM/YYYY')})`, t: 's' }],
-        [], // Empty row
-        // Header row
-        categoryHeaders,
-        // Data rows
-        ...categoryDataRows,
-        // Total row
-        categoryTotals
-      ]
+      // Create worksheet with proper cell objects for styling
+      const categoryWs = {}
 
-      const categoryWs = XLSX.utils.aoa_to_sheet(categoryWsData)
-
-      // Merge title cell
-      categoryWs['!merges'] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } }
-      ]
-
-      // Apply styles - Title
-      categoryWs['A1'].s = {
-        fill: { fgColor: { rgb: 'FA8C16' } },
-        font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 14 },
-        alignment: { horizontal: 'center', vertical: 'center' }
+      // Title row (row 0) - merged across all columns
+      const categoryTitleText = `DOANH THU THEO DANH MỤC (${start.format('DD/MM/YYYY')} - ${end.format('DD/MM/YYYY')})`
+      categoryWs['A1'] = {
+        v: categoryTitleText,
+        t: 's',
+        s: {
+          font: { bold: true, sz: 14 },
+          alignment: { horizontal: 'center', vertical: 'center' },
+          border: thinBorder
+        }
       }
-
-      // Headers (row 3)
-      const categoryHeaderStyle = {
-        fill: { fgColor: { rgb: 'FA8C16' } },
-        font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 12 },
-        alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
-        border: {
-          top: { style: 'thin', color: { rgb: '000000' } },
-          bottom: { style: 'thin', color: { rgb: '000000' } },
-          left: { style: 'thin', color: { rgb: '000000' } },
-          right: { style: 'thin', color: { rgb: '000000' } }
+      // Fill empty merged cells with border
+      for (let i = 1; i < categoryHeaders.length; i++) {
+        const cellRef = XLSX.utils.encode_cell({ r: 0, c: i })
+        categoryWs[cellRef] = {
+          v: '',
+          t: 's',
+          s: { border: thinBorder }
         }
       }
 
-      categoryHeaders.forEach((_, colIdx) => {
-        const cellRef = XLSX.utils.encode_cell({ r: 2, c: colIdx })
-        if (!categoryWs[cellRef]) categoryWs[cellRef] = { t: 's', v: '' }
-        categoryWs[cellRef].s = categoryHeaderStyle
+      // Header row (row 2, index 1)
+      categoryHeaders.forEach((header, colIdx) => {
+        const cellRef = XLSX.utils.encode_cell({ r: 1, c: colIdx })
+        categoryWs[cellRef] = {
+          v: header,
+          t: 's',
+          s: {
+            fill: { fgColor: { rgb: 'D9E8FB' } },
+            font: { bold: true, sz: 11 },
+            alignment: { horizontal: 'center', vertical: 'center' },
+            border: thinBorder
+          }
+        }
       })
 
-      // Data cells
+      // Data rows (starting from row 3, index 2)
       categoryDataRows.forEach((row, rowIdx) => {
         row.forEach((val, colIdx) => {
-          const cellRef = XLSX.utils.encode_cell({ r: rowIdx + 3, c: colIdx })
-          if (!categoryWs[cellRef]) categoryWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
+          const cellRef = XLSX.utils.encode_cell({ r: rowIdx + 2, c: colIdx })
 
-          if (colIdx === 0 || colIdx === 1) {
-            // STT, Danh mục - center/left align
-            categoryWs[cellRef].s = {
-              alignment: { horizontal: colIdx === 0 ? 'center' : 'left', vertical: 'center' },
-              border: {
-                top: { style: 'thin', color: { rgb: 'D9D9D9' } },
-                bottom: { style: 'thin', color: { rgb: 'D9D9D9' } },
-                left: { style: 'thin', color: { rgb: 'D9D9D9' } },
-                right: { style: 'thin', color: { rgb: 'D9D9D9' } }
-              }
+          categoryWs[cellRef] = {
+            v: val,
+            t: typeof val === 'number' ? 'n' : 's',
+            s: {
+              alignment: {
+                horizontal: colIdx === 0 ? 'center' : (colIdx === 1 ? 'left' : 'right'),
+                vertical: 'center'
+              },
+              border: thinBorder
             }
-          } else {
-            // Number columns - right align
-            categoryWs[cellRef].s = dataCellStyle
-            if (typeof val === 'number') {
-              categoryWs[cellRef].z = colIdx === 5 ? '#,##0.0' : '#,##0' // Tỷ trọng với 1 decimal
-            }
+          }
+
+          // Number format
+          if (typeof val === 'number' && colIdx === 4) {
+            categoryWs[cellRef].z = '#,##0'
+          }
+          if (typeof val === 'number' && colIdx === 5) {
+            categoryWs[cellRef].z = '#,##0.00'
           }
         })
       })
 
       // Total row
-      const categoryTotalRowIdx = categoryDataRows.length + 3
+      const categoryTotalRowIdx = categoryDataRows.length + 2
       categoryTotals.forEach((val, colIdx) => {
         const cellRef = XLSX.utils.encode_cell({ r: categoryTotalRowIdx, c: colIdx })
-        if (!categoryWs[cellRef]) categoryWs[cellRef] = { t: typeof val === 'number' ? 'n' : 's', v: val }
-        categoryWs[cellRef].s = totalCellStyle
+        categoryWs[cellRef] = {
+          v: val,
+          t: typeof val === 'number' ? 'n' : 's',
+          s: {
+            fill: { fgColor: { rgb: 'F5F5F5' } },
+            font: { bold: true, sz: 11 },
+            alignment: {
+              horizontal: colIdx === 1 ? 'center' : 'right',
+              vertical: 'center'
+            },
+            border: thinBorder
+          }
+        }
         if (typeof val === 'number') {
-          categoryWs[cellRef].z = colIdx === 5 ? '#,##0.0' : '#,##0'
+          categoryWs[cellRef].z = colIdx === 5 ? '#,##0.00' : '#,##0'
         }
       })
 
+      // Set range for worksheet
+      categoryWs['!ref'] = XLSX.utils.encode_range({
+        s: { r: 0, c: 0 },
+        e: { r: categoryTotalRowIdx, c: categoryHeaders.length - 1 }
+      })
+
+      // Merge title cell across all columns
+      categoryWs['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: categoryHeaders.length - 1 } }
+      ]
+
       // Set column widths
       categoryWs['!cols'] = [
-        { wch: 6 },  // STT
-        { wch: 25 }, // Danh mục
-        { wch: 12 }, // Số món
-        { wch: 16 }, // Số lượng bán
-        { wch: 20 }, // Doanh thu
-        { wch: 14 }  // Tỷ trọng
+        { wch: 6 },   // STT
+        { wch: 25 },  // Danh mục
+        { wch: 12 },  // Số món
+        { wch: 16 },  // Số lượng bán
+        { wch: 20 },  // Doanh thu
+        { wch: 14 }   // Tỷ trọng
       ]
 
       // Set row heights
-      categoryWs['!rows'] = [
-        { hpt: 30 }, // Title row
-        { hpt: 5 },  // Empty row
-        { hpt: 25 }  // Header row
-      ]
+      const categoryRowHeights = [{ hpt: 25 }] // Title row
+      for (let i = 0; i <= categoryDataRows.length; i++) {
+        categoryRowHeights.push({ hpt: 22 })
+      }
+      categoryWs['!rows'] = categoryRowHeights
 
       XLSX.utils.book_append_sheet(wb, categoryWs, 'Doanh thu theo danh mục')
 
@@ -902,34 +1005,100 @@ const ReportsSalesPage = () => {
           <Spin spinning={revenueLoading}>
             <Row gutter={[20, 20]} className="mb-6">
               <Col xs={24} sm={12} lg={8}>
-                <MetricCard
-                  icon={DollarSign}
-                  title="Tổng doanh thu"
-                  value={formatCurrency(totalRevenue)}
-                  trend={`${summaryMetrics.growth?.revenue > 0 ? '+' : ''}${summaryMetrics.growth?.revenue || 0}%`}
-                  trendLabel=""
-                  valueSize="medium"
-                />
+                <Card
+                  bordered={false}
+                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                  bodyStyle={{
+                    padding: '24px',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}
+                  hoverable
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100 flex items-center justify-center flex-shrink-0">
+                      <DollarSign size={22} strokeWidth={2} color="#226533" />
+                    </div>
+                    <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
+                      Tổng doanh thu
+                    </Text>
+                  </div>
+                  <div>
+                    <Title
+                      level={2}
+                      className="text-gray-800 text-2xl font-semibold leading-none tracking-tight float-end"
+                      style={{ margin: '12px 0 4px 0' }}
+                    >
+                      {formatCurrency(totalRevenue)}
+                    </Title>
+                  </div>
+                </Card>
               </Col>
               <Col xs={24} sm={12} lg={8}>
-                <MetricCard
-                  icon={ShoppingCart}
-                  title="Tổng đơn hàng"
-                  value={totalOrders.toLocaleString()}
-                  trend={`${summaryMetrics.growth?.orders > 0 ? '+' : ''}${summaryMetrics.growth?.orders || 0}%`}
-                  trendLabel=""
-                  valueSize="large"
-                />
+                <Card
+                  bordered={false}
+                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                  bodyStyle={{
+                    padding: '24px',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}
+                  hoverable
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center flex-shrink-0">
+                      <ShoppingCart size={22} strokeWidth={2} color="#faad14" />
+                    </div>
+                    <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
+                      Tổng đơn hàng
+                    </Text>
+                  </div>
+                  <div>
+                    <Title
+                      level={2}
+                      className="text-gray-800 text-3xl font-semibold leading-none tracking-tight float-end"
+                      style={{ margin: '12px 0 4px 0' }}
+                    >
+                      {totalOrders.toLocaleString()}
+                    </Title>
+                  </div>
+                </Card>
               </Col>
               <Col xs={24} sm={12} lg={8}>
-                <MetricCard
-                  icon={Users}
-                  title="Tổng khách hàng"
-                  value={totalCustomers.toLocaleString()}
-                  trend={`${summaryMetrics.growth?.customers > 0 ? '+' : ''}${summaryMetrics.growth?.customers || 0}%`}
-                  trendLabel=""
-                  valueSize="large"
-                />
+                <Card
+                  bordered={false}
+                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                  bodyStyle={{
+                    padding: '24px',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}
+                  hoverable
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center flex-shrink-0">
+                      <Users size={22} strokeWidth={2} color="#1890ff" />
+                    </div>
+                    <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
+                      Tổng khách hàng
+                    </Text>
+                  </div>
+                  <div>
+                    <Title
+                      level={2}
+                      className="text-gray-800 text-3xl font-semibold leading-none tracking-tight float-end"
+                      style={{ margin: '12px 0 4px 0' }}
+                    >
+                      {totalCustomers.toLocaleString()}
+                    </Title>
+                  </div>
+                </Card>
               </Col>
             </Row>            {/* 1. BIỂU ĐỒ XU HƯỚNG KINH DOANH */}
             <Row gutter={[20, 20]} className="mb-6">
@@ -1249,8 +1418,8 @@ const ReportsSalesPage = () => {
                       <BarChart data={dishRevenueData}>
                         <defs>
                           <linearGradient id="dishGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#722ed1" stopOpacity={1} />
-                            <stop offset="100%" stopColor="#b37feb" stopOpacity={0.8} />
+                            <stop offset="0%" stopColor="#3b82f6" stopOpacity={1} />
+                            <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.7} />
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
@@ -1419,15 +1588,16 @@ const ReportsSalesPage = () => {
                                   width: '12px',
                                   height: '12px',
                                   borderRadius: '3px',
-                                  background: item.color
+                                  background: item.color,
+                                  flexShrink: 0
                                 }}
                               />
-                              <Text strong className="text-sm">{item.category}</Text>
+                              <Text strong className="text-sm truncate">{item.category}</Text>
                             </div>
-                            <div className="flex items-center gap-3">
-                              <Text className="text-xs text-gray-500">{item.dishes} món</Text>
-                              <Text strong className="text-sm">{formatCurrency(item.revenue)}</Text>
-                              <Tag color={item.color} className="font-semibold ml-2">
+                            <div className="flex items-center flex-shrink-0">
+                              <Text className="text-xs text-gray-500 text-right" style={{ minWidth: '50px' }}>{item.dishes} món</Text>
+                              <Text strong className="text-sm text-right mr-4" style={{ minWidth: '110px' }}>{formatCurrency(item.revenue)}</Text>
+                              <Tag color={item.color} className="font-semibold" style={{ minWidth: '60px', textAlign: 'center', margin: 0 }}>
                                 {item.percentOfTotal}%
                               </Tag>
                             </div>
