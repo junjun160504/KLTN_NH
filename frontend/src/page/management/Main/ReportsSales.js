@@ -1523,29 +1523,39 @@ const ReportsSalesPage = () => {
 
                   {/* Category Details */}
                   <div className="mt-6">
-                    <div className="grid grid-cols-1 gap-3">
+                    {/* Header row */}
+                    <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs text-gray-500 font-medium border-b border-gray-200">
+                      <div className="col-span-5">Danh mục</div>
+                      <div className="col-span-2 text-center">Số món</div>
+                      <div className="col-span-3 text-right">Doanh thu</div>
+                      <div className="col-span-2 text-right">Tỷ lệ</div>
+                    </div>
+                    {/* Data rows */}
+                    <div className="grid grid-cols-1 gap-1 mt-1">
                       {categoryRevenueData.map((item) => (
-                        <div key={item.category} className="p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 flex-1">
-                              <div
-                                style={{
-                                  width: '12px',
-                                  height: '12px',
-                                  borderRadius: '3px',
-                                  background: item.color,
-                                  flexShrink: 0
-                                }}
-                              />
-                              <Text strong className="text-sm truncate">{item.category}</Text>
-                            </div>
-                            <div className="flex items-center flex-shrink-0">
-                              <Text className="text-xs text-gray-500 text-right" style={{ minWidth: '50px' }}>{item.dishes} món</Text>
-                              <Text strong className="text-sm text-right mr-4" style={{ minWidth: '110px' }}>{formatCurrency(item.revenue)}</Text>
-                              <Tag color={item.color} className="font-semibold" style={{ minWidth: '60px', textAlign: 'center', margin: 0 }}>
-                                {item.percentOfTotal}%
-                              </Tag>
-                            </div>
+                        <div key={item.category} className="grid grid-cols-12 gap-2 p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors items-center">
+                          <div className="col-span-5 flex items-center gap-2 min-w-0">
+                            <div
+                              style={{
+                                width: '10px',
+                                height: '10px',
+                                borderRadius: '3px',
+                                background: item.color,
+                                flexShrink: 0
+                              }}
+                            />
+                            <Text strong className="text-xs truncate">{item.category}</Text>
+                          </div>
+                          <div className="col-span-2 text-center">
+                            <Text className="text-xs text-gray-500">{item.dishes}</Text>
+                          </div>
+                          <div className="col-span-3 text-right">
+                            <Text strong className="text-xs">{formatCurrency(item.revenue)}</Text>
+                          </div>
+                          <div className="col-span-2 text-right">
+                            <Tag color={item.color} className="font-semibold text-xs" style={{ margin: 0 }}>
+                              {item.percentOfTotal}%
+                            </Tag>
                           </div>
                         </div>
                       ))}

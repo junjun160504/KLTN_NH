@@ -19,7 +19,8 @@ import {
     Table,
     Tag,
     Avatar,
-    Empty
+    Empty,
+    Popover
 } from 'antd'
 import {
     TrendingUp,
@@ -33,7 +34,9 @@ import {
     FileText,
     User,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    Calendar,
+    MapPin
 } from 'react-feather'
 import {
     BarChart,
@@ -865,92 +868,161 @@ const ReportReviewPage = () => {
                                                 padding: '12px 20px',
                                                 background: '#fafafa',
                                                 borderBottom: '1px solid #f0f0f0',
-                                                fontSize: 12,
+                                                fontSize: 13,
                                                 fontWeight: 600,
-                                                color: '#8c8c8c',
-                                                textTransform: 'uppercase',
+                                                color: '#000',
                                                 letterSpacing: '0.5px'
                                             }}>
-                                                <span>Khách hàng</span>
+                                                <span style={{ textAlign: 'center' }} >Khách hàng</span>
                                                 <span style={{ textAlign: 'center' }}>Đánh giá</span>
-                                                <span>Nội dung</span>
+                                                <span style={{ marginLeft: 80 }}>Nội dung</span>
                                                 <span style={{ textAlign: 'right' }}>Thời gian</span>
                                             </div>
 
                                             {/* Table Body */}
                                             <div className="custom-scrollbar" style={{ maxHeight: 450, overflowY: 'auto' }}>
                                                 {restaurantReviewsDetail.reviews.slice(0, 10).map((review, index) => (
-                                                    <div
+                                                    <Popover
                                                         key={review.id}
-                                                        style={{
-                                                            display: 'grid',
-                                                            gridTemplateColumns: '1.5fr 1fr 2fr 1fr',
-                                                            padding: '14px 20px',
-                                                            borderBottom: index < 9 ? '1px solid #f5f5f5' : 'none',
-                                                            alignItems: 'center',
-                                                            transition: 'background 0.2s',
-                                                            cursor: 'default'
-                                                        }}
-                                                        className="hover:bg-gray-50"
+                                                        placement="left"
+                                                        trigger="hover"
+                                                        mouseEnterDelay={0.3}
+                                                        overlayStyle={{ maxWidth: 380 }}
+                                                        content={
+                                                            <div style={{ padding: '4px 0' }}>
+                                                                {/* Header */}
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid #f0f0f0' }}>
+                                                                    <div style={{
+                                                                        width: 44,
+                                                                        height: 44,
+                                                                        borderRadius: '50%',
+                                                                        background: 'linear-gradient(135deg, #f0f5ff 0%, #d6e4ff 100%)',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center'
+                                                                    }}>
+                                                                        <User size={20} style={{ color: '#1890ff' }} />
+                                                                    </div>
+                                                                    <div>
+                                                                        <div style={{ fontWeight: 600, fontSize: 15, color: '#262626' }}>
+                                                                            {review.customerName || 'Khách hàng'}
+                                                                        </div>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: '#8c8c8c' }}>
+                                                                            <MapPin size={12} /> Bàn {review.tableNumber || '-'}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                {/* Rating */}
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                                                                    <span style={{ fontSize: 13, color: '#595959' }}>Đánh giá:</span>
+                                                                    <div style={{ display: 'flex', gap: 2 }}>
+                                                                        {[1, 2, 3, 4, 5].map((star) => (
+                                                                            <Star
+                                                                                key={star}
+                                                                                size={16}
+                                                                                fill={star <= review.rating ? '#faad14' : 'none'}
+                                                                                color={star <= review.rating ? '#faad14' : '#d9d9d9'}
+                                                                            />
+                                                                        ))}
+                                                                    </div>
+                                                                    <span style={{ fontWeight: 600, color: '#faad14' }}>({review.rating}/5)</span>
+                                                                </div>
+                                                                {/* Comment */}
+                                                                <div style={{ marginBottom: 12 }}>
+                                                                    <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>Nhận xét:</div>
+                                                                    <div style={{
+                                                                        background: '#fafafa',
+                                                                        borderRadius: 8,
+                                                                        padding: '10px 12px',
+                                                                        fontSize: 13,
+                                                                        color: review.comment ? '#262626' : '#bfbfbf',
+                                                                        fontStyle: review.comment ? 'normal' : 'italic',
+                                                                        lineHeight: 1.6,
+                                                                        maxHeight: 120,
+                                                                        overflowY: 'auto'
+                                                                    }}>
+                                                                        {review.comment || 'Không có nhận xét'}
+                                                                    </div>
+                                                                </div>
+                                                                {/* Date */}
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#8c8c8c' }}>
+                                                                    <Calendar size={12} />
+                                                                    {dayjs(review.createdAt).format('HH:mm - DD/MM/YYYY')}
+                                                                </div>
+                                                            </div>
+                                                        }
                                                     >
-                                                        {/* Customer Info */}
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                                            <div style={{
-                                                                width: 36,
-                                                                height: 36,
-                                                                borderRadius: '50%',
-                                                                background: '#f0f5ff',
-                                                                display: 'flex',
+                                                        <div
+                                                            style={{
+                                                                display: 'grid',
+                                                                gridTemplateColumns: '1.5fr 1fr 2fr 1fr',
+                                                                padding: '14px 20px',
+                                                                borderBottom: index < 9 ? '1px solid #f5f5f5' : 'none',
                                                                 alignItems: 'center',
-                                                                justifyContent: 'center'
+                                                                transition: 'background 0.2s',
+                                                                cursor: 'pointer'
+                                                            }}
+                                                            className="hover:bg-blue-50"
+                                                        >
+                                                            {/* Customer Info */}
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                                <div style={{
+                                                                    width: 36,
+                                                                    height: 36,
+                                                                    borderRadius: '50%',
+                                                                    background: '#f0f5ff',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center'
+                                                                }}>
+                                                                    <User size={16} style={{ color: '#1890ff' }} />
+                                                                </div>
+                                                                <div>
+                                                                    <div style={{ fontWeight: 500, fontSize: 14, color: '#262626' }}>
+                                                                        {review.customerName || 'Khách hàng'}
+                                                                    </div>
+                                                                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                                                                        Bàn {review.tableNumber || '-'}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Rating */}
+                                                            <div style={{ textAlign: 'center' }}>
+                                                                <Tag
+                                                                    style={{
+                                                                        margin: 0,
+                                                                        borderRadius: 6,
+                                                                        padding: '2px 10px',
+                                                                        fontSize: 13,
+                                                                        fontWeight: 500,
+                                                                        background: review.rating >= 4 ? '#f6ffed' : review.rating >= 3 ? '#fffbe6' : '#fff2f0',
+                                                                        color: review.rating >= 4 ? '#52c41a' : review.rating >= 3 ? '#faad14' : '#ff4d4f',
+                                                                        border: `1px solid ${review.rating >= 4 ? '#b7eb8f' : review.rating >= 3 ? '#ffe58f' : '#ffccc7'}`
+                                                                    }}
+                                                                >
+                                                                    {review.rating} ⭐
+                                                                </Tag>
+                                                            </div>
+
+                                                            {/* Comment */}
+                                                            <div style={{
+                                                                fontSize: 13,
+                                                                color: review.comment ? '#595959' : '#bfbfbf',
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis',
+                                                                whiteSpace: 'nowrap',
+                                                                paddingRight: 12
                                                             }}>
-                                                                <User size={16} style={{ color: '#1890ff' }} />
+                                                                {review.comment || 'Không có nhận xét'}
                                                             </div>
-                                                            <div>
-                                                                <div style={{ fontWeight: 500, fontSize: 14, color: '#262626' }}>
-                                                                    {review.customerName || 'Khách hàng'}
-                                                                </div>
-                                                                <div style={{ fontSize: 12, color: '#8c8c8c' }}>
-                                                                    Bàn {review.tableNumber || '-'}
-                                                                </div>
+
+                                                            {/* Date */}
+                                                            <div style={{ textAlign: 'right', fontSize: 13, color: '#8c8c8c' }}>
+                                                                {dayjs(review.createdAt).format('DD/MM/YYYY')}
                                                             </div>
                                                         </div>
-
-                                                        {/* Rating */}
-                                                        <div style={{ textAlign: 'center' }}>
-                                                            <Tag
-                                                                style={{
-                                                                    margin: 0,
-                                                                    borderRadius: 6,
-                                                                    padding: '2px 10px',
-                                                                    fontSize: 13,
-                                                                    fontWeight: 500,
-                                                                    background: review.rating >= 4 ? '#f6ffed' : review.rating >= 3 ? '#fffbe6' : '#fff2f0',
-                                                                    color: review.rating >= 4 ? '#52c41a' : review.rating >= 3 ? '#faad14' : '#ff4d4f',
-                                                                    border: `1px solid ${review.rating >= 4 ? '#b7eb8f' : review.rating >= 3 ? '#ffe58f' : '#ffccc7'}`
-                                                                }}
-                                                            >
-                                                                {review.rating} ⭐
-                                                            </Tag>
-                                                        </div>
-
-                                                        {/* Comment */}
-                                                        <div style={{
-                                                            fontSize: 13,
-                                                            color: review.comment ? '#595959' : '#bfbfbf',
-                                                            overflow: 'hidden',
-                                                            textOverflow: 'ellipsis',
-                                                            whiteSpace: 'nowrap',
-                                                            paddingRight: 12
-                                                        }}>
-                                                            {review.comment || 'Không có nhận xét'}
-                                                        </div>
-
-                                                        {/* Date */}
-                                                        <div style={{ textAlign: 'right', fontSize: 13, color: '#8c8c8c' }}>
-                                                            {dayjs(review.createdAt).format('DD/MM/YYYY')}
-                                                        </div>
-                                                    </div>
+                                                    </Popover>
                                                 ))}
                                             </div>
 
@@ -1064,99 +1136,171 @@ const ReportReviewPage = () => {
                                                 padding: '12px 20px',
                                                 background: '#fafafa',
                                                 borderBottom: '1px solid #f0f0f0',
-                                                fontSize: 12,
+                                                fontSize: 13,
                                                 fontWeight: 600,
-                                                color: '#8c8c8c',
-                                                textTransform: 'uppercase',
+                                                color: '#000',
                                                 letterSpacing: '0.5px'
                                             }}>
-                                                <span>Món ăn</span>
+                                                <span style={{ textAlign: 'center' }}>Món ăn</span>
                                                 <span style={{ textAlign: 'center' }}>Đánh giá</span>
-                                                <span>Nội dung</span>
+                                                <span style={{ marginLeft: 80 }}>Nội dung</span>
                                                 <span style={{ textAlign: 'right' }}>Ngày</span>
                                             </div>
 
                                             {/* Table Body */}
                                             <div className="custom-scrollbar" style={{ maxHeight: 450, overflowY: 'auto' }}>
                                                 {menuReviewsDetail.reviews.slice(0, 10).map((review, index) => (
-                                                    <div
+                                                    <Popover
                                                         key={review.id}
-                                                        style={{
-                                                            display: 'grid',
-                                                            gridTemplateColumns: '1.8fr 0.8fr 1.8fr 0.8fr',
-                                                            padding: '14px 20px',
-                                                            borderBottom: index < 9 ? '1px solid #f5f5f5' : 'none',
-                                                            alignItems: 'center',
-                                                            transition: 'background 0.2s',
-                                                            cursor: 'default'
-                                                        }}
-                                                        className="hover:bg-gray-50"
-                                                    >
-                                                        {/* Menu Item Info */}
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
-                                                            <Avatar
-                                                                size={40}
-                                                                src={review.itemImage}
-                                                                style={{
-                                                                    flexShrink: 0,
-                                                                    borderRadius: 8,
-                                                                    border: '1px solid #f0f0f0'
-                                                                }}
-                                                            >
-                                                                {review.itemName?.charAt(0)}
-                                                            </Avatar>
-                                                            <div style={{ overflow: 'hidden' }}>
-                                                                <div style={{
-                                                                    fontWeight: 500,
-                                                                    fontSize: 14,
-                                                                    color: '#262626',
-                                                                    whiteSpace: 'nowrap',
-                                                                    overflow: 'hidden',
-                                                                    textOverflow: 'ellipsis'
-                                                                }}>
-                                                                    {review.itemName}
+                                                        placement="left"
+                                                        trigger="hover"
+                                                        mouseEnterDelay={0.3}
+                                                        overlayStyle={{ maxWidth: 400 }}
+                                                        content={
+                                                            <div style={{ padding: '4px 0' }}>
+                                                                {/* Header with Image */}
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid #f0f0f0' }}>
+                                                                    <Avatar
+                                                                        size={56}
+                                                                        src={review.itemImage}
+                                                                        style={{
+                                                                            flexShrink: 0,
+                                                                            borderRadius: 10,
+                                                                            border: '2px solid #f0f0f0'
+                                                                        }}
+                                                                    >
+                                                                        {review.itemName?.charAt(0)}
+                                                                    </Avatar>
+                                                                    <div>
+                                                                        <div style={{ fontWeight: 600, fontSize: 15, color: '#262626', marginBottom: 2 }}>
+                                                                            {review.itemName}
+                                                                        </div>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: '#8c8c8c' }}>
+                                                                            <User size={12} /> {review.customerName}
+                                                                        </div>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#8c8c8c' }}>
+                                                                            <MapPin size={11} /> Bàn {review.tableNumber || '-'}
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
-                                                                <div style={{ fontSize: 12, color: '#8c8c8c' }}>
-                                                                    {review.customerName} - Bàn {review.tableNumber || '-'}
+                                                                {/* Rating */}
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                                                                    <span style={{ fontSize: 13, color: '#595959' }}>Đánh giá:</span>
+                                                                    <div style={{ display: 'flex', gap: 2 }}>
+                                                                        {[1, 2, 3, 4, 5].map((star) => (
+                                                                            <Star
+                                                                                key={star}
+                                                                                size={16}
+                                                                                fill={star <= review.rating ? '#faad14' : 'none'}
+                                                                                color={star <= review.rating ? '#faad14' : '#d9d9d9'}
+                                                                            />
+                                                                        ))}
+                                                                    </div>
+                                                                    <span style={{ fontWeight: 600, color: '#faad14' }}>({review.rating}/5)</span>
+                                                                </div>
+                                                                {/* Comment */}
+                                                                <div style={{ marginBottom: 12 }}>
+                                                                    <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>Nhận xét:</div>
+                                                                    <div style={{
+                                                                        background: '#fafafa',
+                                                                        borderRadius: 8,
+                                                                        padding: '10px 12px',
+                                                                        fontSize: 13,
+                                                                        color: review.comment ? '#262626' : '#bfbfbf',
+                                                                        fontStyle: review.comment ? 'normal' : 'italic',
+                                                                        lineHeight: 1.6,
+                                                                        maxHeight: 120,
+                                                                        overflowY: 'auto'
+                                                                    }}>
+                                                                        {review.comment || 'Không có nhận xét'}
+                                                                    </div>
+                                                                </div>
+                                                                {/* Date */}
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#8c8c8c' }}>
+                                                                    <Calendar size={12} />
+                                                                    {dayjs(review.createdAt).format('HH:mm - DD/MM/YYYY')}
                                                                 </div>
                                                             </div>
-                                                        </div>
+                                                        }
+                                                    >
+                                                        <div
+                                                            style={{
+                                                                display: 'grid',
+                                                                gridTemplateColumns: '1.8fr 0.8fr 1.8fr 0.8fr',
+                                                                padding: '14px 20px',
+                                                                borderBottom: index < 9 ? '1px solid #f5f5f5' : 'none',
+                                                                alignItems: 'center',
+                                                                transition: 'background 0.2s',
+                                                                cursor: 'pointer'
+                                                            }}
+                                                            className="hover:bg-blue-50"
+                                                        >
+                                                            {/* Menu Item Info */}
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
+                                                                <Avatar
+                                                                    size={40}
+                                                                    src={review.itemImage}
+                                                                    style={{
+                                                                        flexShrink: 0,
+                                                                        borderRadius: 8,
+                                                                        border: '1px solid #f0f0f0'
+                                                                    }}
+                                                                >
+                                                                    {review.itemName?.charAt(0)}
+                                                                </Avatar>
+                                                                <div style={{ overflow: 'hidden' }}>
+                                                                    <div style={{
+                                                                        fontWeight: 500,
+                                                                        fontSize: 14,
+                                                                        color: '#262626',
+                                                                        whiteSpace: 'nowrap',
+                                                                        overflow: 'hidden',
+                                                                        textOverflow: 'ellipsis'
+                                                                    }}>
+                                                                        {review.itemName}
+                                                                    </div>
+                                                                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+                                                                        {review.customerName} - Bàn {review.tableNumber || '-'}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
 
-                                                        {/* Rating */}
-                                                        <div style={{ textAlign: 'center' }}>
-                                                            <Tag
-                                                                style={{
-                                                                    margin: 0,
-                                                                    borderRadius: 6,
-                                                                    padding: '2px 10px',
-                                                                    fontSize: 13,
-                                                                    fontWeight: 500,
-                                                                    background: review.rating >= 4 ? '#f6ffed' : review.rating >= 3 ? '#fffbe6' : '#fff2f0',
-                                                                    color: review.rating >= 4 ? '#52c41a' : review.rating >= 3 ? '#faad14' : '#ff4d4f',
-                                                                    border: `1px solid ${review.rating >= 4 ? '#b7eb8f' : review.rating >= 3 ? '#ffe58f' : '#ffccc7'}`
-                                                                }}
-                                                            >
-                                                                {review.rating} ⭐
-                                                            </Tag>
-                                                        </div>
+                                                            {/* Rating */}
+                                                            <div style={{ textAlign: 'center' }}>
+                                                                <Tag
+                                                                    style={{
+                                                                        margin: 0,
+                                                                        borderRadius: 6,
+                                                                        padding: '2px 10px',
+                                                                        fontSize: 13,
+                                                                        fontWeight: 500,
+                                                                        background: review.rating >= 4 ? '#f6ffed' : review.rating >= 3 ? '#fffbe6' : '#fff2f0',
+                                                                        color: review.rating >= 4 ? '#52c41a' : review.rating >= 3 ? '#faad14' : '#ff4d4f',
+                                                                        border: `1px solid ${review.rating >= 4 ? '#b7eb8f' : review.rating >= 3 ? '#ffe58f' : '#ffccc7'}`
+                                                                    }}
+                                                                >
+                                                                    {review.rating} ⭐
+                                                                </Tag>
+                                                            </div>
 
-                                                        {/* Comment */}
-                                                        <div style={{
-                                                            fontSize: 13,
-                                                            color: review.comment ? '#595959' : '#bfbfbf',
-                                                            overflow: 'hidden',
-                                                            textOverflow: 'ellipsis',
-                                                            whiteSpace: 'nowrap',
-                                                            paddingRight: 12
-                                                        }}>
-                                                            {review.comment || 'Không có nhận xét'}
-                                                        </div>
+                                                            {/* Comment */}
+                                                            <div style={{
+                                                                fontSize: 13,
+                                                                color: review.comment ? '#595959' : '#bfbfbf',
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis',
+                                                                whiteSpace: 'nowrap',
+                                                                paddingRight: 12
+                                                            }}>
+                                                                {review.comment || 'Không có nhận xét'}
+                                                            </div>
 
-                                                        {/* Date */}
-                                                        <div style={{ textAlign: 'right', fontSize: 13, color: '#8c8c8c' }}>
-                                                            {dayjs(review.createdAt).format('DD/MM/YYYY')}
+                                                            {/* Date */}
+                                                            <div style={{ textAlign: 'right', fontSize: 13, color: '#8c8c8c' }}>
+                                                                {dayjs(review.createdAt).format('DD/MM/YYYY')}
+                                                            </div>
                                                         </div>
-                                                    </div>
+                                                    </Popover>
                                                 ))}
                                             </div>
 
