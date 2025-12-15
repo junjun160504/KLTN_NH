@@ -1249,6 +1249,7 @@ function OrderSessionPage() {
       key: 'action',
       width: '20%',
       align: 'center',
+      fixed: "right",
       render: (_, session) => {
         // Check if session has orders that need payment
         const hasOrdersToPayment = session.orders.some(

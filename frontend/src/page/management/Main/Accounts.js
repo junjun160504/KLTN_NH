@@ -373,7 +373,7 @@ const AccountsPage = () => {
       width: 185,
       render: (role) => {
         const roleConfig = {
-          OWNER: { color: "red", text: "OWNER" },
+          OWNER: { color: "red", text: "Chủ" },
           MANAGER: { color: "blue", text: "Quản lý" },
           STAFF: { color: "green", text: "Nhân viên" },
         };
