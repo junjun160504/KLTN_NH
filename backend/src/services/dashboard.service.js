@@ -375,12 +375,12 @@ export async function getOrderStatusDistribution({ startDate, endDate }) {
   const [statuses] = await pool.query(query, [startDate, endDate])
 
   // Map status sang tiếng Việt và màu sắc
-  // Theo yêu cầu: Chờ xác nhận (NEW), Đang phục vụ (IN_PROGRESS), Hoàn thành (PAID), Đã hủy (CANCELLED)
+  // Theo yêu cầu: Chờ xác nhận (cam), Đang phục vụ (xanh lá), Hoàn thành (xanh blue), Đã hủy (đỏ)
   const statusMap = {
-    NEW: { name: 'Chờ xác nhận', color: '#1890ff' },
-    IN_PROGRESS: { name: 'Đang phục vụ', color: '#faad14' },
-    PAID: { name: 'Hoàn thành', color: '#52c41a' },
-    CANCELLED: { name: 'Đã hủy', color: '#ff4d4f' }
+    NEW: { name: 'Chờ xác nhận', color: '#faad14' },        // Cam
+    IN_PROGRESS: { name: 'Đang phục vụ', color: '#52c41a' }, // Xanh lá
+    PAID: { name: 'Hoàn thành', color: '#1890ff' },          // Xanh blue
+    CANCELLED: { name: 'Đã hủy', color: '#ff4d4f' }          // Đỏ
   }
 
   // Tạo object để map count từ DB

@@ -1454,7 +1454,7 @@ function OrderSessionPage() {
               <Col xs={24} sm={12} lg={6}>
                 <Card
                   bordered={false}
-                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-35 overflow-hidden"
                   bodyStyle={{
                     padding: '24px',
                     height: '100%',
@@ -1468,14 +1468,14 @@ function OrderSessionPage() {
                     <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center flex-shrink-0">
                       <Grid size={22} strokeWidth={2} color="#1890ff" />
                     </div>
-                    <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
+                    <Text className="text-gray-500 text-lg font-medium tracking-wide mt-1">
                       Tổng phiên
                     </Text>
                   </div>
                   <div>
                     <Title
-                      level={2}
-                      className="text-gray-800 text-3xl font-semibold leading-none tracking-tight float-end"
+                      level={3}
+                      className="text-gray-800 text-2xl font-semibold leading-none tracking-tight float-end"
                       style={{ margin: '12px 0 4px 0' }}
                     >
                       {statistics.totalSessions}
@@ -1486,7 +1486,7 @@ function OrderSessionPage() {
               <Col xs={24} sm={12} lg={6}>
                 <Card
                   bordered={false}
-                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-35 overflow-hidden"
                   bodyStyle={{
                     padding: '24px',
                     height: '100%',
@@ -1500,14 +1500,14 @@ function OrderSessionPage() {
                     <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-50 to-green-100 flex items-center justify-center flex-shrink-0">
                       <Clock size={22} strokeWidth={2} color="#52c41a" />
                     </div>
-                    <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
+                    <Text className="text-gray-500 text-lg font-medium tracking-wide mt-1">
                       Phiên hoạt động
                     </Text>
                   </div>
                   <div>
                     <Title
-                      level={2}
-                      className="text-gray-800 text-3xl font-semibold leading-none tracking-tight float-end"
+                      level={3}
+                      className="text-gray-800 text-2xl font-semibold leading-none tracking-tight float-end"
                       style={{ margin: '12px 0 4px 0' }}
                     >
                       {statistics.activeSessions}
@@ -1518,7 +1518,7 @@ function OrderSessionPage() {
               <Col xs={24} sm={12} lg={6}>
                 <Card
                   bordered={false}
-                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-35 overflow-hidden"
                   bodyStyle={{
                     padding: '24px',
                     height: '100%',
@@ -1532,14 +1532,14 @@ function OrderSessionPage() {
                     <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center flex-shrink-0">
                       <ShoppingCart size={22} strokeWidth={2} color="#faad14" />
                     </div>
-                    <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
+                    <Text className="text-gray-500 text-lg font-medium tracking-wide mt-1">
                       Tổng đơn hàng
                     </Text>
                   </div>
                   <div>
                     <Title
-                      level={2}
-                      className="text-gray-800 text-3xl font-semibold leading-none tracking-tight float-end"
+                      level={3}
+                      className="text-gray-800 text-2xl font-semibold leading-none tracking-tight float-end"
                       style={{ margin: '12px 0 4px 0' }}
                     >
                       {statistics.totalOrders}
@@ -1550,7 +1550,7 @@ function OrderSessionPage() {
               <Col xs={24} sm={12} lg={6}>
                 <Card
                   bordered={false}
-                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-35 overflow-hidden"
                   bodyStyle={{
                     padding: '24px',
                     height: '100%',
@@ -1564,14 +1564,14 @@ function OrderSessionPage() {
                     <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100 flex items-center justify-center flex-shrink-0">
                       <DollarSign size={22} strokeWidth={2} color="#226533" />
                     </div>
-                    <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
+                    <Text className="text-gray-500 text-lg font-medium tracking-wide mt-1">
                       Doanh thu
                     </Text>
                   </div>
                   <div>
                     <Title
-                      level={2}
-                      className="text-gray-800 text-2xl font-semibold leading-none tracking-tight float-end"
+                      level={3}
+                      className="text-gray-800 text-xl font-semibold leading-none tracking-tight float-end"
                       style={{ margin: '12px 0 4px 0' }}
                     >
                       {statistics.revenue?.toLocaleString('vi-VN')}đ

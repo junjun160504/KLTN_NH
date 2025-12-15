@@ -250,7 +250,7 @@ export async function reply(message, history = []) {
     console.debug("[ChatbotV2] Sending messages to OpenAI:", messages);
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gemini-2.5-flash-lite",
       messages: messages,
       // temperature: 0.7,
       // max_tokens: 100,

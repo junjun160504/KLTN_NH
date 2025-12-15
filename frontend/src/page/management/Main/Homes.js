@@ -116,7 +116,7 @@ const Home = () => {
     const colors = {
       NEW: '#faad14',          // Chờ xác nhận - Cam
       IN_PROGRESS: '#52c41a',  // Đang phục vụ - Xanh lá
-      PAID: '#52c41a',         // Hoàn thành - Xanh lá
+      PAID: '#1890ff',         // Hoàn thành - Xanh blue
       CANCELLED: '#ff4d4f'     // Đã hủy - Đỏ
     }
     return colors[status] || '#d9d9d9'
@@ -337,7 +337,7 @@ const Home = () => {
     return (
       <Card
         bordered={false}
-        className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+        className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-35 overflow-hidden"
         bodyStyle={{
           padding: '24px',
           height: '100%',
@@ -351,14 +351,14 @@ const Home = () => {
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center flex-shrink-0">
             <Icon size={22} strokeWidth={2} color="#1890ff" />
           </div>
-          <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
+          <Text className="text-gray-500 text-lg font-medium tracking-wide mt-1">
             {title}
           </Text>
         </div>
         <div>
           <Title
-            level={2}
-            className={`text-gray-800 ${valueSize === 'large' ? 'text-3xl' : 'text-2xl'} font-semibold leading-none tracking-tight float-end`}
+            level={3}
+            className={`text-gray-800 ${valueSize === 'large' ? 'text-2xl' : 'text-xl'} font-semibold leading-none tracking-tight float-end`}
             style={{ margin: '12px 0 4px 0' }}
           >
             {value}
@@ -1149,21 +1149,23 @@ const Home = () => {
                     }}
                     columns={[
                       {
-                        title: 'Mã đơn',
+                        title: <Text className='text-sm'>Mã đơn</Text>,
                         dataIndex: 'id',
                         key: 'id',
                         width: '15%',
+                        align: 'center',
                         render: (text) => (
-                          <Text strong style={{ fontSize: '13px' }}>
+                          <Text strong style={{ fontSize: '12px' }}>
                             {text}
                           </Text>
                         )
                       },
                       {
-                        title: 'Bàn',
+                        title: <Text className='text-sm'>Bàn</Text>,
                         dataIndex: 'table',
                         key: 'table',
                         width: '10%',
+                        align: 'center',
                         render: (text) => (
                           <Tag color="blue" style={{ fontSize: '12px' }}>
                             {text}
@@ -1171,39 +1173,43 @@ const Home = () => {
                         )
                       },
                       {
-                        title: 'Thời gian',
+                        title: <Text className='text-sm'>Thời gian</Text>,
                         dataIndex: 'time',
                         key: 'time',
-                        width: '15%',
+                        width: '18%',
+                        align: 'center',
                         render: (text) => (
                           <Text style={{ fontSize: '12px' }}>{text}</Text>
                         )
                       },
                       {
-                        title: 'Số món',
+                        title: <Text className='text-sm'>Số món</Text>,
                         dataIndex: 'items',
                         key: 'items',
                         width: '15%',
+                        align: 'center',
                         render: (text) => (
                           <Text style={{ fontSize: '12px' }}>{text} món</Text>
                         )
                       },
                       {
-                        title: 'Tổng tiền',
+                        title: <Text className='text-sm'>Tổng tiền</Text>,
                         dataIndex: 'amount',
                         key: 'amount',
                         width: '20%',
+                        align: 'center',
                         render: (value) => (
-                          <Text strong style={{ fontSize: '13px', color: '#1890ff' }}>
+                          <Text strong style={{ fontSize: '12px', float: 'right', color: '#1890ff' }}>
                             {formatCurrency(value)}
                           </Text>
                         )
                       },
                       {
-                        title: 'Trạng thái',
+                        title: <Text className='text-sm'>Trạng thái</Text>,
                         dataIndex: 'status',
                         key: 'status',
-                        width: '23%',
+                        width: '20%',
+                        align: 'center',
                         render: (status) => (
                           <Tag
                             color={getStatusColor(status)}

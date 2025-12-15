@@ -71,12 +71,12 @@ const scrollbarStyles = `
     }
 `
 
-// MetricCard Component - Synced with ReportsCustomers.js
+// MetricCard Component - Synced with Homes.js
 const MetricCard = ({ icon: Icon, title, value, suffix = '', iconColor = '#faad14', iconBgClass = 'from-yellow-50 to-yellow-100' }) => {
     return (
         <Card
             bordered={false}
-            className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+            className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-35 overflow-hidden"
             bodyStyle={{
                 padding: '24px',
                 height: '100%',
@@ -92,14 +92,14 @@ const MetricCard = ({ icon: Icon, title, value, suffix = '', iconColor = '#faad1
                 >
                     <Icon size={22} strokeWidth={2} color={iconColor} />
                 </div>
-                <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
+                <Text className="text-gray-500 text-lg font-medium tracking-wide mt-1">
                     {title}
                 </Text>
             </div>
             <div>
                 <Title
-                    level={2}
-                    className="text-gray-800 text-3xl font-semibold leading-none tracking-tight float-end"
+                    level={3}
+                    className="text-gray-800 text-2xl font-semibold leading-none tracking-tight float-end"
                     style={{ margin: '12px 0 4px 0' }}
                 >
                     {value}{suffix}

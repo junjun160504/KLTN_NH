@@ -469,59 +469,6 @@ const ReportsCustomerPage = () => {
     }
   }
 
-  // ====== Metric Card Component ======
-  const MetricCard = ({ icon: Icon, title, value, trend, trendLabel, valueSize = 'large', suffix = '' }) => {
-    const isPositive = trend >= 0
-    return (
-      <Card
-        bordered={false}
-        className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
-        bodyStyle={{
-          padding: '24px',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between'
-        }}
-        hoverable
-      >
-        <div className="flex items-start justify-between">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center flex-shrink-0">
-            <Icon size={22} strokeWidth={2} color="#1890ff" />
-          </div>
-          <Text className="text-gray-500 text-xs font-medium tracking-wide mt-1">
-            {title}
-          </Text>
-        </div>
-        <div>
-          <Title
-            level={2}
-            className={`text-gray-800 ${valueSize === 'large' ? 'text-3xl' : 'text-2xl'} font-semibold leading-none tracking-tight`}
-            style={{ margin: '12px 0 4px 0' }}
-          >
-            {value}{suffix}
-          </Title>
-          {trend !== undefined && (
-            <div className="flex items-center gap-1.5 mt-2">
-              <TrendingUp
-                size={14}
-                strokeWidth={2.5}
-                color={isPositive ? '#52c41a' : '#ff4d4f'}
-                style={{ transform: isPositive ? 'none' : 'rotate(180deg)' }}
-              />
-              <Text className={`text-xs font-medium ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                {isPositive ? '+' : ''}{trend}%
-              </Text>
-              {trendLabel && (
-                <Text className="text-xs text-gray-400">{trendLabel}</Text>
-              )}
-            </div>
-          )}
-        </div>
-      </Card>
-    )
-  }
-
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f5f5' }}>
       <AppSidebar collapsed={collapsed} currentPageKey="report_customers" />
@@ -583,7 +530,7 @@ const ReportsCustomerPage = () => {
               <Col xs={24} sm={12} lg={6}>
                 <Card
                   bordered={false}
-                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-35 overflow-hidden"
                   bodyStyle={{
                     padding: '24px',
                     height: '100%',
@@ -597,14 +544,14 @@ const ReportsCustomerPage = () => {
                     <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center flex-shrink-0">
                       <Users size={22} strokeWidth={2} color="#1890ff" />
                     </div>
-                    <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
+                    <Text className="text-gray-500 text-lg font-medium tracking-wide mt-1">
                       Lượt tích điểm
                     </Text>
                   </div>
                   <div>
                     <Title
-                      level={2}
-                      className="text-gray-800 text-3xl font-semibold leading-none tracking-tight float-end"
+                      level={3}
+                      className="text-gray-800 text-2xl font-semibold leading-none tracking-tight float-end"
                       style={{ margin: '12px 0 4px 0' }}
                     >
                       {totalRegistrations.toLocaleString()}
@@ -615,7 +562,7 @@ const ReportsCustomerPage = () => {
               <Col xs={24} sm={12} lg={6}>
                 <Card
                   bordered={false}
-                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-35 overflow-hidden"
                   bodyStyle={{
                     padding: '24px',
                     height: '100%',
@@ -629,14 +576,14 @@ const ReportsCustomerPage = () => {
                     <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-50 to-purple-100 flex items-center justify-center flex-shrink-0">
                       <Award size={22} strokeWidth={2} color="#722ed1" />
                     </div>
-                    <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
+                    <Text className="text-gray-500 text-lg font-medium tracking-wide mt-1">
                       Điểm đã cấp
                     </Text>
                   </div>
                   <div>
                     <Title
-                      level={2}
-                      className="text-gray-800 text-3xl font-semibold leading-none tracking-tight float-end"
+                      level={3}
+                      className="text-gray-800 text-2xl font-semibold leading-none tracking-tight float-end"
                       style={{ margin: '12px 0 4px 0' }}
                     >
                       {totalPointsIssued.toLocaleString()}
@@ -647,7 +594,7 @@ const ReportsCustomerPage = () => {
               <Col xs={24} sm={12} lg={6}>
                 <Card
                   bordered={false}
-                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-35 overflow-hidden"
                   bodyStyle={{
                     padding: '24px',
                     height: '100%',
@@ -661,14 +608,14 @@ const ReportsCustomerPage = () => {
                     <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100 flex items-center justify-center flex-shrink-0">
                       <UserCheck size={22} strokeWidth={2} color="#226533" />
                     </div>
-                    <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
+                    <Text className="text-gray-500 text-lg font-medium tracking-wide mt-1">
                       Tỷ lệ tham gia
                     </Text>
                   </div>
                   <div>
                     <Title
-                      level={2}
-                      className="text-gray-800 text-3xl font-semibold leading-none tracking-tight float-end"
+                      level={3}
+                      className="text-gray-800 text-2xl font-semibold leading-none tracking-tight float-end"
                       style={{ margin: '12px 0 4px 0' }}
                     >
                       {participationRate}%
@@ -679,7 +626,7 @@ const ReportsCustomerPage = () => {
               <Col xs={24} sm={12} lg={6}>
                 <Card
                   bordered={false}
-                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-35 overflow-hidden"
                   bodyStyle={{
                     padding: '24px',
                     height: '100%',
@@ -693,14 +640,14 @@ const ReportsCustomerPage = () => {
                     <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center flex-shrink-0">
                       <TrendingUp size={22} strokeWidth={2} color="#faad14" />
                     </div>
-                    <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
+                    <Text className="text-gray-500 text-lg font-medium tracking-wide mt-1">
                       TB điểm/khách
                     </Text>
                   </div>
                   <div>
                     <Title
-                      level={2}
-                      className="text-gray-800 text-3xl font-semibold leading-none tracking-tight float-end"
+                      level={3}
+                      className="text-gray-800 text-2xl font-semibold leading-none tracking-tight float-end"
                       style={{ margin: '12px 0 4px 0' }}
                     >
                       {avgPointsPerCustomer} điểm

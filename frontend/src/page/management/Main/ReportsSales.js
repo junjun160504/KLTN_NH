@@ -890,62 +890,7 @@ const ReportsSalesPage = () => {
     }).format(value)
   }
 
-  // ==================== METRIC CARD COMPONENT ====================
-  const MetricCard = ({ icon: Icon, title, value, trend, trendLabel, valueSize = 'large', suffix = '' }) => {
-    const trendValue = parseFloat(trend)
-    const isPositive = trendValue >= 0
-    const trendColor = isPositive ? 'text-green-500' : 'text-red-500'
-    const arrowRotation = isPositive ? 'rotate(0 6 6)' : 'rotate(180 6 6)'
-
-    return (
-      <Card
-        bordered={false}
-        className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
-        bodyStyle={{
-          padding: '24px',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between'
-        }}
-        hoverable
-      >
-        <div className="flex items-start justify-between">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center flex-shrink-0">
-            <Icon size={22} strokeWidth={2} color="#1890ff" />
-          </div>
-          <Text className="text-gray-500 text-xs font-medium tracking-wide mt-1">
-            {title}
-          </Text>
-        </div>
-        <div>
-          <Title
-            level={2}
-            className={`text-gray-800 ${valueSize === 'large' ? 'text-3xl' : 'text-2xl'} font-semibold leading-none tracking-tight`}
-            style={{ margin: '12px 0 4px 0' }}
-          >
-            {value}{suffix}
-          </Title>
-          <div className="flex items-center gap-1">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path
-                d="M6 10L6 2M6 2L9 5M6 2L3 5"
-                stroke={isPositive ? '#52c41a' : '#ff4d4f'}
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                transform={arrowRotation}
-              />
-            </svg>
-            <Text className={`${trendColor} text-xs font-medium`}>{trend}%</Text>
-            <Text className="text-gray-400 text-xs">{trendLabel}</Text>
-          </div>
-        </div>
-      </Card>
-    )
-  }
-
-  // ==================== RENDER ====================
+  // ==================== RENDER ==
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f5f5' }}>
       <AppSidebar collapsed={collapsed} currentPageKey="report_sales" />
@@ -1007,7 +952,7 @@ const ReportsSalesPage = () => {
               <Col xs={24} sm={12} lg={8}>
                 <Card
                   bordered={false}
-                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-35 overflow-hidden"
                   bodyStyle={{
                     padding: '24px',
                     height: '100%',
@@ -1021,14 +966,14 @@ const ReportsSalesPage = () => {
                     <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100 flex items-center justify-center flex-shrink-0">
                       <DollarSign size={22} strokeWidth={2} color="#226533" />
                     </div>
-                    <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
+                    <Text className="text-gray-500 text-lg font-medium tracking-wide mt-1">
                       Tổng doanh thu
                     </Text>
                   </div>
                   <div>
                     <Title
-                      level={2}
-                      className="text-gray-800 text-2xl font-semibold leading-none tracking-tight float-end"
+                      level={3}
+                      className="text-gray-800 text-xl font-semibold leading-none tracking-tight float-end"
                       style={{ margin: '12px 0 4px 0' }}
                     >
                       {formatCurrency(totalRevenue)}
@@ -1039,7 +984,7 @@ const ReportsSalesPage = () => {
               <Col xs={24} sm={12} lg={8}>
                 <Card
                   bordered={false}
-                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-35 overflow-hidden"
                   bodyStyle={{
                     padding: '24px',
                     height: '100%',
@@ -1053,14 +998,14 @@ const ReportsSalesPage = () => {
                     <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center flex-shrink-0">
                       <ShoppingCart size={22} strokeWidth={2} color="#faad14" />
                     </div>
-                    <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
+                    <Text className="text-gray-500 text-lg font-medium tracking-wide mt-1">
                       Tổng đơn hàng
                     </Text>
                   </div>
                   <div>
                     <Title
-                      level={2}
-                      className="text-gray-800 text-3xl font-semibold leading-none tracking-tight float-end"
+                      level={3}
+                      className="text-gray-800 text-2xl font-semibold leading-none tracking-tight float-end"
                       style={{ margin: '12px 0 4px 0' }}
                     >
                       {totalOrders.toLocaleString()}
@@ -1071,7 +1016,7 @@ const ReportsSalesPage = () => {
               <Col xs={24} sm={12} lg={8}>
                 <Card
                   bordered={false}
-                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-40 overflow-hidden"
+                  className="rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 h-35 overflow-hidden"
                   bodyStyle={{
                     padding: '24px',
                     height: '100%',
@@ -1085,14 +1030,14 @@ const ReportsSalesPage = () => {
                     <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center flex-shrink-0">
                       <Users size={22} strokeWidth={2} color="#1890ff" />
                     </div>
-                    <Text className="text-gray-500 text-xl font-medium tracking-wide mt-1">
+                    <Text className="text-gray-500 text-lg font-medium tracking-wide mt-1">
                       Tổng khách hàng
                     </Text>
                   </div>
                   <div>
                     <Title
-                      level={2}
-                      className="text-gray-800 text-3xl font-semibold leading-none tracking-tight float-end"
+                      level={3}
+                      className="text-gray-800 text-2xl font-semibold leading-none tracking-tight float-end"
                       style={{ margin: '12px 0 4px 0' }}
                     >
                       {totalCustomers.toLocaleString()}
