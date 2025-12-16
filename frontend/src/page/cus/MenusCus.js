@@ -456,6 +456,7 @@ export default function CustomerMenuPage() {
                   style={{
                     whiteSpace: "nowrap",
                     padding: "0 20px",
+                    margin: "0 2px",
                     height: "36px",
                     fontSize: "14px",
                     fontWeight: selectedCategory === cat.id ? "600" : "400",

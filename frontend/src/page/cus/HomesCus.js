@@ -319,7 +319,8 @@ export default function HomecsPage() {
   const banners = [
     "/assets/images/Banner1.jpg",
     "/assets/images/Banner2.png",
-    "/assets/images/Banner.jpg",
+    "https://scontent.fhan17-1.fna.fbcdn.net/v/t39.30808-6/486799230_1061039256061707_8960190056314113050_n.jpg?_nc_cat=110&ccb=1-7&_nc_sid=833d8c&_nc_ohc=U422eKQxwM0Q7kNvwGXo1At&_nc_oc=AdlnbTNzQvd77PIWbB3moQs3K0teMrib2aZrREfgwLbHSvPJy9Po_PVocd_e3Mqq0lg&_nc_zt=23&_nc_ht=scontent.fhan17-1.fna&_nc_gid=dlvX5Koxc87jPViV1KN-BQ&oh=00_Afn-LwI0gkeuFdLCR7Un6i9sCSOuij1U54lm0c5qWMSAOw&oe=69474A60",
+    "https://channel.mediacdn.vn/428462621602512896/2022/7/25/pr3-anh-10-16587369747741451327099.jpg"
   ];
 
   return (
