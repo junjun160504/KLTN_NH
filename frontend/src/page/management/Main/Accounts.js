@@ -385,11 +385,11 @@ const AccountsPage = () => {
       title: "Tên nhân viên",
       dataIndex: "employee_name",
       key: "employee_name",
-      align: "center",
+      align: "left",
       width: 160,
       render: (employee_name, record) => (
         <div className="flex flex-col items-start">
-          <span className="text-sm ml-3 font-medium text-gray-800">
+          <span className="text-sm font-medium text-gray-800">
             {employee_name || "—"}
           </span>
           {/* <span className="text-xs text-gray-500">

@@ -440,7 +440,7 @@ const StaffsPage = () => {
       ),
     },
     {
-      title: <div className="text-center w-full">Tên nhân viên</div>,
+      title: <div className="text-left w-full">Tên nhân viên</div>,
       dataIndex: "name",
       key: "name",
       sorter: (a, b) => a.name.localeCompare(b.name),
@@ -448,16 +448,16 @@ const StaffsPage = () => {
       width: 220,
       align: "center",
       render: (name) => (
-        <div className="flex justify-start gap-2 py-1 ml-8">
+        <div className="flex justify-start gap-2 py-1">
           <span className="font-semibold text-gray-800 text-sm">{name}</span>
         </div>
       ),
     },
     {
-      title: "Email",
+      title: <div className="text-left w-full ml-4">Email</div>,
       dataIndex: "email",
       key: "email",
-      align: "center",
+      align: "left",
       width: 260,
       render: (email) => (
         <span className="text-sm text-gray-600 float-start ml-4">{email || "—"}</span>

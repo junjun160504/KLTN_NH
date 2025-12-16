@@ -621,7 +621,7 @@ const ReportsSalesPage = () => {
       const dishWs = {}
 
       // Title row (row 0) - merged across all columns
-      const dishTitleText = `TOP ${dishLimit} MÓN CÓ DOANH THU CAO NHẤT (${start.format('DD/MM/YYYY')} - ${end.format('DD/MM/YYYY')})`
+      const dishTitleText = `TOP MÓN CÓ DOANH THU CAO NHẤT (${start.format('DD/MM/YYYY')} - ${end.format('DD/MM/YYYY')})`
       dishWs['A1'] = {
         v: dishTitleText,
         t: 's',

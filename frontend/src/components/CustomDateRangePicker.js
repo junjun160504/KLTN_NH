@@ -52,6 +52,7 @@ const CustomDateRangePicker = ({ value, onChange, className }) => {
         { key: 'yesterday', label: 'Hôm qua', getValue: () => [dayjs().subtract(1, 'day').startOf('day'), dayjs().subtract(1, 'day').endOf('day')] },
         { key: 'last7days', label: '7 ngày qua', getValue: () => [dayjs().subtract(6, 'day').startOf('day'), dayjs().endOf('day')] },
         { key: 'last15days', label: '15 ngày qua', getValue: () => [dayjs().subtract(14, 'day').startOf('day'), dayjs().endOf('day')] },
+        { key: 'last30days', label: '30 ngày qua', getValue: () => [dayjs().subtract(29, 'day').startOf('day'), dayjs().endOf('day')] },
         { key: 'lastMonth', label: 'Tháng trước', getValue: () => [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')] },
         { key: 'custom', label: 'Tùy chỉnh', getValue: null }
     ];

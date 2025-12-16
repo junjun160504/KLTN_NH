@@ -118,7 +118,7 @@ const ReportReviewPage = () => {
 
     // Date Range State
     const [dateRange, setDateRange] = useState([
-        dayjs().subtract(6, 'day').startOf('day'),
+        dayjs().subtract(29, 'day').startOf('day'),
         dayjs().endOf('day')
     ])
 

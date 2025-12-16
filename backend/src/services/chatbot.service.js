@@ -79,12 +79,14 @@ function parseRichContentResponse(gptResponse, menuItems, originalMessage) {
     });
   }
 
-  // 3️⃣ Detect mentioned items in text (chỉ khi có suggestions)
-  // ✅ Tắt auto-detect nếu không muốn hiển thị card khi GPT chỉ nhắc tên món trong text
+  // 3️⃣ Detect mentioned items in text
+  // ✅ TẮT auto-detect - không tự động tạo card nhỏ cho món được nhắc trong text
+  // Nếu muốn bật lại, uncomment block bên dưới
   const mentionedItems = [];
-  const textContent = gptResponse.intro || gptResponse.text || '';
 
-  // Chỉ detect mentioned items nếu đã có suggestions (tránh hiển thị card không mong muốn)
+  /*
+  // AUTO-DETECT DISABLED - Uncomment to enable
+  const textContent = gptResponse.intro || gptResponse.text || '';
   if (textContent && suggestedItems.length > 0) {
     menuItems.forEach((item) => {
       const regex = new RegExp(item.name.replace(/[()]/g, '\\$&'), 'gi');
@@ -99,6 +101,7 @@ function parseRichContentResponse(gptResponse, menuItems, originalMessage) {
       }
     });
   }
+  */
 
   if (mentionedItems.length > 0) {
     contents.push({

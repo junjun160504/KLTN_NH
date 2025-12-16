@@ -202,7 +202,7 @@ const RichContentRenderer = ({ contents, navigate }) => {
           );
         }
 
-        // 3️⃣ MENTIONED ITEMS (smaller cards)
+        // 3️⃣ MENTIONED ITEMS (same size as menu_items)
         if (content.type === 'mentioned_items') {
           return (
             <div key={index} style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
@@ -211,11 +211,11 @@ const RichContentRenderer = ({ contents, navigate }) => {
                   key={`mentioned-${item.id}-${itemIndex}`}
                   hoverable
                   onClick={() => navigate(`/food/${item.id}`)}
-                  size="small"
                   style={{
                     borderRadius: 12,
                     overflow: "hidden",
                     boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                    transition: "all 0.3s",
                   }}
                   bodyStyle={{ padding: 0 }}
                 >
@@ -224,19 +224,36 @@ const RichContentRenderer = ({ contents, navigate }) => {
                       src={item.image_url}
                       alt={item.name}
                       style={{
-                        width: 60,
-                        height: 60,
+                        width: 80,
+                        height: 80,
                         objectFit: "cover",
+                        flexShrink: 0,
+                        display: "block",
                         margin: 8,
                         borderRadius: 8,
                       }}
                     />
-                    <div style={{ flex: 1, padding: "8px 12px" }}>
-                      <Text strong style={{ fontSize: 13, display: "block", marginBottom: 4 }}>
+                    <div style={{
+                      flex: 1,
+                      padding: "8px 12px 8px 4px",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "center",
+                      minWidth: 0,
+                    }}>
+                      <Text strong style={{
+                        fontSize: 14,
+                        marginBottom: 4,
+                        color: "#1a1a1a",
+                        lineHeight: 1.3,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}>
                         {item.name}
                       </Text>
-                      <Text strong style={{ fontSize: 14, color: "#226533" }}>
-                        {item.price.toLocaleString()}đ
+                      <Text strong style={{ fontSize: 14, color: "#226533", fontWeight: 700 }}>
+                        {Number(item.price || 0).toLocaleString()}đ
                       </Text>
                     </div>
                   </div>
@@ -712,14 +729,14 @@ export default function CustomerChatbotPage() {
                           }}
                           bodyStyle={{ padding: 0 }}
                         >
-                          <div style={{ display: "flex", alignItems: "stretch" }}>
+                          <div style={{ display: "flex", alignItems: "center" }}>
                             {/* Image */}
                             <img
                               src={item.image_url}
                               alt={item.name}
                               style={{
-                                width: 90,
-                                height: 90,
+                                width: 80,
+                                height: 80,
                                 objectFit: "cover",
                                 flexShrink: 0,
                                 display: "block",
@@ -731,19 +748,22 @@ export default function CustomerChatbotPage() {
                             {/* Info */}
                             <div style={{
                               flex: 1,
-                              padding: "8px 12px 8px 12px",
+                              padding: "8px 12px 8px 4px",
                               display: "flex",
                               flexDirection: "column",
                               justifyContent: "center",
+                              minWidth: 0,
                             }}>
                               <Text
                                 strong
                                 style={{
                                   fontSize: 14,
-                                  display: "block",
-                                  marginBottom: 6,
+                                  marginBottom: 4,
                                   color: "#1a1a1a",
                                   lineHeight: 1.3,
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
                                 }}
                               >
                                 {item.name}
@@ -752,12 +772,12 @@ export default function CustomerChatbotPage() {
                               <Text
                                 strong
                                 style={{
-                                  fontSize: 15,
+                                  fontSize: 14,
                                   color: "#226533",
                                   fontWeight: 700,
                                 }}
                               >
-                                {item.price.toLocaleString()}đ
+                                {Number(item.price || 0).toLocaleString()}đ
                               </Text>
                             </div>
                           </div>
@@ -852,7 +872,6 @@ export default function CustomerChatbotPage() {
           "Món ít cay",
           "Món chay",
           "Giá dưới 100k",
-          "Combo tiết kiệm",
         ].map((suggestion, i) => (
           <Button
             key={i}

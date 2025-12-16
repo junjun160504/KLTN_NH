@@ -349,8 +349,8 @@ export async function resetPasswordByOwner(targetAdminId, newPassword, ownerAdmi
         throw new Error('Target admin not found');
     }
 
-    // Prevent OWNER from resetting another OWNER's password
-    if (targetAdmin.role === 'OWNER') {
+    // OWNER can reset their own password, but cannot reset another OWNER's password
+    if (targetAdmin.role === 'OWNER' && targetAdmin.id !== ownerAdminId) {
         throw new Error('Cannot reset password for another OWNER account');
     }
 
@@ -444,7 +444,7 @@ export async function deleteAdmin(id) {
 
     // Cannot delete the last OWNER
     if (admin.role === 'OWNER') {
-        const [owners] = await query(
+        const owners = await query(
             'SELECT COUNT(*) as count FROM admins WHERE role = "OWNER" AND deleted_at IS NULL AND id != ?',
             [id]
         );
@@ -475,7 +475,7 @@ export async function hardDeleteAdmin(id) {
 
     // Cannot delete the last OWNER
     if (admin.role === 'OWNER') {
-        const [owners] = await query(
+        const owners = await query(
             'SELECT COUNT(*) as count FROM admins WHERE role = "OWNER" AND id != ?',
             [id]
         );
@@ -486,7 +486,7 @@ export async function hardDeleteAdmin(id) {
     }
 
     // Check for related data (orders, payments, etc.)
-    const [orders] = await query(
+    const orders = await query(
         'SELECT COUNT(*) as count FROM orders WHERE admin_id = ?',
         [id]
     );
@@ -498,7 +498,7 @@ export async function hardDeleteAdmin(id) {
         );
     }
 
-    const [payments] = await query(
+    const payments = await query(
         'SELECT COUNT(*) as count FROM payments WHERE admin_id = ?',
         [id]
     );
