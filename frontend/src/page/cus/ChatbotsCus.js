@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import CustomerFooterNav from "../../components/CustomerFooterNav";
+import ReactMarkdown from "react-markdown";
 import {
   Layout,
   Typography,
@@ -22,6 +23,13 @@ const { Title, Text } = Typography;
 
 const REACT_APP_API_URL = process.env.REACT_APP_API_URL;
 
+// 📝 Helper: Truncate text to max characters
+const truncateText = (text, maxLength = 80) => {
+  if (!text) return "";
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength).trim() + "...";
+};
+
 // 🎨 Rich Content Renderer Component
 const RichContentRenderer = ({ contents, navigate }) => {
   if (!contents || contents.length === 0) return null;
@@ -29,7 +37,7 @@ const RichContentRenderer = ({ contents, navigate }) => {
   return (
     <div style={{ maxWidth: "100%", width: "100%" }}>
       {contents.map((content, index) => {
-        // 1️⃣ TEXT CONTENT
+        // 1️⃣ TEXT CONTENT (with Markdown support)
         if (content.type === 'text') {
           return (
             <div
@@ -41,16 +49,66 @@ const RichContentRenderer = ({ contents, navigate }) => {
                 borderRadius: 16,
                 marginBottom: contents.length > 1 ? 12 : 0,
                 fontSize: 15,
-                lineHeight: 1.5,
+                lineHeight: 1.6,
               }}
             >
-              {/* Main text */}
-              <div dangerouslySetInnerHTML={{
-                __html: content.value.replace(
-                  /(https?:\/\/[^\s]+)/g,
-                  '<a href="$1" target="_blank" rel="noopener noreferrer" style="color: #226533; text-decoration: underline;">$1</a>'
-                )
-              }} />
+              {/* 🌟 Markdown Renderer */}
+              <ReactMarkdown
+                components={{
+                  // Custom styling for markdown elements
+                  p: ({ children }) => (
+                    <p style={{ margin: '0 0 8px 0', lineHeight: 1.6 }}>{children}</p>
+                  ),
+                  strong: ({ children }) => (
+                    <strong style={{ color: '#226533', fontWeight: 600 }}>{children}</strong>
+                  ),
+                  em: ({ children }) => (
+                    <em style={{ color: '#555', fontStyle: 'italic' }}>{children}</em>
+                  ),
+                  ul: ({ children }) => (
+                    <ul style={{ margin: '8px 0', paddingLeft: 20 }}>{children}</ul>
+                  ),
+                  ol: ({ children }) => (
+                    <ol style={{ margin: '8px 0', paddingLeft: 20 }}>{children}</ol>
+                  ),
+                  li: ({ children }) => (
+                    <li style={{ marginBottom: 4 }}>{children}</li>
+                  ),
+                  a: ({ href, children }) => (
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#226533', textDecoration: 'underline' }}
+                    >
+                      {children}
+                    </a>
+                  ),
+                  code: ({ children }) => (
+                    <code style={{
+                      background: '#e8e8e8',
+                      padding: '2px 6px',
+                      borderRadius: 4,
+                      fontSize: 13
+                    }}>
+                      {children}
+                    </code>
+                  ),
+                  blockquote: ({ children }) => (
+                    <blockquote style={{
+                      borderLeft: '3px solid #226533',
+                      margin: '8px 0',
+                      paddingLeft: 12,
+                      color: '#555',
+                      fontStyle: 'italic'
+                    }}>
+                      {children}
+                    </blockquote>
+                  ),
+                }}
+              >
+                {content.value}
+              </ReactMarkdown>
 
               {/* Extracted URLs as buttons */}
               {content.urls && content.urls.length > 0 && (
@@ -77,9 +135,9 @@ const RichContentRenderer = ({ contents, navigate }) => {
         if (content.type === 'menu_items') {
           return (
             <div key={index} style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-              {content.items.map((item) => (
+              {content.items.map((item, itemIndex) => (
                 <Card
-                  key={item.id}
+                  key={`menu-${item.id}-${itemIndex}`}
                   hoverable
                   onClick={() => navigate(`/food/${item.id}`)}
                   style={{
@@ -90,13 +148,13 @@ const RichContentRenderer = ({ contents, navigate }) => {
                   }}
                   bodyStyle={{ padding: 0 }}
                 >
-                  <div style={{ display: "flex", alignItems: "stretch" }}>
+                  <div style={{ display: "flex", alignItems: "center" }}>
                     <img
                       src={item.image_url}
                       alt={item.name}
                       style={{
-                        width: 90,
-                        height: 90,
+                        width: 80,
+                        height: 80,
                         objectFit: "cover",
                         flexShrink: 0,
                         display: "block",
@@ -106,23 +164,35 @@ const RichContentRenderer = ({ contents, navigate }) => {
                     />
                     <div style={{
                       flex: 1,
-                      padding: "8px 12px",
+                      padding: "8px 12px 8px 4px",
                       display: "flex",
                       flexDirection: "column",
-                      justifyContent: "space-between",
+                      justifyContent: "center",
+                      minWidth: 0,
                     }}>
-                      <div>
-                        <Text strong style={{ fontSize: 14, display: "block", marginBottom: 4, color: "#1a1a1a", lineHeight: 1.3 }}>
-                          {item.name}
+                      <Text strong style={{
+                        fontSize: 14,
+                        marginBottom: 4,
+                        color: "#1a1a1a",
+                        lineHeight: 1.3,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}>
+                        {item.name}
+                      </Text>
+                      {item.reason && (
+                        <Text style={{
+                          fontSize: 12,
+                          color: "#666",
+                          marginBottom: 4,
+                          lineHeight: 1.4,
+                        }}>
+                          {truncateText(item.reason, 70)}
                         </Text>
-                        {item.reason && (
-                          <Text style={{ fontSize: 12, color: "#666", display: "block", marginBottom: 4, lineHeight: 1.3 }}>
-                            {item.reason}
-                          </Text>
-                        )}
-                      </div>
-                      <Text strong style={{ fontSize: 15, color: "#226533", fontWeight: 700 }}>
-                        {item.price.toLocaleString()}đ
+                      )}
+                      <Text strong style={{ fontSize: 14, color: "#226533", fontWeight: 700 }}>
+                        {Number(item.price || 0).toLocaleString()}đ
                       </Text>
                     </div>
                   </div>
@@ -136,9 +206,9 @@ const RichContentRenderer = ({ contents, navigate }) => {
         if (content.type === 'mentioned_items') {
           return (
             <div key={index} style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-              {content.items.map((item) => (
+              {content.items.map((item, itemIndex) => (
                 <Card
-                  key={item.id}
+                  key={`mentioned-${item.id}-${itemIndex}`}
                   hoverable
                   onClick={() => navigate(`/food/${item.id}`)}
                   size="small"
@@ -214,7 +284,7 @@ const RichContentRenderer = ({ contents, navigate }) => {
                 <img
                   key={i}
                   src={url}
-                  alt={`Image ${i + 1}`}
+                  alt={`Hình ${i + 1}`}
                   style={{
                     maxWidth: '100%',
                     borderRadius: 12,
@@ -312,6 +382,8 @@ export default function CustomerChatbotPage() {
             from: "bot",
             type: "rich_content",
             contents: botResponse.contents,
+            // ✅ Lưu _historyContext để đảm bảo context 100% khi gửi history
+            _historyContext: botResponse._historyContext,
             // Legacy fields for backward compatibility
             intro: botResponse.intro,
             suggestions: botResponse.suggestions,
@@ -387,6 +459,14 @@ export default function CustomerChatbotPage() {
 
   return (
     <Layout style={{ minHeight: "100vh", background: "#f5f7fa" }}>
+      {/* Hide scrollbar CSS for Webkit browsers */}
+      <style>
+        {`
+          .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+          }
+        `}
+      </style>
       {/* ========== HEADER ========== */}
       <Header
         style={{
@@ -433,17 +513,22 @@ export default function CustomerChatbotPage() {
         style={{
           padding: "12px",
           paddingTop: "76px",
-          paddingBottom: "220px",
+          paddingBottom: "150px",
         }}
       >
         <div
           style={{
-            height: "calc(100vh - 290px)",
+            height: "calc(100vh - 150px)",
             overflowY: "auto",
             display: "flex",
             flexDirection: "column",
             gap: 12,
+            // Hide scrollbar for mobile
+            scrollbarWidth: "none", // Firefox
+            msOverflowStyle: "none", // IE/Edge
+            WebkitOverflowScrolling: "touch",
           }}
+          className="hide-scrollbar"
         >
           {messages.map((msg, index) => (
             <div
@@ -474,7 +559,7 @@ export default function CustomerChatbotPage() {
               ) : msg.type === "suggestions" ? (
                 // Bot suggestions with images
                 <div style={{ maxWidth: "100%", width: "100%" }}>
-                  {/* Intro text */}
+                  {/* Intro text with Markdown */}
                   <div
                     style={{
                       background: "#f0f0f0",
@@ -483,17 +568,27 @@ export default function CustomerChatbotPage() {
                       borderRadius: 16,
                       marginBottom: 12,
                       fontSize: 15,
-                      lineHeight: 1.5,
+                      lineHeight: 1.6,
                     }}
                   >
-                    {msg.intro}
+                    <ReactMarkdown
+                      components={{
+                        p: ({ children }) => <p style={{ margin: '0 0 8px 0', lineHeight: 1.6 }}>{children}</p>,
+                        strong: ({ children }) => <strong style={{ color: '#226533', fontWeight: 600 }}>{children}</strong>,
+                        em: ({ children }) => <em style={{ color: '#555' }}>{children}</em>,
+                        ul: ({ children }) => <ul style={{ margin: '8px 0', paddingLeft: 20 }}>{children}</ul>,
+                        li: ({ children }) => <li style={{ marginBottom: 4 }}>{children}</li>,
+                      }}
+                    >
+                      {msg.intro}
+                    </ReactMarkdown>
                   </div>
 
                   {/* Suggestion cards */}
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {msg.suggestions.map((item) => (
+                    {msg.suggestions.map((item, itemIndex) => (
                       <Card
-                        key={item.id}
+                        key={`legacy-sug-${item.id}-${itemIndex}`}
                         hoverable
                         onClick={() => navigate(`/food/${item.id}`)}
                         style={{
@@ -504,14 +599,14 @@ export default function CustomerChatbotPage() {
                         }}
                         bodyStyle={{ padding: 0 }}
                       >
-                        <div style={{ display: "flex", alignItems: "stretch" }}>
+                        <div style={{ display: "flex", alignItems: "center" }}>
                           {/* Image */}
                           <img
                             src={item.image_url}
                             alt={item.name}
                             style={{
-                              width: 90,
-                              height: 90,
+                              width: 80,
+                              height: 80,
                               objectFit: "cover",
                               flexShrink: 0,
                               display: "block",
@@ -523,47 +618,49 @@ export default function CustomerChatbotPage() {
                           {/* Info */}
                           <div style={{
                             flex: 1,
-                            padding: "8px 12px 8px 12px",
+                            padding: "8px 12px 8px 4px",
                             display: "flex",
                             flexDirection: "column",
-                            justifyContent: "space-between",
+                            justifyContent: "center",
+                            minWidth: 0,
                           }}>
-                            <div>
-                              <Text
-                                strong
-                                style={{
-                                  fontSize: 14,
-                                  display: "block",
-                                  marginBottom: 4,
-                                  color: "#1a1a1a",
-                                  lineHeight: 1.3,
-                                }}
-                              >
-                                {item.name}
-                              </Text>
+                            <Text
+                              strong
+                              style={{
+                                fontSize: 14,
+                                marginBottom: 4,
+                                color: "#1a1a1a",
+                                lineHeight: 1.3,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {item.name}
+                            </Text>
 
+                            {item.reason && (
                               <Text
                                 style={{
                                   fontSize: 12,
                                   color: "#666",
-                                  display: "block",
                                   marginBottom: 4,
-                                  lineHeight: 1.3,
+                                  lineHeight: 1.4,
                                 }}
                               >
-                                {item.reason}
+                                {truncateText(item.reason, 70)}
                               </Text>
-                            </div>
+                            )}
 
                             <Text
                               strong
                               style={{
-                                fontSize: 15,
+                                fontSize: 14,
                                 color: "#226533",
                                 fontWeight: 700,
                               }}
                             >
-                              {item.price.toLocaleString()}đ
+                              {Number(item.price || 0).toLocaleString()}đ
                             </Text>
                           </div>
                         </div>
@@ -574,7 +671,7 @@ export default function CustomerChatbotPage() {
               ) : msg.type === "text_with_items" ? (
                 // ✅ Bot text with mentioned items
                 <div style={{ maxWidth: "100%", width: "100%" }}>
-                  {/* Text response */}
+                  {/* Text response with Markdown */}
                   <div
                     style={{
                       background: "#f0f0f0",
@@ -583,18 +680,28 @@ export default function CustomerChatbotPage() {
                       borderRadius: 16,
                       marginBottom: 12,
                       fontSize: 15,
-                      lineHeight: 1.5,
+                      lineHeight: 1.6,
                     }}
                   >
-                    {msg.text}
+                    <ReactMarkdown
+                      components={{
+                        p: ({ children }) => <p style={{ margin: '0 0 8px 0', lineHeight: 1.6 }}>{children}</p>,
+                        strong: ({ children }) => <strong style={{ color: '#226533', fontWeight: 600 }}>{children}</strong>,
+                        em: ({ children }) => <em style={{ color: '#555' }}>{children}</em>,
+                        ul: ({ children }) => <ul style={{ margin: '8px 0', paddingLeft: 20 }}>{children}</ul>,
+                        li: ({ children }) => <li style={{ marginBottom: 4 }}>{children}</li>,
+                      }}
+                    >
+                      {msg.text}
+                    </ReactMarkdown>
                   </div>
 
                   {/* Mentioned items cards */}
                   {msg.mentioned_items && msg.mentioned_items.length > 0 && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {msg.mentioned_items.map((item) => (
+                      {msg.mentioned_items.map((item, itemIndex) => (
                         <Card
-                          key={item.id}
+                          key={`legacy-mentioned-${item.id}-${itemIndex}`}
                           hoverable
                           onClick={() => navigate(`/food/${item.id}`)}
                           style={{
@@ -660,7 +767,7 @@ export default function CustomerChatbotPage() {
                   )}
                 </div>
               ) : (
-                // Bot text message
+                // Bot text message with Markdown support
                 <div
                   style={{
                     background: "#f0f0f0",
@@ -669,10 +776,25 @@ export default function CustomerChatbotPage() {
                     borderRadius: 16,
                     maxWidth: "75%",
                     fontSize: 15,
-                    lineHeight: 1.5,
+                    lineHeight: 1.6,
                   }}
                 >
-                  {msg.text}
+                  <ReactMarkdown
+                    components={{
+                      p: ({ children }) => <p style={{ margin: '0 0 8px 0', lineHeight: 1.6 }}>{children}</p>,
+                      strong: ({ children }) => <strong style={{ color: '#226533', fontWeight: 600 }}>{children}</strong>,
+                      em: ({ children }) => <em style={{ color: '#555' }}>{children}</em>,
+                      ul: ({ children }) => <ul style={{ margin: '8px 0', paddingLeft: 20 }}>{children}</ul>,
+                      li: ({ children }) => <li style={{ marginBottom: 4 }}>{children}</li>,
+                      a: ({ href, children }) => (
+                        <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: '#226533', textDecoration: 'underline' }}>
+                          {children}
+                        </a>
+                      ),
+                    }}
+                  >
+                    {msg.text}
+                  </ReactMarkdown>
                 </div>
               )}
             </div>
@@ -705,7 +827,7 @@ export default function CustomerChatbotPage() {
       <div
         style={{
           position: "fixed",
-          bottom: 120,
+          bottom: 100,
           left: 0,
           right: 0,
           padding: "8px 12px",
@@ -716,13 +838,21 @@ export default function CustomerChatbotPage() {
           whiteSpace: "nowrap",
           gap: 8,
           zIndex: 1000,
+          // Hide scrollbar for mobile
+          scrollbarWidth: "none", // Firefox
+          msOverflowStyle: "none", // IE/Edge
+          WebkitOverflowScrolling: "touch",
         }}
+        className="hide-scrollbar"
       >
         {[
-          "Món mới gần đây?",
-          "Món đặc trưng?",
-          "Đồ ăn cho 2 người?",
-          "Món ít cay?",
+          "Món mới gần đây",
+          "Món đặc trưng",
+          "Đồ ăn cho 2 người",
+          "Món ít cay",
+          "Món chay",
+          "Giá dưới 100k",
+          "Combo tiết kiệm",
         ].map((suggestion, i) => (
           <Button
             key={i}
@@ -743,12 +873,12 @@ export default function CustomerChatbotPage() {
       <div
         style={{
           position: "fixed",
-          bottom: 70,
+          bottom: 50,
           left: 0,
           right: 0,
           padding: "8px 12px",
           background: "#fff",
-          borderTop: "2px solid #f0f0f0",
+          borderTop: "1px solid #e8e8e8",
           display: "flex",
           gap: 8,
           zIndex: 1000,
@@ -771,9 +901,13 @@ export default function CustomerChatbotPage() {
           onClick={() => handleSend()}
           disabled={loading || !input.trim()}
           style={{
-            borderRadius: 20,
-            background: "#226533",
-            borderColor: "#226533",
+            // borderRadius: 20,
+            // background: "#226533",
+            // borderColor: "#226533",
+            minWidth: 32,
+            borderRadius: "50%",
+            background: loading || !input.trim() ? "#ccc" : "#226533",
+            borderColor: loading || !input.trim() ? "#ccc" : "#226533",
           }}
         />
       </div>

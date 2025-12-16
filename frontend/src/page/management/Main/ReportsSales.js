@@ -590,12 +590,19 @@ const ReportsSalesPage = () => {
 
       // ========== 3️⃣ SHEET "DOANH THU THEO MÓN" ==========
 
-      const dishHeaders = ['STT', 'Tên món', 'Danh mục', 'Số lượng bán', 'Doanh thu (VNĐ)', 'Tăng trưởng (%)']
+      const dishHeaders = ['STT', 'Tên món', 'Số lượng bán', 'Doanh thu (VNĐ)', 'Tăng trưởng (%)']
 
-      const dishDataRows = dishRevenueData.map((item, index) => [
+      // Loại bỏ món trùng lặp (giữ lại món đầu tiên theo id)
+      const uniqueDishData = dishRevenueData.reduce((acc, item) => {
+        if (!acc.find(d => d.id === item.id)) {
+          acc.push(item)
+        }
+        return acc
+      }, [])
+
+      const dishDataRows = uniqueDishData.map((item, index) => [
         index + 1,
         item.name,
-        item.category || 'Chưa phân loại',
         item.quantity || 0,
         Math.floor(item.revenue || 0),
         item.growth || 0
@@ -605,9 +612,8 @@ const ReportsSalesPage = () => {
       const dishTotals = [
         '',
         'Tổng cộng',
-        '',
+        dishDataRows.reduce((sum, row) => sum + row[2], 0),
         dishDataRows.reduce((sum, row) => sum + row[3], 0),
-        dishDataRows.reduce((sum, row) => sum + row[4], 0),
         ''
       ]
 
@@ -660,19 +666,19 @@ const ReportsSalesPage = () => {
             t: typeof val === 'number' ? 'n' : 's',
             s: {
               alignment: {
-                horizontal: colIdx === 0 ? 'center' : (colIdx === 1 || colIdx === 2 ? 'left' : 'right'),
+                horizontal: colIdx === 0 ? 'center' : (colIdx === 1 ? 'left' : 'right'),
                 vertical: 'center',
-                wrapText: colIdx === 1 || colIdx === 2 // Tự xuống dòng cho cột Tên món và Danh mục
+                wrapText: colIdx === 1 // Tự xuống dòng cho cột Tên món
               },
               border: thinBorder
             }
           }
 
           // Number format
-          if (typeof val === 'number' && colIdx === 4) {
+          if (typeof val === 'number' && colIdx === 3) {
             dishWs[cellRef].z = '#,##0'
           }
-          if (typeof val === 'number' && colIdx === 5) {
+          if (typeof val === 'number' && colIdx === 4) {
             dishWs[cellRef].z = '#,##0.00'
           }
         })
@@ -714,8 +720,7 @@ const ReportsSalesPage = () => {
       // Set column widths
       dishWs['!cols'] = [
         { wch: 6 },   // STT
-        { wch: 45 },  // Tên món - tăng độ rộng để hiển thị đầy đủ
-        { wch: 20 },  // Danh mục
+        { wch: 50 },  // Tên món - tăng độ rộng để hiển thị đầy đủ
         { wch: 16 },  // Số lượng bán
         { wch: 20 },  // Doanh thu
         { wch: 16 }   // Tăng trưởng

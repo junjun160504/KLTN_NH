@@ -79,11 +79,13 @@ function parseRichContentResponse(gptResponse, menuItems, originalMessage) {
     });
   }
 
-  // 3️⃣ Detect mentioned items in text
+  // 3️⃣ Detect mentioned items in text (chỉ khi có suggestions)
+  // ✅ Tắt auto-detect nếu không muốn hiển thị card khi GPT chỉ nhắc tên món trong text
   const mentionedItems = [];
   const textContent = gptResponse.intro || gptResponse.text || '';
 
-  if (textContent) {
+  // Chỉ detect mentioned items nếu đã có suggestions (tránh hiển thị card không mong muốn)
+  if (textContent && suggestedItems.length > 0) {
     menuItems.forEach((item) => {
       const regex = new RegExp(item.name.replace(/[()]/g, '\\$&'), 'gi');
       if (regex.test(textContent) && !suggestedItems.find(s => s.id === item.id)) {
@@ -125,11 +127,37 @@ function parseRichContentResponse(gptResponse, menuItems, originalMessage) {
     });
   }
 
+  // 🎯 Build _historyContext - text đầy đủ để lưu vào history
+  const historyParts = [];
+
+  // Text chính
+  if (gptResponse.intro || gptResponse.text) {
+    historyParts.push(gptResponse.intro || gptResponse.text);
+  }
+
+  // Danh sách món gợi ý
+  if (suggestedItems.length > 0) {
+    const itemsList = suggestedItems
+      .map(item => `- ${item.name} (${item.price?.toLocaleString()}đ)${item.reason ? `: ${item.reason}` : ''}`)
+      .join("\n");
+    historyParts.push(`Món đã gợi ý:\n${itemsList}`);
+  }
+
+  // Món được đề cập
+  if (mentionedItems.length > 0) {
+    const itemsList = mentionedItems
+      .map(item => `- ${item.name} (${item.price?.toLocaleString()}đ)`)
+      .join("\n");
+    historyParts.push(`Món được đề cập:\n${itemsList}`);
+  }
+
   // 🎯 Return unified response structure
   return {
     message: originalMessage,
     response_type: 'rich_content',
     contents: contents,
+    // ✅ Field để lưu vào history - đảm bảo context đầy đủ 100%
+    _historyContext: historyParts.join("\n\n"),
     // Legacy support (backward compatible)
     type: suggestedItems.length > 0 ? 'suggestions' :
       mentionedItems.length > 0 ? 'text_with_items' : 'text',
@@ -142,7 +170,7 @@ function parseRichContentResponse(gptResponse, menuItems, originalMessage) {
 /**
  * Main chatbot reply function with conversation context
  * @param {string} message - Current user message
- * @param {Array} history - Conversation history [{from: "user"/"bot", text: "..."}]
+ * @param {Array} history - Conversation history [{from: "user"/"bot", text: "...", type: "...", ...}]
  */
 export async function reply(message, history = []) {
   try {
@@ -165,14 +193,13 @@ export async function reply(message, history = []) {
 
     // Build system prompt với menu
     const systemPrompt = `
-      Bạn là trợ lý AI thân thiện của nhà hàng, chuyên hỗ trợ khách hàng tìm hiểu về menu.
+      Bạn là trợ lý AI thân thiện của nhà hàng, chuyên hỗ trợ khách hàng tìm hiểu về menu và giải thích mọi câu hỏi của khách hàng.
       Đây là menu hiện có:
       ${menuList}
 
       Nhiệm vụ:
-      - Giới thiệu menu, các món ăn có trong nhà hàng
-      - Gợi ý món ăn theo yêu cầu của khách
-      - Trả lời thắc mắc về giá cả, mô tả món ăn
+      - Giới thiệu menu, các món ăn có trong nhà hàng từ 3 - 5 món phù hợp nhất với yêu cầu của khách
+      - Trả lời thắc mắc về giá cả, mô tả món ăn (bạn có thể dùng thông tin từ internet nếu cần thiết)
       - Cung cấp thông tin về danh mục món ăn
       - CHỈ chọn món CÓ TRONG MENU, KHÔNG bịa thêm
 
@@ -181,13 +208,21 @@ export async function reply(message, history = []) {
       - Gọi nhân viên (khách dùng nút gọi riêng)
       - Thanh toán (khách thanh toán qua ứng dụng)
 
-      Trả về JSON format (KHÔNG có markdown, chỉ pure JSON):
+      ## Định dạng văn bản (Markdown):
+      Trong trường "intro", bạn CÓ THỂ sử dụng Markdown để làm nội dung đẹp và dễ đọc hơn:
+      - **in đậm** cho tên món hoặc điểm nhấn quan trọng
+      - *in nghiêng* cho mô tả nhẹ nhàng
+      - Dùng emoji phù hợp 🍜🔥✨ để tăng sự thân thiện
+      - Xuống dòng bằng 2 dấu cách cuối dòng hoặc \n
+      - Có thể dùng bullet points nếu liệt kê nhiều thông tin
+
+      Trả về JSON format:
       {
-        "intro": "Câu trả lời của bạn",
+        "intro": "Câu trả lời của bạn (có thể dùng **Markdown**)",
         "suggestions": [
           {
             "name": "Tên món (chính xác từ menu)",
-            "reason": "Lý do gợi ý "
+            "reason": "Lý do gợi ý ngắn gọn"
           }
         ]
       }
@@ -198,59 +233,122 @@ export async function reply(message, history = []) {
       }
     `;
 
-
-
-    // add system prompt if no history
-    const messages = [];
-    if (history.length === 0) {
-      messages.push({
+    // ✅ Build messages array - System prompt LUÔN được thêm đầu tiên
+    const messages = [
+      {
         role: "system",
         content: systemPrompt,
-      })
-    }
+      }
+    ];
 
-    // if history exists, add history as messages
+    // ✅ Giới hạn history: chỉ lấy 10 tin nhắn gần nhất để tránh tốn token
+    const MAX_HISTORY = 100;
+    const recentHistory = history.slice(-MAX_HISTORY);
 
-    const recentHistory = history;
-    console.log("Recent History:", recentHistory);
-    if (recentHistory.length > 0) {
-      messages.push({
-        role: "system",
-        content: systemPrompt,
-      });
-    }
+    // ✅ Xử lý history - convert từ frontend format sang OpenAI format
     recentHistory.forEach((msg) => {
-      if (msg.from === "user" && msg.text) {
-        messages.push({
-          role: "user",
-          content: msg.text,
-        });
-      }
+      if (msg.from === "user") {
+        // User message
+        if (msg.text) {
+          messages.push({
+            role: "user",
+            content: msg.text,
+          });
+        }
+      } else if (msg.from === "bot") {
+        // Bot message - ƯU TIÊN dùng _historyContext nếu có (đảm bảo context 100%)
+        let assistantContent = "";
 
-      else if (msg.from === "bot" && msg.text) {
-        messages.push({
-          role: "assistant",
-          content: msg.text,
-        });
-      }
-      if (msg.from === "bot" && msg.contents) {
-        messages.push({
-          role: "assistant",
-          content: JSON.stringify(msg.contents),
-        })
+        // ✅ Ưu tiên dùng _historyContext - field được tạo sẵn với đầy đủ context
+        if (msg._historyContext) {
+          assistantContent = msg._historyContext;
+        }
+        // Fallback: xử lý các format cũ
+        else if (msg.type === "rich_content" && msg.contents) {
+          // Rich content: trích xuất text + menu_items từ contents
+          const parts = [];
+
+          // Lấy text content
+          const textContent = msg.contents
+            .filter(c => c.type === "text")
+            .map(c => c.value)
+            .join("\n");
+          if (textContent) parts.push(textContent);
+
+          // Lấy danh sách món đã gợi ý
+          const menuItemsContent = msg.contents.find(c => c.type === "menu_items");
+          if (menuItemsContent && menuItemsContent.items && menuItemsContent.items.length > 0) {
+            const itemsList = menuItemsContent.items
+              .map(item => `- ${item.name} (${item.price?.toLocaleString()}đ)${item.reason ? `: ${item.reason}` : ''}`)
+              .join("\n");
+            parts.push(`Món đã gợi ý:\n${itemsList}`);
+          }
+
+          // Lấy mentioned items
+          const mentionedItemsContent = msg.contents.find(c => c.type === "mentioned_items");
+          if (mentionedItemsContent && mentionedItemsContent.items && mentionedItemsContent.items.length > 0) {
+            const itemsList = mentionedItemsContent.items
+              .map(item => `- ${item.name} (${item.price?.toLocaleString()}đ)`)
+              .join("\n");
+            parts.push(`Món được đề cập:\n${itemsList}`);
+          }
+
+          assistantContent = parts.join("\n\n") || "Đã gợi ý món ăn";
+
+        } else if (msg.type === "suggestions") {
+          // Suggestions format - bao gồm cả intro và danh sách món
+          const parts = [];
+          if (msg.intro) parts.push(msg.intro);
+
+          if (msg.suggestions && msg.suggestions.length > 0) {
+            const itemsList = msg.suggestions
+              .map(item => `- ${item.name} (${item.price?.toLocaleString()}đ)${item.reason ? `: ${item.reason}` : ''}`)
+              .join("\n");
+            parts.push(`Món đã gợi ý:\n${itemsList}`);
+          }
+
+          assistantContent = parts.join("\n\n");
+
+        } else if (msg.type === "text_with_items") {
+          // Text with mentioned items
+          const parts = [];
+          if (msg.text) parts.push(msg.text);
+
+          if (msg.mentioned_items && msg.mentioned_items.length > 0) {
+            const itemsList = msg.mentioned_items
+              .map(item => `- ${item.name} (${item.price?.toLocaleString()}đ)`)
+              .join("\n");
+            parts.push(`Món được đề cập:\n${itemsList}`);
+          }
+
+          assistantContent = parts.join("\n\n");
+
+        } else if (msg.text) {
+          // Plain text
+          assistantContent = msg.text;
+        }
+
+        // Chỉ thêm nếu có content
+        if (assistantContent) {
+          messages.push({
+            role: "assistant",
+            content: assistantContent,
+          });
+        }
       }
     });
 
-    // Add current message
+    // ✅ Thêm tin nhắn hiện tại của user
     messages.push({
       role: "user",
       content: message,
     });
 
-    console.debug("[ChatbotV2] Sending messages to OpenAI:", messages);
+    console.debug("[ChatbotV2] Sending messages to OpenAI:", JSON.stringify(messages, null, 2));
 
     const completion = await openai.chat.completions.create({
       model: "gemini-2.5-flash-lite",
+      // model: "gemini-robotics-er-1.5-preview",
       messages: messages,
       // temperature: 0.7,
       // max_tokens: 100,
@@ -262,6 +360,9 @@ export async function reply(message, history = []) {
     try {
       const rawResponse = completion.choices[0].message.content.trim();
       gptResponse = JSON.parse(rawResponse);
+      console.log("Raw GPT Response:", rawResponse);
+      console.log("GPT Response:", gptResponse);
+
     } catch (parseError) {
       console.error("Failed to parse GPT JSON:", parseError);
       throw new Error("Invalid JSON response from GPT");
